@@ -1,14 +1,14 @@
+from pathlib import Path
+import pandas as pd
 from sqlalchemy import types
 import configparser
-import numpy as np
-import scipy
-import pandas as pd
-from pathlib import Path
-import dbi  # importiere das dbi Modul aus dem py_dbi Verzeichnis
-from functions import *
 import time
-
 import matplotlib.pyplot as plt
+
+from ..utilities import dbi
+from ..utilities import basics
+from ..utilities import tempdrift
+
 
 
 class Messung:
@@ -100,12 +100,12 @@ class Messung:
         return dtype_dict
 
     def limit_time(self, start_time, end_time):
-        self.data = limit_data_by_time(self.data, time_col="Time", start_time=start_time, end_time=end_time)
+        self.data = basics.limit_data_by_time(self.data, time_col="Time", start_time=start_time, end_time=end_time)
         self.update_metadata()
 
     def random_sample(self, n):
 
-        self.data = random_sample(self.data, n=n)
+        self.data = basics.random_sample(self.data, n=n)
         self.update_metadata()
 
     def temp_drift_comp(self, method="temp_drift_comp_lin_reg"):
@@ -118,11 +118,11 @@ class Messung:
         freq_range = (0.05, 2, 128) # why 128??
 
         methods = {
-            "temp_drift_comp_lin_reg": lambda x: temp_drift_comp_lin_reg(x, temp),
-            "temp_drift_comp_lin_reg_2": lambda x: temp_drift_comp_lin_reg_2(x, temp),
-            "temp_drift_comp_mov_avg": lambda x: temp_drift_comp_mov_avg(x, window_size=size),
-            "temp_drift_comp_emd": lambda x: temp_drift_comp_emd(x, sample_rate, freq_range, plot=True),
-            "temp_drift_comp_emd_2": lambda x: temp_drift_comp_emd_2(x, sample_rate, freq_range, plot=True),
+            "temp_drift_comp_lin_reg": lambda x: tempdrift.temp_drift_comp_lin_reg(x, temp),
+            "temp_drift_comp_lin_reg_2": lambda x: tempdrift.temp_drift_comp_lin_reg_2(x, temp),
+            "temp_drift_comp_mov_avg": lambda x: tempdrift.temp_drift_comp_mov_avg(x, window_size=size),
+            "temp_drift_comp_emd": lambda x: tempdrift.temp_drift_comp_emd(x, sample_rate, freq_range, plot=True),
+            "temp_drift_comp_emd_2": lambda x: tempdrift.temp_drift_comp_emd_2(x, sample_rate, freq_range, plot=True),
         }
 
         if method in methods:
@@ -131,8 +131,8 @@ class Messung:
         else:
             raise ValueError(f"Invalid method: {method}")
 
-        z = get_absolute_inclination(x, y)
-        d = get_inclination_direction(x, y)
+        z = basics.get_absolute_inclination(x, y)
+        d = basics.get_inclination_direction(x, y)
 
         self.data['east_west_inclination_tdc'] = x
         self.data['north_south_inclination_tdc'] = y
@@ -170,38 +170,3 @@ class Messung:
             axs[i].set_xlabel("Time")
             axs[i].legend()
         plt.show()
-
-
-if __name__ == "__main__":
-    print("Start")
-    test_dir = r"C:\Users\mail\Meine Ablage\OB_GDrive_Kyellsen\006_Tools\py_tms_tools\test"
-    csv_file = r"C:\Users\mail\Meine Ablage\OB_GDrive_Kyellsen\005_Projekte\2023_Kronensicherung_Plesse\020_Daten\TMS\CSV_Messung_001_Plesse_export_2023-03-22_24h\2023-03-22 000000__DatasA000-0000-0007.csv"
-    db_file = r"C:\Users\mail\Meine Ablage\OB_GDrive_Kyellsen\006_Tools\py_tms_tools\test\test.db"
-
-    messung_1 = Messung.read_from_csv(source_path=csv_file, messung_id=1, feedback=True)
-
-    start_time = pd.Timestamp('2023-03-22 07:58:00')
-    end_time = pd.Timestamp('2023-03-22 08:00:00')
-    messung_1.limit_time(start_time, end_time)
-
-    messung_1.temp_drift_comp(method="temp_drift_comp_emd")
-
-    plot_list = ['East-West-Inclination', 'east_west_inclination_tdc']
-    messung_1.plot_data_sub(plot_list)
-
-    plot_list = ['North-South-Inclination', 'north_south_inclination_tdc']
-    messung_1.plot_data_sub(plot_list)
-
-    plot_list = ['Absolute-Inclination', 'absolute_inclination_tdc']
-    messung_1.plot_data_sub(plot_list)
-
-    plot_list = ['Inclination direction of the tree', 'inclination_direction_tdc']
-    messung_1.plot_data_sub_scatter(plot_list)
-
-    test = messung_1.data[plot_list].reset_index()
-    print(test.describe())
-
-    summary = pd.DataFrame({'mean': test.mean(), 'median': test.median()})
-    print(summary)
-
-    print("Ende")

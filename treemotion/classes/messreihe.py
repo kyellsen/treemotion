@@ -1,12 +1,5 @@
-import pandas
-from sqlalchemy import types
-import configparser
-import pandas as pd
 from pathlib import Path
-import dbi  # importiere das dbi Modul aus dem py_dbi Verzeichnis
 
-
-from baum import Baum
 
 class Messreihe:
     def __init__(self):
