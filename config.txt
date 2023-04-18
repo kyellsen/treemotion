@@ -1,0 +1,14 @@
+[data_types]
+Nr = Integer
+Time = DateTime
+East-West-Inclination = Float
+North-South-Inclination = Float
+Absolute-Inclination = Float
+Inclination direction of the tree = Float
+Temperature = Float
+East-West-Inclination - drift compensated = Float
+North-South-Inclination - drift compensated = Float
+Absolute-Inclination - drift compensated = Float
+Inclination direction of the tree - drift compensated = Float
+
+
