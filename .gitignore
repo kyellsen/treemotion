@@ -1,7 +1,7 @@
+.gitignore
+/.idea
+/venv_Python39/
 /data_tests/
 old.py
 rust.py
 test.py
-
-/venv_Python310/
-/venv_Python39/
