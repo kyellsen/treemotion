@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def limit_data_by_time(data: pd.DataFrame, time_col: str, start_time, end_time) -> pd.DataFrame:
+def limit_by_time(data: pd.DataFrame, time_col: str, start_time, end_time) -> pd.DataFrame:
     """
     Returns a Pandas DataFrame that is limited to the specified time range.
 
@@ -30,20 +30,6 @@ def limit_data_by_time(data: pd.DataFrame, time_col: str, start_time, end_time) 
     data.reset_index(drop=True, inplace=True)
 
     return data
-
-def random_sample(data: pd.DataFrame, n: int) -> pd.DataFrame:
-    """
-    Returns a random sample of n rows from the input DataFrame.
-
-    Args:
-    - data (pd.DataFrame): Input DataFrame to sample from.
-    - n (int): Number of rows to sample.
-
-    Returns:
-    - sampled_data (pd.DataFrame): A random sample of n rows from input DataFrame.
-    """
-
-    return data.sample(n=n)
 
 
 def get_absolute_inclination(x: pd.Series, y: pd.Series) -> pd.Series:

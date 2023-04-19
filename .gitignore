@@ -2,6 +2,6 @@
 /.idea
 /venv_Python39/
 /data_tests/
-old.py
-rust.py
-test.py
+sandbox/old.py
+sandbox/rust.py
+sandbox/test.py
