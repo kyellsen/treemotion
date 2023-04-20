@@ -1,3 +1,6 @@
+import dbi
+from messung import Messung
+
 class Sensor:
     def __init__(self):
         self.id = int()
@@ -5,12 +8,15 @@ class Sensor:
         self.hoehe = int()
         self.umfang = int()
         self.ausrichtung = None
-        self.messungen = []  # Liste von Messung-Objekten
+        self.messungen = []
 
     @classmethod
-    def from_database(cls, db_connection, sensor_id):
-        # Hier sollte der Code zum Auslesen der Daten aus der SQLite-Datenbank mittels Pandas und SQLAlchemy eingefügt werden
+    def from_database(cls, db_path: str, table_name: str, id: int):
+
         pass
 
-if __name__ == "__main__":
-    pass
+    @classmethod
+    def get_sensor_manuell(cls, id: int, ort: str, hoehe: int, umfang: int, ausrichtung: str, messung: object):
+        pass
+
+

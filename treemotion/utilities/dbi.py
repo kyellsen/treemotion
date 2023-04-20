@@ -1,10 +1,11 @@
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 import pandas as pd
+import pathlib
 
 
-def test_connection(db_name):
-    engine = create_engine('sqlite:///' + str(db_name))
+def test_connection(db_path: str):
+    engine = create_engine('sqlite:///' + db_path)
     connection = engine.connect()
     if connection.closed == 0:
         print("Connection to Database successful")
@@ -13,7 +14,7 @@ def test_connection(db_name):
         print("Connection Error to Database")
 
 
-def read_df(db_path, table_name):
+def read_df(db_path: str, table_name: str):
     """
     Reads a SQLite database table into a pandas DataFrame.
 
@@ -24,7 +25,7 @@ def read_df(db_path, table_name):
     """
 
     # Create an engine to connect to the SQLite database with a 100-second timeout and a NullPool connection pool.
-    engine = create_engine('sqlite:///' + str(db_path), connect_args={'timeout': 100}, poolclass=NullPool)
+    engine = create_engine('sqlite:///' + db_path, connect_args={'timeout': 100}, poolclass=NullPool)
 
     # Return the DataFrame with the data from the specified database table.
     return pd.read_sql_table(table_name, con=engine)
@@ -41,33 +42,33 @@ def read_sql(db_path: str, sql_query: str):
     """
 
     # Create an engine to connect to the SQLite database with a 100-second timeout and a NullPool connection pool.
-    engine = create_engine('sqlite:///' + str(db_path), connect_args={'timeout': 100}, poolclass=NullPool)
+    engine = create_engine('sqlite:///' + db_path, connect_args={'timeout': 100}, poolclass=NullPool)
 
     # Read the data from the database using the specified SQL query into a pandas DataFrame.
     return pd.read_sql(sql=sql_query, con=engine)
 
 
-def write_df(db_path, table_name, data_df, dtype_dict, if_exists='replace'):
+def write_df(db_path: str, table_name: str, data: pd.DataFrame, dtypes: dict, if_exists='replace'):
     """
     Writes a pandas DataFrame to a SQLite database table using a specified data type dictionary and other options.
 
     :param if_exists:
     :param db_path: the name of the SQLite database to write to.
     :param table_name: the name of the database table to write to.
-    :param data_df: the pandas DataFrame to write to the database table.
-    :param dtype_dict: a dictionary of column names and their corresponding data types for the database table.
+    :param data: the pandas DataFrame to write to the database table.
+    :param dtypes: a dictionary of column names and their corresponding data types for the database table.
 
     :return: None.
     """
 
     # Create an engine to connect to the SQLite database
-    engine = create_engine('sqlite:///' + str(db_path))
+    engine = create_engine('sqlite:///' + db_path)
 
     # Write the data from the DataFrame to the database table using the specified data type dictionary and other options.
-    data_df.to_sql(
+    data.to_sql(
         table_name,
         con=engine,
         if_exists=if_exists,
         index=False,
-        dtype=dtype_dict
+        dtype=dtypes
     )

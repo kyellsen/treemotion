@@ -1,5 +1,4 @@
 [data_types]
-Nr = Integer
 Time = DateTime
 East-West-Inclination = Float
 North-South-Inclination = Float
@@ -11,4 +10,8 @@ North-South-Inclination - drift compensated = Float
 Absolute-Inclination - drift compensated = Float
 Inclination direction of the tree - drift compensated = Float
 
+East-West-Inclination - drift compensated - new = Float
+North-South-Inclination - drift compensated - new= Float
+Absolute-Inclination - drift compensated - new= Float
+Inclination direction of the tree - drift compensated - new = Float
 
