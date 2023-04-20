@@ -1,11 +1,16 @@
 class Baum:
-    def __init__(self):
-        self.id = int()
+    def __init__(self, id_baum: int):
+        # from SQLite table
+        self.id_baum = id_baum
         self.datum_erhebung = None
+        self.art = str()
         self.bhd = int()
         self.hoehe = int()
         self.zwiesel_hoehe = int()
-        self.baumbehandlung = list()
+        # treemotion intern referenz
+        self.messreihe = None
+        self.id_messreihe = int()
+        self.behandlung_list = list()
 
     @classmethod
     def from_database(cls, db_connection, baum_id):

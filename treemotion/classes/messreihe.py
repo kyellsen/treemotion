@@ -5,17 +5,17 @@ from sqlalchemy import types
 import dbi
 
 class Messreihe:
-    def __init__(self):
-        self.id = int()
+    def __init__(self, id_messreihe: int):
+        # from SQLite table
+        self.id_messreihe = id_messreihe
         self.beschreibung = str()
         self.datum_beginn = None
         self.datum_ende = None
         self.ort = str()
-        self.filepath = Path()
-        self.baeume = []  # Liste von Baum-Objekten
-        self.baumbehandlung = [] # Liste von Baum-Objekten
-        self.sensor = [] # Liste von Baum-Objekten
-        self.messung = [] # Liste von Baum-Objekten
+        self.anmerkung = str()
+        self.filepath_tms = Path()
+        # treemotion intern referenz
+        self.baum_list = list()
 
     @classmethod
     def from_database(cls, db_connection, messreihe_id):

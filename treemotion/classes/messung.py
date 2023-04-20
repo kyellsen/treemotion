@@ -11,8 +11,9 @@ from treemotion.utilities import tempdrift
 
 
 class Messung:
-    def __init__(self, messung_id: int):
-        self.messung_id = messung_id
+    def __init__(self, id_messung: int):
+        self.id_messung = id_messung
+        self.sensor = None
         self.source_path = Path()
         self.source_file = str()
         self.data = pd.DataFrame()
@@ -27,9 +28,9 @@ class Messung:
         self.metadata['length'] = len(self.data)
 
     @classmethod
-    def read_from_csv(cls, db_path: str, messung_id: int, feedback: False):
+    def read_from_csv(cls, db_path: str, id_messung: int, feedback: False):
         start_time = time.time()
-        obj = cls(messung_id)
+        obj = cls(id_messung)
         obj.source_path = Path(db_path)
         obj.source_file = obj.source_path.name
         obj.data = pd.read_csv(obj.source_path, sep=";", parse_dates=["Time"], decimal=",")
@@ -39,13 +40,13 @@ class Messung:
 
         if feedback is True:
             print(
-                f"Messung.read_from_csv - messung_id: {obj.messung_id} - source_file: {obj.source_file} - time: {time.time() - start_time:.2f} sec")
+                f"Messung.read_from_csv - id_messung: {obj.id_messung} - source_file: {obj.source_file} - time: {time.time() - start_time:.2f} sec")
         return obj
 
     @classmethod
-    def read_from_db(cls, csv_path: str, messung_id: int, add_name="", feedback=False):
+    def read_from_db(cls, csv_path: str, id_messung: int, add_name="", feedback=False):
         start_time = time.time()
-        obj = cls(messung_id)
+        obj = cls(id_messung)
         obj.source_path = Path(csv_path)
         obj.source_file = obj.source_path.name
         table_name = obj.get_table_name(add_name=add_name)
@@ -56,12 +57,12 @@ class Messung:
 
         if feedback is True:
             print(
-                f"Messung.read_from_db - messung_id: {obj.messung_id} - source_file: {obj.source_file} - time: {time.time() - start_time:.2f} sec")
+                f"Messung.read_from_db - id_messung: {obj.id_messung} - source_file: {obj.source_file} - time: {time.time() - start_time:.2f} sec")
         return obj
 
     def get_table_name(self, add_name):
 
-        return f"{add_name}_{self.messung_id}"
+        return f"{add_name}_{self.id_messung}"
 
     def write_to_csv(self, output_dir, add_name="data", raw_data=False, bz2=False, feedback=False):
         start_time = time.time()
@@ -78,7 +79,7 @@ class Messung:
         data.to_csv(file_path, index=False, sep=";", decimal=",")
         if feedback is True:
             print(
-                f"Messung.write_to_csv - messung_id: {self.messung_id} - new_file: {file_path} - raw_data: {raw_data} - time: {time.time() - start_time:.2f} sec")
+                f"Messung.write_to_csv - id_messung: {self.id_messung} - new_file: {file_path} - raw_data: {raw_data} - time: {time.time() - start_time:.2f} sec")
 
     def write_to_db(self, db_path, add_name="data", raw_data=False, feedback=False):
         start_time = time.time()
@@ -91,7 +92,7 @@ class Messung:
         dbi.write_df(db_path, table_name=table_name, data=data, dtypes=dtype_dict)
         if feedback is True:
             print(
-                f"Messung.write_to_db - messung_id: {self.messung_id} - table_name: {table_name} - raw_data: {raw_data} time: {time.time() - start_time:.2f} sec")
+                f"Messung.write_to_db - id_messung: {self.id_messung} - table_name: {table_name} - raw_data: {raw_data} time: {time.time() - start_time:.2f} sec")
 
     @staticmethod
     def read_config_dtypes():
@@ -150,7 +151,7 @@ class Messung:
             x, y)
         if feedback is True:
             print(
-                f"Messung.temp_drift_comp - messung_id: {self.messung_id} -  time: {time.time() - start_time:.2f} sec")
+                f"Messung.temp_drift_comp - id_messung: {self.id_messung} -  time: {time.time() - start_time:.2f} sec")
 
 
     def plot_data(self, y_cols):
