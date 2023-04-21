@@ -8,7 +8,7 @@ class SensorPosition:
         self.ort = str()
         self.hoehe = int()
         self.umfang = int()
-        self.ausrichtung = None
+        self.ausrichtung = int()
 
         # treemotion intern referenz
         self.behandlung = None

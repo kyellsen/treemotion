@@ -1,0 +1,3 @@
+
+class Projekt:
+    pass
