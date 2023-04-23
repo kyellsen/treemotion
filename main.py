@@ -1,5 +1,4 @@
-import pandas as pd
-from treemotion import Sensor
+from treemotion import Projekt, Messreihe, Messung
 
 # import tempdrift
 # import treemotion as tms
@@ -23,8 +22,16 @@ from treemotion import Sensor
 #
 #     print("Ende")
 
+
 if __name__ == "__main__":
     print("Start")
-    db_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Testdaten"
+    projekt_data_path = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\projekt_test_data"
+    projekt_name = "TREEMOTION_03"
+    csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
+
+    projekt_1 = Projekt.load(id_projekt=1, name=projekt_name, path=projekt_data_path)
+    projekt_1.add_all_messreihen(add_filenames=True, csv_path=csv_path)
+    projekt_data_path = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\projekt_test_data"
+
 
     print("Ende")
