@@ -1,8 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
-
 from pathlib import Path
-import glob
 
 from utilities.base import Base
 from .messung import Messung
@@ -21,7 +19,7 @@ class Messreihe(Base):
     messungen = relationship("Messung", backref="messreihe")
 
     def __init__(self, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
-                 anmerkung=None, filepaths_tms=None, filepaths_ls3=None):
+                 anmerkung=None, filepaths_tms=None):
         # in SQLite Database
         self.id_messreihe = id_messreihe
         self.beschreibung = beschreibung
@@ -36,6 +34,7 @@ class Messreihe(Base):
     @classmethod
     def from_database(cls, db_messreihe):
         obj = cls()
+        # in SQLite Database
         obj.id_messreihe = db_messreihe.id_messreihe
         obj.beschreibung = db_messreihe.beschreibung
         obj.datum_beginn = db_messreihe.datum_beginn
@@ -43,9 +42,11 @@ class Messreihe(Base):
         obj.ort = db_messreihe.ort
         obj.anmerkung = db_messreihe.anmerkung
         obj.filepaths_tms = db_messreihe.filepaths_tms
+        # additional only in class-object
+        obj.messungen_list = []
         return obj
 
-    def add_all_messungen(self, session):
+    def add_messungen(self, session):
         # Alle Messungen aus der Datenbank laden, die der aktuellen Messreihe zugeordnet sind
         db_messungen = session.query(Messung).filter_by(id_messreihe=self.id_messreihe).all()
 
@@ -61,28 +62,32 @@ class Messreihe(Base):
 
         return self.messungen_list
 
-    def add_filenames(self, session, csv_path):
+    def add_filenames(self, session, csv_path, feedback=False):
         if not csv_path:
-            print("Fehler: csv_path ist ungültig.")
+            if feedback:
+                print("Fehler: csv_path ist ungültig.")
             return
 
         if not self.filepaths_tms:
-            print("Fehler: self.filepaths_tms ist ungültig.")
+            if feedback:
+                print("Fehler: self.filepaths_tms ist ungültig.")
             return
 
         csv_path = Path(csv_path)
         filepaths_tms = Path(self.filepaths_tms)
         search_path = csv_path.joinpath(filepaths_tms)
-        print(f"Suche TMS-files in Pfad: {search_path}")
-
+        if feedback:
+            print(f"Suche TMS-files in Pfad: {search_path}")
 
         # Suche nach CSV-Dateien im Verzeichnis und allen Unterordnern
         files = list(search_path.glob('**/*.csv'))
-        print(f"Folgende Files gefunden: {files}")
+        if feedback:
+            print(f"Folgende Files gefunden: {files}")
 
         # Erstelle eine Liste der id_sensor aus den Dateinamen der gefundenen Dateien
         id_sensor_list = [int(filename.stem[-3:]) for filename in files]
-        print(f"Entspricht folgenden Sensor_ID`s: {id_sensor_list}")
+        if feedback:
+            print(f"Entspricht folgenden Sensor_ID`s: {id_sensor_list}")
 
         # Aktualisiere die Datenbank für alle Messungen in der messungen_list
         for messung in self.messungen_list:
@@ -90,7 +95,8 @@ class Messreihe(Base):
                 try:
                     sensor_index = id_sensor_list.index(messung.id_sensor)
                 except ValueError:
-                    print(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
+                    if feedback:
+                        print(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
                     continue
 
                 messung.filename = files[sensor_index].name
@@ -102,5 +108,6 @@ class Messreihe(Base):
                     }
                 )
                 session.commit()
-                print(f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename erfolgreich aktualisiert.")
-
+                if feedback:
+                    print(
+                        f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename erfolgreich aktualisiert.")

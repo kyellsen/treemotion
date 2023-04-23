@@ -1,9 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 
 from utilities.base import Base
-import os
-import glob
-
 
 
 class Messung(Base):
@@ -50,4 +47,3 @@ class Messung(Base):
         obj.sensor_umfang = db_messung.sensor_umfang
         obj.sensor_ausrichtung = db_messung.sensor_ausrichtung
         return obj
-
