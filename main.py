@@ -1,4 +1,4 @@
-from treemotion import Projekt
+from treemotion import Projekt, Data
 
 # import tempdrift
 # import treemotion as tms
@@ -30,6 +30,16 @@ if __name__ == "__main__":
     csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
     projekt_1 = Projekt.load(id_projekt=1, name=projekt_name, path=projekt_data_path)
-
+    session = projekt_1.session
+    projekt_1.add_messreihen()
+    #projekt_1.add_filenames(csv_path, feedback=True)
+    my = projekt_1.messreihen_list[0].messungen_list[0]
+    my.add_data_from_csv(session, version="test001")
+    my = projekt_1.messreihen_list[0].messungen_list[0]
+    my.add_data_from_csv(session, version="test002")
+    my = projekt_1.messreihen_list[0].messungen_list[0]
+    my.add_data_from_csv(session, version="test001")
+    my = projekt_1.messreihen_list[0].messungen_list[1]
+    my.add_data_from_csv(session, version="test001")
 
     print("Ende")

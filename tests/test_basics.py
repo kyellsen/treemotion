@@ -4,7 +4,7 @@ import numpy as np
 # from treemotion.utilities.basics import limit_data_by_time
 # from treemotion.utilities.basics import random_sample
 # from treemotion.utilities.basics import get_absolute_inclination
-from treemotion.utilities.basics import get_inclination_direction
+from treemotion.utilities.tms_basics import get_inclination_direction
 
 def test_get_inclination_direction():
     # Test with positive x and y values

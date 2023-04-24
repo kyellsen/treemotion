@@ -25,7 +25,6 @@ class Projekt:
         except Exception as e:
             print(f"Fehler beim Herstellen der Verbindung zur Datenbank: {e}")
             return False
-
         return True
 
     @classmethod
@@ -81,26 +80,7 @@ class Projekt:
         print(f"Projekt '{name}' wurde erfolgreich geladen.\n")
         return obj
 
-    # @classmethod
-    # def load_easy(cls, id_projekt: int, name: str, path: str, csv_path: str):
-    #     obj = cls()
-    #     obj.id = id_projekt
-    #     obj.name = name
-    #     obj.path = Path(path)
-    #     obj.path_db = obj.path / f"{name}.db"
-    #
-    #     # Überprüfen, ob die angegebene Datenbank existiert
-    #     if not obj.path_db.exists() or not obj.path_db.is_file():
-    #         print(f"Fehler: Die angegebene Datenbank {obj.path_db} wurde nicht gefunden.")
-    #         return None
-    #
-    #     # Erstellen einer Verbindung zur angegebenen Datenbank
-    #     if not obj.connect_to_database():
-    #         return None
-    #     print(f"Projekt '{name}' wurde erfolgreich geladen.\n")
-    #     obj.add_messreihen()
-    #     obj.add_filenames(csv_path=csv_path)
-    #     return obj
+
 
     def add_messreihe(self, id_messreihe, feedback=False):
         # Überprüfen, ob die Messreihe bereits in der Liste ist
@@ -151,7 +131,29 @@ class Projekt:
                 if feedback:
                     print("\n")
             except Exception as e:
-                print(f"Messreihe{messreihe.id_messreihe}: Fehler beim Hinzufügen der Filenames zu Messreihe. : {e}")
+                print(f"Messreihe {messreihe.id_messreihe}: Fehler beim Hinzufügen der Filenames zu Messreihe. : {e}")
                 continue
             if feedback:
                 print(f"Messreihe {messreihe.id_messreihe}: Füge Filenames hinzu.")
+
+
+    # @classmethod
+    # def load_easy(cls, id_projekt: int, name: str, path: str, csv_path: str):
+    #     obj = cls()
+    #     obj.id = id_projekt
+    #     obj.name = name
+    #     obj.path = Path(path)
+    #     obj.path_db = obj.path / f"{name}.db"
+    #
+    #     # Überprüfen, ob die angegebene Datenbank existiert
+    #     if not obj.path_db.exists() or not obj.path_db.is_file():
+    #         print(f"Fehler: Die angegebene Datenbank {obj.path_db} wurde nicht gefunden.")
+    #         return None
+    #
+    #     # Erstellen einer Verbindung zur angegebenen Datenbank
+    #     if not obj.connect_to_database():
+    #         return None
+    #     print(f"Projekt '{name}' wurde erfolgreich geladen.\n")
+    #     obj.add_messreihen()
+    #     obj.add_filenames(csv_path=csv_path)
+    #     return obj

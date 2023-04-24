@@ -1,6 +1,11 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import create_engine
+from sqlalchemy.orm import relationship, sessionmaker
+
+import pandas as pd
 
 from utilities.base import Base
+from .data import Data
 
 
 class Messung(Base):
@@ -11,10 +16,14 @@ class Messung(Base):
     id_sensor = Column(Integer, ForeignKey('Sensor.id_sensor'))
     id_messung_status = Column(Integer, ForeignKey('MessungStatus.id_messung_status'))
     filename = Column(String)
+    filepath = Column(String)
     id_sensor_ort = Column(Integer, ForeignKey('SensorOrt.id_sensor_ort'))
     sensor_hoehe = Column(Integer)
     sensor_umfang = Column(Integer)
     sensor_ausrichtung = Column(Integer)
+
+    # Verweis auf Data-Instanzen
+    data = relationship("Data", cascade="all, delete-orphan")
 
     def __init__(self, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
                  id_messung_status=None, filename=None, filepath=None, id_sensor_ort=None, sensor_hoehe=None,
@@ -26,12 +35,13 @@ class Messung(Base):
         self.id_sensor = id_sensor
         self.id_messung_status = id_messung_status
         self.filename = filename
+        self.filepath = filepath
         self.id_sensor_ort = id_sensor_ort
         self.sensor_hoehe = sensor_hoehe
         self.sensor_umfang = sensor_umfang
         self.sensor_ausrichtung = sensor_ausrichtung
         # additional only in class-object
-        self.filepath = filepath
+        self.data_list = []
 
     @classmethod
     def from_database(cls, db_messung):
@@ -42,8 +52,48 @@ class Messung(Base):
         obj.id_sensor = db_messung.id_sensor
         obj.id_messung_status = db_messung.id_messung_status
         obj.filename = db_messung.filename
+        obj.filepath = db_messung.filepath
         obj.id_sensor_ort = db_messung.id_sensor_ort
         obj.sensor_hoehe = db_messung.sensor_hoehe
         obj.sensor_umfang = db_messung.sensor_umfang
         obj.sensor_ausrichtung = db_messung.sensor_ausrichtung
         return obj
+
+    def add_data_from_db(self, session, version):
+
+        db_data = session.query(Data).filter_by(id_messung=self.id_messung).all()
+
+        for db_data in db_data:
+            # Überprüfen, ob die Messung bereits in der Liste ist
+            if any(data.id_data == db_data.id_data for data in self.data_list):
+                continue
+            data = Data.from_database(db_data)
+            self.data_list.append(data)
+
+    def add_data_from_csv(self, session, version):
+        table_name = self.get_table_name(id_messung=self.id_messung, version=version)
+
+        # Prüfen, ob bereits eine Zeile mit dem gleichen table_name vorhanden ist
+        existing_data = session.query(Data).filter_by(table_name=table_name).first()
+        if existing_data:
+            data_id = existing_data.id_data
+        else:
+            data_id = None
+
+        # Erstellen einer neuen Data-Instanz
+        print(f"filepath is: {self.filepath}")
+        obj = Data(id_data=data_id, id_messung=self.id_messung, version=version)
+        obj.data = self.read_csv(filepath=self.filepath)
+        obj.update_metadata()
+        obj.table_name = table_name
+        obj.to_database(session)
+        self.data_list.append(obj)
+
+    @staticmethod
+    def read_csv(filepath):
+        data = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
+        return data
+
+    @staticmethod
+    def get_table_name(id_messung: int, version: str):
+        return f"auto_data_{version}_id_messung_{id_messung}"

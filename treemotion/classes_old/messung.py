@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import types
 
-from treemotion.utilities import basics
-from treemotion.utilities import dbi
+from utilities_old import dbi
 from treemotion.utilities import tempdrift
 
 

@@ -14,12 +14,12 @@ class Messreihe(Base):
     datum_ende = Column(DateTime)
     ort = Column(String)
     anmerkung = Column(String)
-    filepaths_tms = Column(String)
+    filepath_tms = Column(String)
 
     messungen = relationship("Messung", backref="messreihe")
 
     def __init__(self, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
-                 anmerkung=None, filepaths_tms=None):
+                 anmerkung=None, filepath_tms=None):
         # in SQLite Database
         self.id_messreihe = id_messreihe
         self.beschreibung = beschreibung
@@ -27,7 +27,7 @@ class Messreihe(Base):
         self.datum_ende = datum_ende
         self.ort = ort
         self.anmerkung = anmerkung
-        self.filepaths_tms = filepaths_tms
+        self.filepath_tms = filepath_tms
         # additional only in class-object
         self.messungen_list = []
 
@@ -41,9 +41,7 @@ class Messreihe(Base):
         obj.datum_ende = db_messreihe.datum_ende
         obj.ort = db_messreihe.ort
         obj.anmerkung = db_messreihe.anmerkung
-        obj.filepaths_tms = db_messreihe.filepaths_tms
-        # additional only in class-object
-        obj.messungen_list = []
+        obj.filepath_tms = db_messreihe.filepath_tms
         return obj
 
     def add_messungen(self, session):
@@ -60,22 +58,20 @@ class Messreihe(Base):
             messung = Messung.from_database(db_messung)
             self.messungen_list.append(messung)
 
-        return self.messungen_list
-
     def add_filenames(self, session, csv_path, feedback=False):
         if not csv_path:
             if feedback:
                 print("Fehler: csv_path ist ungültig.")
             return
 
-        if not self.filepaths_tms:
+        if not self.filepath_tms:
             if feedback:
-                print("Fehler: self.filepaths_tms ist ungültig.")
+                print("Fehler: self.filepath_tms ist ungültig.")
             return
 
         csv_path = Path(csv_path)
-        filepaths_tms = Path(self.filepaths_tms)
-        search_path = csv_path.joinpath(filepaths_tms)
+        filepath_tms = Path(self.filepath_tms)
+        search_path = csv_path.joinpath(filepath_tms)
         if feedback:
             print(f"Suche TMS-files in Pfad: {search_path}")
 
@@ -94,20 +90,21 @@ class Messreihe(Base):
             if messung.id_messreihe == self.id_messreihe:  # Prüfe, ob die Messung zur aktuellen Messreihe gehört
                 try:
                     sensor_index = id_sensor_list.index(messung.id_sensor)
+                    messung.filename = files[sensor_index].name
+                    messung.filepath = files[sensor_index].resolve()
+
+                    session.query(Messung).filter_by(id_messung=messung.id_messung).update(
+                        {
+                            "filename": messung.filename,
+                            "filepath": str(messung.filepath)
+                        }
+                    )
+                    session.commit()
+                    if feedback:
+                        print(
+                            f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename und Filepath erfolgreich aktualisiert.")
                 except ValueError:
                     if feedback:
                         print(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
                     continue
 
-                messung.filename = files[sensor_index].name
-                messung.filepath = files[sensor_index].resolve()
-
-                session.query(Messung).filter_by(id_messung=messung.id_messung).update(
-                    {
-                        "filename": messung.filename
-                    }
-                )
-                session.commit()
-                if feedback:
-                    print(
-                        f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename erfolgreich aktualisiert.")
