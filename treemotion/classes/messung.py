@@ -1,10 +1,9 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy import create_engine
-from sqlalchemy.orm import relationship, sessionmaker
-
+from sqlalchemy.orm import relationship
 import pandas as pd
 
 from utilities.base import Base
+from utilities.timing import timing_decorator
 from .data import Data
 
 
@@ -25,9 +24,12 @@ class Messung(Base):
     # Verweis auf Data-Instanzen
     data = relationship("Data", cascade="all, delete-orphan")
 
-    def __init__(self, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
+    def __init__(self, session, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
                  id_messung_status=None, filename=None, filepath=None, id_sensor_ort=None, sensor_hoehe=None,
                  sensor_umfang=None, sensor_ausrichtung=None):
+        # Speichern des Sessions-Objektes (Standard aus Messreihe-Klasse)
+        self.session = session
+
         # in SQLite Database
         self.id_messung = id_messung
         self.id_messreihe = id_messreihe
@@ -44,8 +46,8 @@ class Messung(Base):
         self.data_list = []
 
     @classmethod
-    def from_database(cls, db_messung):
-        obj = cls()
+    def from_database(cls, db_messung, session):
+        obj = cls(session)
         obj.id_messung = db_messung.id_messung
         obj.id_messreihe = db_messung.id_messreihe
         obj.id_baum_behandlung = db_messung.id_baum_behandlung
@@ -59,37 +61,59 @@ class Messung(Base):
         obj.sensor_ausrichtung = db_messung.sensor_ausrichtung
         return obj
 
-    def add_data_from_db(self, session, version):
-
-        db_data = session.query(Data).filter_by(id_messung=self.id_messung).all()
-
-        for db_data in db_data:
-            # Überprüfen, ob die Messung bereits in der Liste ist
-            if any(data.id_data == db_data.id_data for data in self.data_list):
-                continue
-            data = Data.from_database(db_data)
-            self.data_list.append(data)
-
-    def add_data_from_csv(self, session, version):
-        table_name = self.get_table_name(id_messung=self.id_messung, version=version)
+    @timing_decorator
+    def add_data_from_csv(self, version="raw"):
+        table_name = Messung.get_table_name(id_messung=self.id_messung, version=version)
 
         # Prüfen, ob bereits eine Zeile mit dem gleichen table_name vorhanden ist
-        existing_data = session.query(Data).filter_by(table_name=table_name).first()
+        existing_data = self.session.query(Data).filter_by(table_name=table_name).first()
         if existing_data:
             data_id = existing_data.id_data
         else:
             data_id = None
 
         # Erstellen einer neuen Data-Instanz
-        print(f"filepath is: {self.filepath}")
         obj = Data(id_data=data_id, id_messung=self.id_messung, version=version)
         obj.data = self.read_csv(filepath=self.filepath)
         obj.update_metadata()
         obj.table_name = table_name
-        obj.to_database(session)
+        obj.to_database(self.session)
         self.data_list.append(obj)
+        print(
+            f"Messung {self.id_messung}: add_data_from_csv '{self.filename}', table_name '{table_name}', id_data '{data_id}'.")
+
+    @timing_decorator
+    def add_data_from_db(self, version):
+        db_data_list = self.session.query(Data).filter_by(id_messung=self.id_messung).all()
+
+        for db_data in db_data_list:
+            # Überprüfen, ob die Messung bereits in der Liste ist und ob die Version der Daten übereinstimmt
+            if any(data.id_data == db_data.id_data for data in self.data_list) or db_data.version != version:
+                continue
+
+            # Überprüfen, ob die angegebene Version bereits in der data_list der Messung vorhanden ist
+            if any(data.version == version for data in self.data_list):
+                print(
+                    f"Messung {self.id_messung}: Version {version} bereits vorhanden, Daten werden nicht erneut hinzugefügt.")
+                continue
+
+            data = Data.from_database(db_data, self.session)
+            self.data_list.append(data)
+            print(
+                f"Messung {self.id_messung}: add_data_from_db '{data.table_name}', id_data '{data.id_data}'.")
+
+    @timing_decorator
+    def delete_data_from_db(self, version):
+        # Lösche alle Data-Objekte, die der angegebenen Version entsprechen
+        self.session.query(Data).filter_by(id_messung=self.id_messung, version=version).delete()
+        self.session.commit()
+
+        # Entferne die gelöschten Data-Objekte aus der data_list
+        self.data_list = [data for data in self.data_list if data.version != version]
+
 
     @staticmethod
+    @timing_decorator
     def read_csv(filepath):
         data = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
         return data

@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from pathlib import Path
 
 from utilities.base import Base
+from utilities.timing import timing_decorator
 from .messung import Messung
 
 
@@ -18,8 +19,11 @@ class Messreihe(Base):
 
     messungen = relationship("Messung", backref="messreihe")
 
-    def __init__(self, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
+    def __init__(self, session, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
                  anmerkung=None, filepath_tms=None):
+        # Speichern des Sessions-Objektes (Standard aus Projekt-Klasse)
+        self.session = session
+
         # in SQLite Database
         self.id_messreihe = id_messreihe
         self.beschreibung = beschreibung
@@ -32,8 +36,8 @@ class Messreihe(Base):
         self.messungen_list = []
 
     @classmethod
-    def from_database(cls, db_messreihe):
-        obj = cls()
+    def from_database(cls, db_messreihe, session):
+        obj = cls(session)
         # in SQLite Database
         obj.id_messreihe = db_messreihe.id_messreihe
         obj.beschreibung = db_messreihe.beschreibung
@@ -44,9 +48,10 @@ class Messreihe(Base):
         obj.filepath_tms = db_messreihe.filepath_tms
         return obj
 
-    def add_messungen(self, session):
+    @timing_decorator
+    def add_messungen(self):
         # Alle Messungen aus der Datenbank laden, die der aktuellen Messreihe zugeordnet sind
-        db_messungen = session.query(Messung).filter_by(id_messreihe=self.id_messreihe).all()
+        db_messungen = self.session.query(Messung).filter_by(id_messreihe=self.id_messreihe).all()
 
         # Für jede Messung in der Datenbank eine neue Messung-Instanz erstellen
         # und zur Liste der Messungen in der Messreihe hinzufügen, falls sie noch nicht vorhanden ist
@@ -55,10 +60,11 @@ class Messreihe(Base):
             if any(messung.id_messung == db_messung.id_messung for messung in self.messungen_list):
                 continue
 
-            messung = Messung.from_database(db_messung)
+            messung = Messung.from_database(db_messung, self.session)
             self.messungen_list.append(messung)
 
-    def add_filenames(self, session, csv_path, feedback=False):
+    @timing_decorator
+    def add_filenames(self, csv_path, feedback=False):
         if not csv_path:
             if feedback:
                 print("Fehler: csv_path ist ungültig.")
@@ -93,13 +99,13 @@ class Messreihe(Base):
                     messung.filename = files[sensor_index].name
                     messung.filepath = files[sensor_index].resolve()
 
-                    session.query(Messung).filter_by(id_messung=messung.id_messung).update(
+                    self.session.query(Messung).filter_by(id_messung=messung.id_messung).update(
                         {
                             "filename": messung.filename,
                             "filepath": str(messung.filepath)
                         }
                     )
-                    session.commit()
+                    self.session.commit()
                     if feedback:
                         print(
                             f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename und Filepath erfolgreich aktualisiert.")
@@ -108,3 +114,47 @@ class Messreihe(Base):
                         print(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
                     continue
 
+    def check_messungen_list(self):
+        if not self.messungen_list:
+            print("Fehler: Es gibt keine Messungen in der Messreihe.")
+            return False
+        return True
+
+    @timing_decorator
+    def add_data_from_csv(self, version="raw"):
+        if not self.check_messungen_list():
+            return
+
+        for messung in self.messungen_list:
+            if messung.filepath:
+                try:
+                    messung.add_data_from_csv(version=version)
+                    print(f"CSV-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
+                except Exception as e:
+                    print(f"Fehler beim Hinzufügen von Daten aus CSV für Messung {messung.id_messung}: {e}")
+            else:
+                print(f"Fehler: Kein Dateipfad für Messung {messung.id_messung} vorhanden.")
+
+    @timing_decorator
+    def add_data_from_db(self, version: str):
+        if not self.check_messungen_list():
+            return
+
+        for messung in self.messungen_list:
+            try:
+                messung.add_data_from_db(version=version)
+                print(f"DB-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
+            except Exception as e:
+                print(f"Fehler beim Hinzufügen von Daten aus der Datenbank für Messung {messung.id_messung}: {e}")
+
+    @timing_decorator
+    def delete_data_version_from_db(self, version):
+        if not self.check_messungen_list():
+            return
+
+        for messung in self.messungen_list:
+            try:
+                messung.delete_data_version(version)
+                print(f"Daten-Version {version} für Messung {messung.id_messung} wurde erfolgreich gelöscht.")
+            except Exception as e:
+                print(f"Fehler beim Löschen der Daten-Version {version} für Messung {messung.id_messung}: {e}")

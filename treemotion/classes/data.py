@@ -1,14 +1,11 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy import create_engine, MetaData, Table
-from sqlalchemy.orm import sessionmaker
 import pandas as pd
-import time
-import datetime
-from pathlib import Path
 import matplotlib.pyplot as plt
 
 from utilities.base import Base
+from utilities.timing import timing_decorator
 from utilities import tms_basics, tempdrift
+
 
 
 class Data(Base):
@@ -37,19 +34,20 @@ class Data(Base):
         self.data = data
 
     @classmethod
-    def from_database(cls, db_data):
+    def from_database(cls, db_data, session):
         obj = cls()
         obj.id_data = db_data.id_data
         obj.id_messung = db_data.id_messung
-        obj.version = db_data.id_messung
-        obj.table_name = db_data.data_table_name
+        obj.version = db_data.version
+        obj.table_name = db_data.table_name
         obj.datetime_start = db_data.datetime_start
         obj.datetime_end = db_data.datetime_end
         obj.duration = db_data.duration
         obj.length = db_data.length
-        obj.data = db_data.data  ### HIER Methode
+        obj.data = pd.read_sql_table(db_data.table_name, session.bind)
         return obj
 
+    @timing_decorator
     def to_database(self, session):
         # Speichern der Metadaten in der Data-Tabelle
         if self.id_data is None:
@@ -59,8 +57,9 @@ class Data(Base):
             session.merge(self)
             session.commit()
 
-        # Speichern des DataFrames in der neu erstellten Tabelle
-        self.data.to_sql(self.table_name, session.bind, if_exists='replace', index=True)
+        # Speichern des DataFrames data in der neu erstellten Tabelle
+        self.data.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
+
 
     def update_metadata(self):
         # self.datetime_start = self.data['Time'].min()
@@ -88,7 +87,6 @@ class Data(Base):
         :param freq_range: The frequency range for the EMD-HHT method.
         :param feedback: Show result and runtime
         """
-        start_time = time.time()
         temp = self.data['Temperature']
 
         methods = {
@@ -113,7 +111,7 @@ class Data(Base):
             x, y)
         if feedback is True:
             print(
-                f"Messung.temp_drift_comp - id_messung: {self.id_messung} -  time: {time.time() - start_time:.2f} sec")
+                f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
 
     def plot_data(self, y_cols):
         """
