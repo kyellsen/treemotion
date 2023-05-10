@@ -1,11 +1,13 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 import pandas as pd
 import matplotlib.pyplot as plt
+import logging
 
 from utilities.base import Base
 from utilities.timing import timing_decorator
 from utilities import tms_basics, tempdrift
 
+logger = logging.getLogger(__name__)
 
 
 class Data(Base):
@@ -34,6 +36,7 @@ class Data(Base):
         self.data = data
 
     @classmethod
+    @timing_decorator
     def from_database(cls, db_data, session):
         obj = cls()
         obj.id_data = db_data.id_data
@@ -60,7 +63,6 @@ class Data(Base):
         # Speichern des DataFrames data in der neu erstellten Tabelle
         self.data.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
 
-
     def update_metadata(self):
         # self.datetime_start = self.data['Time'].min()
         # self.datetime_end = self.data['Time'].max()
@@ -75,6 +77,7 @@ class Data(Base):
         self.data = self.data.sample(n)
         self.update_metadata()
 
+    @timing_decorator
     def temp_drift_comp(self, method="emd_hht", overwrite=True, sample_rate=20, window_size=1000,
                         freq_range=(0.05, 2, 128), feedback=False):  # 128 is used because ...
         """
@@ -107,7 +110,8 @@ class Data(Base):
         self.data[f'East-West-Inclination - drift compensated{suffix}'] = x
         self.data[f'North-South-Inclination - drift compensated{suffix}'] = y
         self.data[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
-        self.data[f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
+        self.data[
+            f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
             x, y)
         if feedback is True:
             print(

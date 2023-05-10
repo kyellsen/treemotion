@@ -1,10 +1,14 @@
+# messreihe.py
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from pathlib import Path
+import logging
 
+logger = logging.getLogger(__name__)
+
+from .messung import Messung
 from utilities.base import Base
 from utilities.timing import timing_decorator
-from .messung import Messung
 
 
 class Messreihe(Base):
@@ -36,6 +40,7 @@ class Messreihe(Base):
         self.messungen_list = []
 
     @classmethod
+    @timing_decorator
     def from_database(cls, db_messreihe, session):
         obj = cls(session)
         # in SQLite Database
@@ -64,32 +69,27 @@ class Messreihe(Base):
             self.messungen_list.append(messung)
 
     @timing_decorator
-    def add_filenames(self, csv_path, feedback=False):
+    def add_filenames(self, csv_path):
         if not csv_path:
-            if feedback:
-                print("Fehler: csv_path ist ungültig.")
+            logger.error("Fehler: csv_path ist ungültig.")
             return
 
         if not self.filepath_tms:
-            if feedback:
-                print("Fehler: self.filepath_tms ist ungültig.")
+            logger.error("Fehler: self.filepath_tms ist ungültig.")
             return
 
         csv_path = Path(csv_path)
         filepath_tms = Path(self.filepath_tms)
         search_path = csv_path.joinpath(filepath_tms)
-        if feedback:
-            print(f"Suche TMS-files in Pfad: {search_path}")
+        logger.info(f"Suche TMS-files in Pfad: {search_path}")
 
         # Suche nach CSV-Dateien im Verzeichnis und allen Unterordnern
         files = list(search_path.glob('**/*.csv'))
-        if feedback:
-            print(f"Folgende Files gefunden: {files}")
+        logger.info(f"Folgende Files gefunden: {files}")
 
         # Erstelle eine Liste der id_sensor aus den Dateinamen der gefundenen Dateien
         id_sensor_list = [int(filename.stem[-3:]) for filename in files]
-        if feedback:
-            print(f"Entspricht folgenden Sensor_ID`s: {id_sensor_list}")
+        logger.info(f"Entspricht folgenden Sensor_ID`s: {id_sensor_list}")
 
         # Aktualisiere die Datenbank für alle Messungen in der messungen_list
         for messung in self.messungen_list:
@@ -106,17 +106,15 @@ class Messreihe(Base):
                         }
                     )
                     self.session.commit()
-                    if feedback:
-                        print(
-                            f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename und Filepath erfolgreich aktualisiert.")
+                    logger.info(
+                        f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename und Filepath erfolgreich aktualisiert.")
                 except ValueError:
-                    if feedback:
-                        print(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
+                    logger.warning(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
                     continue
 
     def check_messungen_list(self):
         if not self.messungen_list:
-            print("Fehler: Es gibt keine Messungen in der Messreihe.")
+            logger.warning("Fehler: Es gibt keine Messungen in der Messreihe.")
             return False
         return True
 
@@ -129,11 +127,11 @@ class Messreihe(Base):
             if messung.filepath:
                 try:
                     messung.add_data_from_csv(version=version)
-                    print(f"CSV-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
+                    logger.info(f"CSV-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
                 except Exception as e:
-                    print(f"Fehler beim Hinzufügen von Daten aus CSV für Messung {messung.id_messung}: {e}")
+                    logger.warning(f"Fehler beim Hinzufügen von Daten aus CSV für Messung {messung.id_messung}: {e}")
             else:
-                print(f"Fehler: Kein Dateipfad für Messung {messung.id_messung} vorhanden.")
+                logger.warning(f"Fehler: Kein Dateipfad für Messung {messung.id_messung} vorhanden.")
 
     @timing_decorator
     def add_data_from_db(self, version: str):
@@ -143,18 +141,20 @@ class Messreihe(Base):
         for messung in self.messungen_list:
             try:
                 messung.add_data_from_db(version=version)
-                print(f"DB-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
+                logger.info(f"DB-Daten für Messung {messung.id_messung} wurden erfolgreich hinzugefügt.")
             except Exception as e:
-                print(f"Fehler beim Hinzufügen von Daten aus der Datenbank für Messung {messung.id_messung}: {e}")
+                logger.warning(
+                    f"Fehler beim Hinzufügen von Daten aus der Datenbank für Messung {messung.id_messung}: {e}")
 
     @timing_decorator
     def delete_data_version_from_db(self, version):
+
         if not self.check_messungen_list():
             return
 
         for messung in self.messungen_list:
             try:
                 messung.delete_data_version(version)
-                print(f"Daten-Version {version} für Messung {messung.id_messung} wurde erfolgreich gelöscht.")
+                logger.info(f"Daten-Version {version} für Messung {messung.id_messung} wurde erfolgreich gelöscht.")
             except Exception as e:
-                print(f"Fehler beim Löschen der Daten-Version {version} für Messung {messung.id_messung}: {e}")
+                logger.error(f"Fehler beim Löschen der Daten-Version {version} für Messung {messung.id_messung}: {e}")
