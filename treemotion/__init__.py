@@ -4,7 +4,7 @@ import logging
 print("imported treemotion")
 from utilities.log import configure_logger, get_logger
 
-configure_logger(log_level=logging.DEBUG)
+configure_logger(log_level="debug")
 logger = get_logger(__name__)
 
 

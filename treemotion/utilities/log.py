@@ -1,8 +1,9 @@
+# treemotion/utilities/log.py
 import logging
 from datetime import datetime
 from pathlib import Path
 
-class ColorfulConsoleHandler(logging.StreamHandler):
+class ColorfulFormatter(logging.Formatter):
     COLOR_CODES = {
         logging.CRITICAL: '\033[91m',  # Red
         logging.ERROR: '\033[91m',     # Red
@@ -13,12 +14,14 @@ class ColorfulConsoleHandler(logging.StreamHandler):
 
     RESET_CODE = '\033[0m'
 
-    def emit(self, record):
+    def format(self, record):
         color_code = self.COLOR_CODES.get(record.levelno, self.RESET_CODE)
-        record.msg = f"{color_code}{record.msg}{self.RESET_CODE}"
-        super().emit(record)
+        record.levelname = f"{color_code}{record.levelname}{self.RESET_CODE}"
+        return super().format(record)
 
-def configure_logger(log_level=logging.DEBUG, log_directory="log", log_format=None, date_format=None, log_file=None):
+
+def configure_logger(log_level="info", log_directory="log", log_format=None, date_format=None, log_file=None):
+    log_level = LOG_LEVELS.get(log_level.lower(), logging.INFO)
     log_directory = Path(log_directory)
     log_directory.mkdir(exist_ok=True)
 
@@ -30,18 +33,21 @@ def configure_logger(log_level=logging.DEBUG, log_directory="log", log_format=No
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         log_file = log_directory / f"treemotion_log_{timestamp}.txt"
 
-    handlers = [
-        ColorfulConsoleHandler(),
-        logging.FileHandler(log_file)
-    ]
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(ColorfulFormatter(log_format, datefmt=date_format))
+
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(logging.Formatter(log_format, datefmt=date_format))
+
+    handlers = [console_handler, file_handler]
 
     logging.basicConfig(
         level=log_level,
-        format=log_format,
-        datefmt=date_format,
         handlers=handlers,
     )
     return
+
+
 
 def get_logger(name):
     return logging.getLogger(name)

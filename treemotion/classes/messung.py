@@ -68,8 +68,8 @@ class Messung(Base):
         return any(data.version == version for data in self.data_list)
 
     def is_version_in_db(self, version):
-        pass
-        ### Hier code einfügen
+        existing_data = self.session.query(Data).filter_by(id_messung=self.id_messung, version=version).first()
+        return existing_data is not None
 
     @timing_decorator
     def add_data_from_csv(self, version="raw"):
