@@ -1,15 +1,13 @@
 # treemotion/classes/projekt.py
 from pathlib import Path
 import shutil
-import logging
 
 from .messreihe import Messreihe
 from utilities.session import connect_to_database
 from utilities.timing import timing_decorator
 
-# Initialisiere den Logger für dieses Modul
-logger = logging.getLogger(__name__)
-
+from utilities.log import get_logger
+logger = get_logger(__name__)
 
 class Projekt:
 
@@ -49,7 +47,7 @@ class Projekt:
         obj.session, error_message = connect_to_database(obj.path_db)
         if error_message:
             return error_message
-        logger.info(f"Projekt '{name}' wurde erfolgreich erstellt.\n")
+        logger.info(f"Projekt '{name}' wurde erfolgreich erstellt.")
         return obj
 
     @classmethod
@@ -68,7 +66,7 @@ class Projekt:
         obj.session, error_message = connect_to_database(obj.path_db)
         if error_message:
             return error_message
-        logger.info(f"Projekt '{name}' wurde erfolgreich geladen.\n")
+        logger.info(f"Projekt '{name}' wurde erfolgreich geladen.")
         return obj
 
     @timing_decorator
@@ -110,11 +108,37 @@ class Projekt:
         for messreihe in self.messreihen_list:
             try:
                 messreihe.add_filenames(csv_path)
+                logger.info(f"Messreihe {messreihe.id_messreihe}: Füge Filenames hinzu.")
             except Exception as e:
                 logger.error(
                     f"Messreihe {messreihe.id_messreihe}: Fehler beim Hinzufügen der Filenames zu Messreihe. : {e}")
-                continue
-            logger.info(f"Messreihe {messreihe.id_messreihe}: Füge Filenames hinzu.")
+
+    @timing_decorator
+    def add_data_from_csv(self, version="raw"):
+        for messreihe in self.messreihen_list:
+            try:
+                messreihe.add_data_from_csv(version=version)
+                logger.info(f"CSV-Daten für Messreihe {messreihe.id_messreihe} wurden erfolgreich hinzugefügt.")
+            except Exception as e:
+                logger.warning(f"Fehler beim Hinzufügen von Daten aus CSV für Messreihe {messreihe.id_messreihe}: {e}")
+
+    @timing_decorator
+    def add_data_from_db(self, version: str):
+        for messreihe in self.messreihen_list:
+            try:
+                messreihe.add_data_from_db(version=version)
+                logger.info(f"DB-Daten für Messreihe {messreihe.id_messreihe} wurden erfolgreich hinzugefügt.")
+            except Exception as e:
+                logger.warning(f"Fehler beim Hinzufügen von Daten aus DB für Messreihe {messreihe.id_messreihe}: {e}")
+
+    @timing_decorator
+    def delete_data_version_from_db(self, version):
+        for messreihe in self.messreihen_list:
+            try:
+                messreihe.delete_data_version_from_db(version)
+                logger.info(f"Daten-Version {version} für Messreihe {messreihe.id_messreihe} wurde erfolgreich gelöscht.")
+            except Exception as e:
+                logger.error(f"Fehler beim Löschen der Daten-Version {version} für Messreihe {messreihe.id_messreihe}: {e}")
 
     @classmethod
     @timing_decorator
@@ -122,4 +146,5 @@ class Projekt:
         obj = cls.load(id_projekt, name, path)
         obj.add_messreihen()
         obj.add_filenames(csv_path=csv_path)
+        obj.add_data_from_csv()
         return obj

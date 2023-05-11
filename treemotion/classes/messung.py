@@ -2,15 +2,13 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 import pandas as pd
-import logging
 
 from .data import Data
 from utilities.base import Base
 from utilities.timing import timing_decorator
 
-# Initialisiere den Logger für dieses Modul
-logger = logging.getLogger(__name__)
-
+from utilities.log import get_logger
+logger = get_logger(__name__)
 
 class Messung(Base):
     __tablename__ = 'Messung'
@@ -69,10 +67,14 @@ class Messung(Base):
     def is_version_in_data_list(self, version):
         return any(data.version == version for data in self.data_list)
 
+    def is_version_in_db(self, version):
+        pass
+        ### Hier code einfügen
+
     @timing_decorator
     def add_data_from_csv(self, version="raw"):
         if self.is_version_in_data_list(version):
-            logger.info(f"Version {version} bereits vorhanden, Daten werden nicht erneut hinzugefügt.")
+            logger.info(f"Version {version} bereits vorhanden in Instanz, Daten werden nicht erneut hinzugefügt.")
             return
 
         table_name = Messung.get_table_name(id_messung=self.id_messung, version=version)
@@ -94,7 +96,7 @@ class Messung(Base):
     @timing_decorator
     def add_data_from_db(self, version):
         if self.is_version_in_data_list(version):
-            logger.info(f"Version {version} bereits vorhanden, Daten werden nicht erneut hinzugefügt.")
+            logger.info(f"Version {version} bereits vorhanden in Instanz, Daten werden nicht erneut hinzugefügt.")
             return
 
         db_data_list = self.session.query(Data).filter_by(id_messung=self.id_messung).all()

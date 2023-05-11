@@ -2,16 +2,15 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from pathlib import Path
-import logging
-
-
 
 from .messung import Messung
 from utilities.base import Base
 from utilities.timing import timing_decorator
 
-# Initialisiere den Logger für dieses Modul
-logger = logging.getLogger(__name__)
+from utilities.log import get_logger
+logger = get_logger(__name__)
+
+
 
 class Messreihe(Base):
     __tablename__ = 'Messreihe'
@@ -73,11 +72,11 @@ class Messreihe(Base):
     @timing_decorator
     def add_filenames(self, csv_path):
         if not csv_path:
-            logger.error("Fehler: csv_path ist ungültig.")
+            logger.warning("Fehler: csv_path ist ungültig.")
             return
 
         if not self.filepath_tms:
-            logger.error("Fehler: self.filepath_tms ist ungültig.")
+            logger.warning("Fehler: self.filepath_tms ist ungültig.")
             return
 
         csv_path = Path(csv_path)

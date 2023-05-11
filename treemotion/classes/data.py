@@ -2,14 +2,13 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 import pandas as pd
 import matplotlib.pyplot as plt
-import logging
 
 from utilities.base import Base
 from utilities.timing import timing_decorator
 from utilities import tms_basics, tempdrift
 
-# Initialisiere den Logger für dieses Modul
-logger = logging.getLogger(__name__)
+from utilities.log import get_logger
+logger = get_logger(__name__)
 
 
 class Data(Base):
