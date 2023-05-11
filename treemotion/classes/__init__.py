@@ -1,3 +1,3 @@
-# classes/__init__.py
+# treemotion/classes/__init__.py
 print("imported treemotion/classes")
 

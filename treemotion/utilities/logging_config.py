@@ -1,4 +1,4 @@
-# logging_config.py
+# treemotion/utilities/logging_config.py
 import logging
 import os
 
@@ -16,7 +16,7 @@ def configure_logger():
         datefmt=date_format,
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(f"{log_directory}/application.log")
+            logging.FileHandler(f"{log_directory}/treemotion.log")
         ],
     )
 

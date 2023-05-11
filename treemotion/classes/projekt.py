@@ -1,4 +1,4 @@
-# projekt.py
+# treemotion/classes/projekt.py
 from pathlib import Path
 import shutil
 import logging
@@ -9,6 +9,7 @@ from utilities.timing import timing_decorator
 
 # Initialisiere den Logger für dieses Modul
 logger = logging.getLogger(__name__)
+
 
 class Projekt:
 

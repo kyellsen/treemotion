@@ -1,15 +1,17 @@
-# messreihe.py
+# treemotion/classes/messreihe.py
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from pathlib import Path
 import logging
 
-logger = logging.getLogger(__name__)
+
 
 from .messung import Messung
 from utilities.base import Base
 from utilities.timing import timing_decorator
 
+# Initialisiere den Logger für dieses Modul
+logger = logging.getLogger(__name__)
 
 class Messreihe(Base):
     __tablename__ = 'Messreihe'

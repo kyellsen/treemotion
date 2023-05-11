@@ -1,3 +1,4 @@
+# treemotion/classes/data.py
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ from utilities.base import Base
 from utilities.timing import timing_decorator
 from utilities import tms_basics, tempdrift
 
+# Initialisiere den Logger für dieses Modul
 logger = logging.getLogger(__name__)
 
 

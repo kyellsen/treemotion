@@ -1,4 +1,4 @@
-# messung.py
+# treemotion/classes/messung.py
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 import pandas as pd
@@ -8,6 +8,7 @@ from .data import Data
 from utilities.base import Base
 from utilities.timing import timing_decorator
 
+# Initialisiere den Logger für dieses Modul
 logger = logging.getLogger(__name__)
 
 
