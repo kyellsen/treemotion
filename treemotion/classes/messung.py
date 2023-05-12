@@ -3,12 +3,15 @@ from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 import pandas as pd
 
+from treemotion import configuration
 from .data import Data
 from utilities.base import Base
 from utilities.timing import timing_decorator
 
 from utilities.log import get_logger
+
 logger = get_logger(__name__)
+
 
 class Messung(Base):
     __tablename__ = 'Messung'
@@ -62,22 +65,71 @@ class Messung(Base):
         obj.sensor_hoehe = db_messung.sensor_hoehe
         obj.sensor_umfang = db_messung.sensor_umfang
         obj.sensor_ausrichtung = db_messung.sensor_ausrichtung
+        # Erzeugen der Data-Instanzen
+        obj.data_list = [Data.from_database(data, session) for data in db_messung.data]
         return obj
 
     def is_version_in_data_list(self, version):
+        """
+        Checks if a specific version is present in the data list.
+
+        Args:
+            version (str): Version to be checked.
+
+        Returns:
+            bool: True if the version is in the data list, False otherwise.
+        """
         return any(data.version == version for data in self.data_list)
 
     def is_version_in_db(self, version):
+        """
+        Checks if a specific version is present in the database.
+
+        Args:
+            version (str): Version to be checked.
+
+        Returns:
+            bool: True if the version is in the database, False otherwise.
+        """
         existing_data = self.session.query(Data).filter_by(id_messung=self.id_messung, version=version).first()
         return existing_data is not None
 
+    @staticmethod
     @timing_decorator
-    def add_data_from_csv(self, version="raw"):
-        if self.is_version_in_data_list(version):
-            logger.info(f"Version {version} bereits vorhanden in Instanz, Daten werden nicht erneut hinzugefügt.")
+    def read_csv(filepath):
+        data = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
+        return data
+
+    @timing_decorator
+    def add_data_from_csv(self, version=configuration.data_version_default):
+        version_in_data_list = self.is_version_in_data_list(version)
+        version_in_db = self.is_version_in_db(version)
+
+        if not version_in_data_list and not version_in_db:
+
+            table_name = Messung.get_table_name(id_data=self.id_data, id_messung=self.id_messung, version=version)
+
+            logger.info(f"Version {version} wurde Datenbank und Instanz neu hinzugefügt als {table_name}")
+        elif version_in_data_list and version_in_db:
+            logger.info(
+                f"Version {version} bereits in Instanz und Datenbank vorhanden, Daten werden nicht erneut hinzugefügt.")
             return
 
-        table_name = Messung.get_table_name(id_messung=self.id_messung, version=version)
+        elif version_in_data_list and not version_in_db:
+            # Get the data from data_list where version = version
+            data_for_db = next(data for data in self.data_list if data.version == version)
+            # Save the data to the database
+            data_for_db.to_database(self.session)
+            logger.info(f"Version {version} bereits in Instanz vorhanden, Daten werden zur Datenbank hinzugefügt.")
+            return
+
+        elif version_in_db and not version_in_data_list:
+            # Get the data from the database where version = version
+            data_for_list = self.session.query(Data).filter_by(id_messung=self.id_messung, version=version).first()
+            # Add the data to data_list
+            self.data_list.append(data_for_list)
+            logger.info(f"Version {version} bereits in der Datenbank vorhanden, Daten werden zur Instanz hinzugefügt.")
+            return
 
         existing_data = self.session.query(Data).filter_by(table_name=table_name).first()
         if existing_data:
@@ -125,13 +177,3 @@ class Messung(Base):
             logger.info(f"Daten der Version {version} erfolgreich aus der Datenbank gelöscht.")
         except Exception as e:
             logger.error(f"Ein Fehler ist beim Löschen der Daten der Version {version} aufgetreten: {e}", "error")
-
-    @staticmethod
-    def get_table_name(id_messung: int, version: str):
-        return f"auto_data_{version}_id_messung_{id_messung}"
-
-    @staticmethod
-    @timing_decorator
-    def read_csv(filepath):
-        data = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
-        return data

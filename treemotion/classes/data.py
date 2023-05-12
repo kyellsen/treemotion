@@ -3,11 +3,13 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from treemotion import configuration
 from utilities.base import Base
 from utilities.timing import timing_decorator
 from utilities import tms_basics, tempdrift
 
 from utilities.log import get_logger
+
 logger = get_logger(__name__)
 
 
@@ -22,24 +24,27 @@ class Data(Base):
     duration = Column(DateTime)
     length = Column(Integer)
 
-    def __init__(self, id_data=None, id_messung=None, version=None, table_name=None, datetime_start=None,
+    def __init__(self, session, id_data=None, id_messung=None, version=None, table_name=None, datetime_start=None,
                  datetime_end=None, duration=None, length=None, data=None):
+        # Speichern des Sessions-Objektes (Standard aus Messung-Klasse)
+        self.session = session
+
         # in SQLite Database
         self.id_data = id_data
         self.id_messung = id_messung
         self.version = version
-        self.table_name = table_name  # name of SQLite Table, where data is stored, f"auto_data_{version}_id_messung_{id_messung}"
+        self.table_name = table_name  # name of SQLite Table, where data is stored
         self.datetime_start = datetime_start  # metadata
         self.datetime_end = datetime_end  # metadata
         self.duration = duration  # metadata
         self.length = length  # metadata
-        # additional only in class-object
+        # additional only in class-object, own table in database
         self.data = data
 
     @classmethod
     @timing_decorator
     def from_database(cls, db_data, session):
-        obj = cls()
+        obj = cls(session)
         obj.id_data = db_data.id_data
         obj.id_messung = db_data.id_messung
         obj.version = db_data.version
@@ -48,22 +53,23 @@ class Data(Base):
         obj.datetime_end = db_data.datetime_end
         obj.duration = db_data.duration
         obj.length = db_data.length
-        obj.data = pd.read_sql_table(db_data.table_name, session.bind)
+        obj.data = pd.read_sql_table(db_data.table_name, obj.session.bind)
         return obj
 
+    def new_table_name(self):
+        return f"{self.id_data}_data_{self.version}_{self.id_messung}_messung"
+
     @timing_decorator
-    def to_database(self, session):
-        # Speichern der Metadaten in der Data-Tabelle
-        if self.id_data is None:
-            session.add(self)
-            session.commit()
-        else:
-            session.merge(self)
-            session.commit()
+    def to_database(self):
+        self.table_name = self.new_table_name()
+        # Attribute speichern
+        self.session.add(self)
+        self.data.to_sql(self.table_name, self.session.bind, if_exists="replace")
+        self.session.commit()
 
-        # Speichern des DataFrames data in der neu erstellten Tabelle
-        self.data.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
 
+
+    ##############################################    TOOLS   ##############################################
     def update_metadata(self):
         # self.datetime_start = self.data['Time'].min()
         # self.datetime_end = self.data['Time'].max()
