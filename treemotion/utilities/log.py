@@ -3,6 +3,9 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from treemotion import configuration
+
+
 class ColorfulFormatter(logging.Formatter):
     COLOR_CODES = {
         logging.CRITICAL: '\033[91m',  # Red
@@ -20,7 +23,7 @@ class ColorfulFormatter(logging.Formatter):
         return super().format(record)
 
 
-def configure_logger(log_level="info", log_directory="log", log_format=None, date_format=None, log_file=None):
+def configure_logger(log_level=configuration.log_level, log_directory=configuration.log_directory, log_format=None, date_format=None, log_file=None):
     log_level = LOG_LEVELS.get(log_level.lower(), logging.INFO)
     log_directory = Path(log_directory)
     log_directory.mkdir(exist_ok=True)

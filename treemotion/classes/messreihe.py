@@ -3,6 +3,7 @@ from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from pathlib import Path
 
+from treemotion import configuration
 from .messung import Messung
 from utilities.base import Base
 from utilities.timing import timing_decorator
@@ -120,7 +121,7 @@ class Messreihe(Base):
         return True
 
     @timing_decorator
-    def add_data_from_csv(self, version="raw"):
+    def add_data_from_csv(self, version=configuration.data_version_default):
         if not self.check_messungen_list():
             return
 

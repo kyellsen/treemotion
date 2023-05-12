@@ -1,12 +1,16 @@
+
 # treemotion/classes/projekt.py
 from pathlib import Path
 import shutil
 
+from treemotion import configuration
 from .messreihe import Messreihe
 from utilities.session import connect_to_database
 from utilities.timing import timing_decorator
 
 from utilities.log import get_logger
+
+
 logger = get_logger(__name__)
 
 class Projekt:
@@ -30,18 +34,19 @@ class Projekt:
         obj.path.mkdir(parents=True, exist_ok=True)
         obj.path_db = obj.path / f"{name}.db"
 
+        template_db_name = configuration.template_db_name
         current_file = Path(__file__)
         parent_directory = current_file.parent.parent
-        template_db_path = parent_directory / 'template.db'
+        template_db_path = parent_directory / template_db_name
 
         if not template_db_path.exists() or not template_db_path.is_file():
-            logger.error("Fehler: Die template.db-Datei wurde nicht gefunden.")
+            logger.error(f"Fehler: Die {template_db_name}-Datei wurde nicht gefunden.")
             return None
 
         try:
             shutil.copy(template_db_path, obj.path_db)
         except Exception as e:
-            logger.error(f"Fehler beim Kopieren der template.db-Datei: {e}")
+            logger.error(f"Fehler beim Kopieren der {template_db_name}-Datei: {e}")
             return None
 
         obj.session, error_message = connect_to_database(obj.path_db)
@@ -52,7 +57,7 @@ class Projekt:
 
     @classmethod
     @timing_decorator
-    def load(cls, id_projekt: int, name: str, path: str):
+    def from_database(cls, id_projekt: int, name: str, path: str):
         obj = cls()
         obj.id = id_projekt
         obj.name = name
@@ -114,7 +119,7 @@ class Projekt:
                     f"Messreihe {messreihe.id_messreihe}: Fehler beim Hinzufügen der Filenames zu Messreihe. : {e}")
 
     @timing_decorator
-    def add_data_from_csv(self, version="raw"):
+    def add_data_from_csv(self, version=configuration.data_version_default):
         for messreihe in self.messreihen_list:
             try:
                 messreihe.add_data_from_csv(version=version)
@@ -143,7 +148,7 @@ class Projekt:
     @classmethod
     @timing_decorator
     def load_complete(cls, id_projekt: int, name: str, path: str, csv_path: str):
-        obj = cls.load(id_projekt, name, path)
+        obj = cls.from_database(id_projekt, name, path)
         obj.add_messreihen()
         obj.add_filenames(csv_path=csv_path)
         obj.add_data_from_csv()
