@@ -13,6 +13,14 @@ class Configuration:
         self.log_directory = "log"
         self.template_db_name = "database_template_1_0_0_0.db"  # Look in the "treemotion" directory for template.db
 
+        # Projekt
+        self.projekt_load_related_default = True
+        # Messreihe
+        self.messreihe_load_related_default = True
+        # Messung
+        self.messung_load_related_default = True
+        # Data
+        self.data_load_related_default = True
         self.data_version_default = "raw"
         # Weitere Konstanten hier
 
