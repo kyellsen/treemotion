@@ -1,17 +1,13 @@
 # treemotion/classes/messung.py
 
-# import packages
 import pandas as pd
 
-# import utilities
 from utilities.common_imports import *
 
-# import classes
-from .base_class import BaseClass
 from .data import Data
 
 
-class Messung(Base):
+class Messung(BaseClass):
     __tablename__ = 'Messung'
     id_messung = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     id_messreihe = Column(Integer, ForeignKey('Messreihe.id_messreihe'))
@@ -26,11 +22,12 @@ class Messung(Base):
     sensor_ausrichtung = Column(Integer)
 
     # Verweis auf Data-Instanzen
-    data_list = relationship("Data", backref="Messung", lazy='select')
+    data_list = relationship("Data", backref="Messung", lazy='select', cascade="all, delete, delete-orphan")
 
-    def __init__(self, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
+    def __init__(self, *args, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
                  id_messung_status=None, filename=None, filepath=None, id_sensor_ort=None, sensor_hoehe=None,
-                 sensor_umfang=None, sensor_ausrichtung=None):
+                 sensor_umfang=None, sensor_ausrichtung=None, **kwargs):
+        super().__init__(*args, **kwargs)
         # in SQLite Database
         self.id_messung = id_messung
         self.id_messreihe = id_messreihe
@@ -46,25 +43,22 @@ class Messung(Base):
 
     @classmethod
     @timing_decorator
-    def from_database(cls, path_db, id_messreihe=None, load_related=configuration.messung_load_related_default):
-        session = create_session(path_db)
-
-        # If id_messreihe is provided, load only the Messung instances that belong to the Messreihe instance
-        if id_messreihe is not None:
-            if load_related:
-                objs = session.query(cls).options(joinedload(cls.data_list)).filter(
-                    cls.id_messreihe == id_messreihe).all()
-            else:
-                objs = session.query(cls).filter(cls.id_messreihe == id_messreihe).all()
-        else:
-            if load_related:
-                objs = session.query(cls).options(joinedload(cls.data_list)).all()
-            else:
-                objs = session.query(cls).all()
-
-        session.close()
+    def load_from_db(cls, path_db, id_messreihe=None, load_related=configuration.messung_load_related_default):
+        objs = super().load_from_db(path_db, filter_by={'id_messreihe': id_messreihe} if id_messreihe else None,
+                                    load_related=load_related, related_attribute=cls.data_list)
         logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
         return objs
+    @timing_decorator
+    def add_to_db(self, *args, path_db, update=False):
+        super().add_to_db(path_db, id_name='id_messung', update=update)
+
+    @timing_decorator
+    def remove_from_db(self, *args, path_db):
+        # Call the base class method to remove this Data object from the database
+        super().remove_from_db(path_db, id_name='id_messung')
+
+
+
 
     # def is_version_in_data_list(self, version):
     #     """
@@ -116,7 +110,7 @@ class Messung(Base):
     #         # Get the data from data_list where version = version
     #         data_for_db = next(data for data in self.data_list if data.version == version)
     #         # Save the data to the database
-    #         data_for_db.to_database(self.session)
+    #         data_for_db.add_to_db(self.session)
     #         logger.info(f"Version {version} bereits in Instanz vorhanden, Daten werden zur Datenbank hinzugefügt.")
     #         return
     #
@@ -138,39 +132,6 @@ class Messung(Base):
     #     obj.data = self.read_csv(filepath=self.filepath)
     #     obj.update_metadata()
     #     obj.table_name = table_name
-    #     obj.to_database(self.session)
+    #     obj.add_to_db(self.session)
     #     self.data_list.append(obj)
     #     logger.info(f"add_data_from_csv '{self.filename}', table_name '{table_name}', id_data '{data_id}'.")
-    #
-    # @timing_decorator
-    # def add_data_from_db(self, version):
-    #     if self.is_version_in_data_list(version):
-    #         logger.info(f"Version {version} bereits vorhanden in Instanz, Daten werden nicht erneut hinzugefügt.")
-    #         return
-    #
-    #     db_data_list = self.session.query(Data).filter_by(id_messung=self.id_messung).all()
-    #
-    #     for db_data in db_data_list:
-    #         if any(data.id_data == db_data.id_data for data in self.data_list) or db_data.version != version:
-    #             continue
-    #
-    #         data = Data.from_database(db_data, self.session)
-    #         self.data_list.append(data)
-    #         logger.info(f"add_data_from_db '{data.table_name}', id_data '{data.id_data}'.")
-    #
-    # @timing_decorator
-    # def delete_data_from_db(self, version):
-    #     if not self.is_version_in_data_list(version):
-    #         logger.warning(f"Version {version} nicht vorhanden, keine Daten zum Löschen gefunden.")
-    #         return
-    #
-    #     try:
-    #         # Lösche alle Data-Objekte, die der angegebenen Version entsprechen
-    #         self.session.query(Data).filter_by(id_messung=self.id_messung, version=version).delete()
-    #         self.session.commit()
-    #
-    #         # Entferne die gelöschten Data-Objekte aus der data_list
-    #         self.data_list = [data for data in self.data_list if data.version != version]
-    #         logger.info(f"Daten der Version {version} erfolgreich aus der Datenbank gelöscht.")
-    #     except Exception as e:
-    #         logger.error(f"Ein Fehler ist beim Löschen der Daten der Version {version} aufgetreten: {e}", "error")

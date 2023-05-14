@@ -1,17 +1,12 @@
 # treemotion/classes/data.py
-
-# import packages
+from sqlalchemy.schema import DropTable, MetaData
 import pandas as pd
 # import matplotlib.pyplot as plt
 
-# import utilities
 from utilities.common_imports import *
 
-# import classes
-from .base_class import BaseClass
 
-
-class Data(Base):
+class Data(BaseClass):
     __tablename__ = 'Data'
     id_data = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     id_messung = Column(Integer, ForeignKey('Messung.id_messung'))
@@ -22,8 +17,9 @@ class Data(Base):
     duration = Column(DateTime)
     length = Column(Integer)
 
-    def __init__(self, id_data=None, id_messung=None, version=None, table_name=None, datetime_start=None,
-                 datetime_end=None, duration=None, length=None, data=None):
+    def __init__(self, *args, id_data=None, id_messung=None, version=None, table_name=None, datetime_start=None,
+                 datetime_end=None, duration=None, length=None, data=None, **kwargs):
+        super().__init__(*args, **kwargs)
         # in SQLite Database
         self.id_data = id_data
         self.id_messung = id_messung
@@ -38,29 +34,41 @@ class Data(Base):
 
     @classmethod
     @timing_decorator
-    def from_database(cls, path_db, id_messung=None, load_related=configuration.data_load_related_default):
-        session = create_session(path_db)
-
-        # If id_messung is provided, load only the Data instances that belong to the Messung instance
-        if id_messung is not None:
-            objs = session.query(cls).filter(cls.id_messung == id_messung).all()
-        else:
-            objs = session.query(cls).all()
+    def load_from_db(cls, path_db, id_messung=None, load_related=configuration.data_load_related_default):
+        objs = super().load_from_db(path_db, filter_by={'id_messung': id_messung} if id_messung else None)
 
         if load_related:
             for obj in objs:
-                obj.data = pd.read_sql_table(obj.table_name, session.bind)
+                obj.data = pd.read_sql_table(obj.table_name, create_session(path_db).bind)
 
-        session.close()
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         return objs
+    @timing_decorator
+    def add_to_db(self, *args, path_db, update=False):
+        super().add_to_db(path_db, id_name='id_data', update=update)
 
+    @timing_decorator
+    def remove_from_db(self, *args, path_db):
+        session = create_session(path_db)
+        if self.table_name:
+            # Delete the table associated with this Data object
+            session.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+            logger.info(f"Tabelle {self.table_name} wurde aus der Datenbank gelöscht.")
+            session.commit()
+
+        # Call the base class method to remove this Data object from the database
+        super().remove_from_db(path_db, id_name='id_data')
+
+    @timing_decorator
+    def remove_from_db(self, *args, path_db):
+        # Call the base class method to remove this Data object from the database
+        super().remove_from_db(path_db, id_name='id_data')
 
     # def new_table_name(self):
     #     return f"{self.id_data}_data_{self.version}_{self.id_messung}_messung"
     #
     # @timing_decorator
-    # def to_database(self):
+    # def add_to_db(self):
     #     self.table_name = self.new_table_name()
     #     # Attribute speichern
     #     self.session.add(self)

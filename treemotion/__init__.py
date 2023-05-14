@@ -8,6 +8,8 @@ from utilities.log import configure_logger, get_logger
 configure_logger()
 logger = get_logger(__name__)
 
+
+from .utilities.database import new_db
 from .classes.projekt import Projekt
 from .classes.messreihe import Messreihe
 from .classes.messung import Messung
