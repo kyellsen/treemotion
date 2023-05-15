@@ -9,23 +9,39 @@ class Configuration:
         """
         Initialisiert die Konfigurationswerte mit den Standardwerten.
         """
-        self.log_level = "debug"  # debug, info, warning, critical, error
+        self.log_level = "info"  # debug, info, warning, critical, error
         self.log_directory = "log"
         self.template_db_name = "database_template_1_0_0_0.db"  # Look in the "treemotion" directory for template.db
+        self.default_path_db = None  # Default database path
 
         # Projekt
-        self.projekt_load_related_default = True
+
         # Messreihe
-        self.messreihe_load_related_default = True
+
         # Messung
-        self.messung_load_related_default = True
+
         # Data
-        self.data_load_related_default = True
         self.data_version_default = "raw"
         # Weitere Konstanten hier
 
+
 # Eine Instanz der Configuration-Klasse erstellen
 configuration = Configuration()
+
+
+def get_default_path_db(path_db):
+    """
+    Gibt den Standardpfad zur Datenbank zurück, falls kein spezifischer Pfad angegeben ist.
+
+    Args:
+        path_db (str): Der spezifische Pfad zur Datenbank.
+
+    Returns:
+        str: Der Pfad zur Datenbank.
+    """
+    if path_db is None:
+        return configuration.default_path_db
+    return path_db
 
 ### README
 

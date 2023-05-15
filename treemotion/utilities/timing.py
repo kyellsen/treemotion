@@ -20,7 +20,7 @@ def timing_decorator(func):
         class_name = ""
         if len(args) > 0 and hasattr(args[0], "__class__"):
             class_name = args[0].__class__.__name__ + "."
-        logger.debug(f"[Runtime] {run_time:.4f} secs, {class_name}{func.__name__}")
+        logger.info(f"[Runtime] {run_time:.4f} secs, {class_name}{func.__name__}")
         return result
 
     return wrapper

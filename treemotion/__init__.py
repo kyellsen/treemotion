@@ -1,13 +1,11 @@
 # treemotion/__init__.py
 print("imported treemotion")
 
-from treemotion.config import configuration  # get classe-instance
-
-from utilities.log import configure_logger, get_logger
+from .config import configuration
+from .utilities.log import get_logger, configure_logger
 
 configure_logger()
 logger = get_logger(__name__)
-
 
 from .utilities.database import new_db
 from .classes.projekt import Projekt

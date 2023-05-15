@@ -1,10 +1,9 @@
 # treemotion/classes/messreihe.py
-from pathlib import Path
-
 from utilities.common_imports import *
 
-from .messung import Messung
+from utilities.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
 
+from .messung import Messung
 
 class Messreihe(BaseClass):
     __tablename__ = 'Messreihe'
@@ -17,7 +16,7 @@ class Messreihe(BaseClass):
     anmerkung = Column(String)
     filepath_tms = Column(String)
 
-    messungen_list = relationship("Messung", backref="messreihe", lazy='joined', cascade='all, delete, delete-orphan')
+    messungen = relationship("Messung", backref="messreihe", lazy="joined", cascade='all, delete, delete-orphan', order_by="Messung.id_messung")
 
     def __init__(self, *args, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
                  anmerkung=None, filepath_tms=None, **kwargs):
@@ -31,77 +30,72 @@ class Messreihe(BaseClass):
         self.ort = ort
         self.anmerkung = anmerkung
         self.filepath_tms = filepath_tms
+
     @classmethod
     @timing_decorator
-    def load_from_db2(cls, path_db, id_projekt=None, load_related=True):
-        objs = super().load_from_db(path_db, filter_by=None,
-                                    load_related=load_related, related_attribute=Messreihe.messungen_list)
-        logger.info(f"{len(objs)} Messreihen wurden erfolgreich geladen.")
-        return objs
-    @classmethod
-    @timing_decorator
-    def load_from_db2(cls, path_db, id_projekt=None, load_related=configuration.messreihe_load_related_default):
-        objs = super().load_from_db(path_db, filter_by={'id_projekt': id_projekt} if id_projekt else None,
-                                    load_related=load_related, related_attribute=cls.messungen_list)
+    def load_from_db(cls, path_db=None, id_projekt=None):
+        objs = super().load_from_db(path_db, filter_by={'id_projekt': id_projekt} if id_projekt else None)
         logger.info(f"{len(objs)} Messreihen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def add_to_db(self, *args, path_db, update=False):
-        super().add_to_db(path_db, id_name='id_messreihe', update=update)
-
-    @timing_decorator
-    def remove_from_db(self, *args, path_db):
+    def remove_from_db(self, *args, path_db=None):
         # Call the base class method to remove this Data object from the database
         super().remove_from_db(path_db, id_name='id_messreihe')
 
     @timing_decorator
-    def add_filenames(self, csv_path: Path):
+    def copy(self, copy_relationships=True):
+        copy = super().copy(copy_relationships=copy_relationships)
+        return copy
 
-        if not isinstance(csv_path, Path):
-            try:
-                csv_path = Path(csv_path)
-                logger.debug(f"Path korrekt: {csv_path} ")
-            except Exception as e:
-                logger.error(f"Parameter csv_path kann nicht nicht mit Path(csv_path) umgewandelt werden. Fehler: {e}")
-                return
+    @timing_decorator
+    def add_filenames(self, csv_path: str):
+        """
+        Aktualisiert die Attribute 'filename' und 'filepath' für jede Messung dieser Messreihe,
+        indem CSV-Dateien im angegebenen Pfad gesucht und deren Namen und Pfade extrahiert werden.
 
-        if not isinstance(self.filepath_tms, Path):
-            try:
-                filepath_tms = Path(self.filepath_tms)
-                logger.debug(f"Path korrekt: {self.filepath_tms} ")
-            except Exception as e:
-                logger.error(f"Parameter csv_path kann nicht nicht mit Path(csv_path) umgewandelt werden. Fehler: {e}")
-                return
+        :param csv_path: Der Pfad, in dem nach CSV-Dateien gesucht werden soll
+        """
+        csv_path = validate_and_get_path(csv_path)
+        if csv_path is None:
+            return None
+
+        if self.filepath_tms is None:
+            logger.warning(f"Kein filepath_tms in Messreihe {self.id_messreihe}")
+            return None
+
+        filepath_tms = validate_and_get_path(self.filepath_tms)
+        if filepath_tms is None:
+            return None
 
         search_path = csv_path.joinpath(filepath_tms)
-        logger.info(f"Suche TMS-files in Pfad: {search_path}")
+        if not search_path.exists():
+            logger.error(f"Suchpfad existiert nicht: {search_path}")
+            return None
 
-        # Suche nach CSV-Dateien im Verzeichnis und allen Unterordnern
-        files = list(search_path.glob('**/*.csv'))
-        logger.info(f"Folgende Files gefunden: {files}")
+        logger.info(f"Suche TMS-Dateien in Pfad: {search_path}")
 
-        # Erstelle eine Liste der id_sensor aus den Dateinamen der gefundenen Dateien
-        id_sensor_list = [int(filename.stem[-3:]) for filename in files]
-        logger.info(f"Entspricht folgenden Sensor_ID`s: {id_sensor_list}")
+        files = validate_and_get_file_list(search_path)
+        if files is None:
+            return None
 
-        # Aktualisiere die Datenbank für alle Messungen in der messungen_list
-        for messung in self.messungen_list:
-            if messung.id_messreihe == self.id_messreihe:  # Prüfe, ob die Messung zur aktuellen Messreihe gehört
-                try:
-                    sensor_index = id_sensor_list.index(messung.id_sensor)
-                    messung.filename = files[sensor_index].name
-                    messung.filepath = files[sensor_index].resolve()
+        id_sensor_list = extract_id_sensor_list(files)
+        if id_sensor_list is None:
+            return None
 
-                    self.session.query(Messung).filter_by(id_messung=messung.id_messung).update(
-                        {
-                            "filename": messung.filename,
-                            "filepath": str(messung.filepath)
-                        }
-                    )
-                    self.session.commit()
-                    logger.info(
-                        f"Messung {messung.id_messung} (Sensor {messung.id_sensor}): Filename und Filepath erfolgreich aktualisiert.")
-                except ValueError:
-                    logger.warning(f"Messung {messung.id_messung}: Fehler - Filename nicht gefunden.")
-                    continue
+        for messung in self.messungen:
+            if messung.id_sensor in id_sensor_list:
+                corresponding_file = next((file for file in files if int(file.stem[-3:]) == messung.id_sensor), None)
+                if corresponding_file and corresponding_file.is_file():
+                    messung.filename = corresponding_file.name
+                    messung.filepath = str(corresponding_file)
+                    messung.commit_to_db()
+                else:
+                    logger.error(f"Die Datei {corresponding_file} existiert nicht oder ist keine CSV-Datei.")
+                    return None
+
+        logger.info(f"Die Attribute filename und filepath wurden erfolgreich aktualisiert.")
+
+    @timing_decorator
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
+        self.for_all('messungen', 'load_data_from_csv', version, overwrite)

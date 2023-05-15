@@ -9,7 +9,7 @@ from utilities.common_imports import *
 class Data(BaseClass):
     __tablename__ = 'Data'
     id_data = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    id_messung = Column(Integer, ForeignKey('Messung.id_messung'))
+    id_messung = Column(Integer, ForeignKey('Messung.id_messung', onupdate='CASCADE'), nullable=False)
     version = Column(String)
     table_name = Column(String)
     datetime_start = Column(DateTime)
@@ -18,7 +18,7 @@ class Data(BaseClass):
     length = Column(Integer)
 
     def __init__(self, *args, id_data=None, id_messung=None, version=None, table_name=None, datetime_start=None,
-                 datetime_end=None, duration=None, length=None, data=None, **kwargs):
+                 datetime_end=None, duration=None, length=None, df=None, **kwargs):
         super().__init__(*args, **kwargs)
         # in SQLite Database
         self.id_data = id_data
@@ -30,66 +30,101 @@ class Data(BaseClass):
         self.duration = duration  # metadata
         self.length = length  # metadata
         # additional only in class-object, own table in database
-        self.data = data
+        self.df = df
+
+    def __str__(self):
+        return f"Data(id_data={self.id_data}, id_messung={self.id_messung}, version={self.version}, table_name={self.table_name})"
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, path_db, id_messung=None, load_related=configuration.data_load_related_default):
-        objs = super().load_from_db(path_db, filter_by={'id_messung': id_messung} if id_messung else None)
-
-        if load_related:
-            for obj in objs:
-                obj.data = pd.read_sql_table(obj.table_name, create_session(path_db).bind)
-
+    def load_from_db(cls, path_db=None, id_messung=None):
+        objs = super().load_from_db(path_db=path_db, filter_by={'id_messung': id_messung} if id_messung else None)
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         return objs
-    @timing_decorator
-    def add_to_db(self, *args, path_db, update=False):
-        super().add_to_db(path_db, id_name='id_data', update=update)
 
+    @classmethod
     @timing_decorator
-    def remove_from_db(self, *args, path_db):
+    def load_from_db_with_df(cls, path_db=None, filter_by=None):
+        path_db = get_default_path_db(path_db)
         session = create_session(path_db)
-        if self.table_name:
-            # Delete the table associated with this Data object
-            session.execute(f"DROP TABLE IF EXISTS {self.table_name}")
-            logger.info(f"Tabelle {self.table_name} wurde aus der Datenbank gelöscht.")
-            session.commit()
 
-        # Call the base class method to remove this Data object from the database
-        super().remove_from_db(path_db, id_name='id_data')
+        if filter_by is not None:
+            objs = session.query(cls).filter_by(**filter_by).all()
+        else:
+            objs = session.query(cls).all()
+
+        objs = [obj.load_df() for obj in objs]
+
+        session.close()
+        logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
+        return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, path_db):
-        # Call the base class method to remove this Data object from the database
-        super().remove_from_db(path_db, id_name='id_data')
+    def load_df(self, path_db=None):
+        path_db = get_default_path_db(path_db)
+        self.df = pd.read_sql_table(self.table_name, create_session(path_db).bind)
+        return self.df
 
-    # def new_table_name(self):
-    #     return f"{self.id_data}_data_{self.version}_{self.id_messung}_messung"
-    #
-    # @timing_decorator
-    # def add_to_db(self):
-    #     self.table_name = self.new_table_name()
-    #     # Attribute speichern
-    #     self.session.add(self)
-    #     self.data.to_sql(self.table_name, self.session.bind, if_exists="replace")
-    #     self.session.commit()
-    #
-    #
-    #
-    # ##############################################    TOOLS   ##############################################
-    # def update_metadata(self):
-    #     # self.datetime_start = self.data['Time'].min()
-    #     # self.datetime_end = self.data['Time'].max()
-    #     # self.duration = self.datetime_end - self.datetime_start
-    #     self.length = len(self.data)
+
+
+    def commit_to_db(self, path_db=None):
+        path_db = get_default_path_db(path_db)
+
+        try:
+            with create_session(path_db) as session:
+                session.add(self)
+                session.commit()
+
+                if self.df is not None:
+                    self.df.to_sql(self.table_name, session.bind, if_exists='replace')
+                session.refresh(self)
+                logger.debug(
+                    f": Data-Objekt erfolgreich in {Path(path_db).stem} committed, obj: {self.__str__()}")
+        except Exception as e:
+            logger.error(
+                f"Fehler beim committen des Data-Objekts in {Path(path_db).stem}, obj: {self.__str__()}, error: {e}")
+
+    @timing_decorator
+    def remove_from_db(self, path_db=None):
+        path_db = get_default_path_db(path_db)
+
+        try:
+            with create_session(path_db) as session:
+                # Start a transaction
+                session.begin()
+
+                if self.table_name:
+                    # Delete the table associated with this Data object
+                    session.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                    logger.info(f"Tabelle {self.table_name} wurde aus der Datenbank gelöscht.")
+
+                # Call the base class method to remove this Data object from the database
+                super().remove_from_db(path_db, id_name='id_data')
+
+        except SQLAlchemyError as e:
+            logger.error(f"Fehler beim Entfernen des Data-Objekts {self.__str__()} aus der Datenbank: {e}")
+
+    def copy(self, copy_relationships=False):
+        copy = super().copy(copy_relationships=copy_relationships)
+        return copy
+
+    @staticmethod
+    def new_table_name(version: str, id_messung: int):
+        return f"auto_df_{version}_{id_messung}_messung"
+
+    def update_metadata(self):
+        # self.datetime_start = self.df['Time'].min()
+        # self.datetime_end = self.df['Time'].max()
+        # self.duration = self.datetime_end - self.datetime_start
+        self.length = len(self.df)
+
     #
     # def limit_time(self, start_time, end_time):
-    #     self.data = tms_basics.limit_by_time(self.data, time_col="Time", start_time=start_time, end_time=end_time)
+    #     self.df = tms_basics.limit_by_time(self.df, time_col="Time", start_time=start_time, end_time=end_time)
     #     self.update_metadata()
     #
     # def random_sample(self, n):
-    #     self.data = self.data.sample(n)
+    #     self.df = self.df.sample(n)
     #     self.update_metadata()
     #
     # @timing_decorator
@@ -105,36 +140,36 @@ class Data(BaseClass):
     #     :param freq_range: The frequency range for the EMD-HHT method.
     #     :param feedback: Show result and runtime
     #     """
-    #     temp = self.data['Temperature']
+    #     temp = self.df['Temperature']
     #
     #     methods = {
-    #         "lin_reg": lambda data: tempdrift.temp_drift_comp_lin_reg(data, temp),
-    #         "lin_reg_2": lambda data: tempdrift.temp_drift_comp_lin_reg_2(data, temp),
-    #         "mov_avg": lambda data: tempdrift.temp_drift_comp_mov_avg(data, window_size),
-    #         "emd_hht": lambda data: tempdrift.temp_drift_comp_emd(data, sample_rate, freq_range),
+    #         "lin_reg": lambda df: tempdrift.temp_drift_comp_lin_reg(df, temp),
+    #         "lin_reg_2": lambda df: tempdrift.temp_drift_comp_lin_reg_2(df, temp),
+    #         "mov_avg": lambda df: tempdrift.temp_drift_comp_mov_avg(df, window_size),
+    #         "emd_hht": lambda df: tempdrift.temp_drift_comp_emd(df, sample_rate, freq_range),
     #     }
     #
     #     if method in methods:
-    #         x = methods[method](self.data['East-West-Inclination'])
-    #         y = methods[method](self.data['North-South-Inclination'])
+    #         x = methods[method](self.df['East-West-Inclination'])
+    #         y = methods[method](self.df['North-South-Inclination'])
     #     else:
     #         raise ValueError(f"Invalid method for temp_drift_comp: {method}")
     #
     #     suffix = "" if overwrite else " - new"
     #
-    #     self.data[f'East-West-Inclination - drift compensated{suffix}'] = x
-    #     self.data[f'North-South-Inclination - drift compensated{suffix}'] = y
-    #     self.data[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
-    #     self.data[
+    #     self.df[f'East-West-Inclination - drift compensated{suffix}'] = x
+    #     self.df[f'North-South-Inclination - drift compensated{suffix}'] = y
+    #     self.df[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
+    #     self.df[
     #         f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
     #         x, y)
     #     if feedback is True:
     #         print(
     #             f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
     #
-    # def plot_data(self, y_cols):
+    # def plot_df(self, y_cols):
     #     """
-    #     Plots the specified columns of data against time.
+    #     Plots the specified columns of df against time.
     #
     #     Args:
     #         y_cols (list of str): The names of the columns to plot on the y-axis.
@@ -143,21 +178,21 @@ class Data(BaseClass):
     #         None.
     #
     #     Raises:
-    #         KeyError: If any of the specified column names are not in the data.
+    #         KeyError: If any of the specified column names are not in the df.
     #     """
     #     fig, ax = plt.subplots()
-    #     x = self.data["Time"]
+    #     x = self.df["Time"]
     #     for col in y_cols:
     #         try:
-    #             y = self.data[col]
+    #             y = self.df[col]
     #         except KeyError:
-    #             raise KeyError(f"Column '{col}' not found in data.")
+    #             raise KeyError(f"Column '{col}' not found in df.")
     #         ax.plot(x, y, label=col)
     #     ax.set_xlabel("Time")
     #     ax.legend()
     #     plt.show()
     #
-    # def plot_data_sub(self, y_cols):
+    # def plot_df_sub(self, y_cols):
     #     """
     #     Plot multiple time series subplots.
     #
@@ -168,16 +203,16 @@ class Data(BaseClass):
     #     None
     #
     #     Raises:
-    #         KeyError: If any of the specified column names are not in the data.
+    #         KeyError: If any of the specified column names are not in the df.
     #     """
     #     num_plots = len(y_cols)
     #     fig, axs = plt.subplots(num_plots, 1, figsize=(8, num_plots * 4))
-    #     x = self.data["Time"]
+    #     x = self.df["Time"]
     #     for i, col in enumerate(y_cols):
     #         try:
-    #             y = self.data[col]
+    #             y = self.df[col]
     #         except KeyError:
-    #             raise KeyError(f"Column '{col}' not found in data.")
+    #             raise KeyError(f"Column '{col}' not found in df.")
     #         axs[i].plot(x, y, label=col)
     #         axs[i].set_xlabel("Time")
     #         axs[i].legend()

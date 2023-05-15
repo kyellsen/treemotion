@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy import types
 
 from utilities_old import dbi
-from treemotion.utilities import tempdrift
+from tms import tempdrift
 
 
 class Messung:
