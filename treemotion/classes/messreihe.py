@@ -89,7 +89,7 @@ class Messreihe(BaseClass):
                 if corresponding_file and corresponding_file.is_file():
                     messung.filename = corresponding_file.name
                     messung.filepath = str(corresponding_file)
-                    messung.commit_to_db()
+                    messung.commit_to_db(refresh=False)
                 else:
                     logger.error(f"Die Datei {corresponding_file} existiert nicht oder ist keine CSV-Datei.")
                     return None

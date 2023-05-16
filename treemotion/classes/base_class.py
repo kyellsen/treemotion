@@ -27,15 +27,25 @@ class BaseClass(Base):
         logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
         return objs
 
+    def for_all(self, list_name, method_name, *args, **kwargs):
+        for obj in getattr(self, list_name):
+            method = getattr(obj, method_name, None)
+            if callable(method):
+                method(*args, **kwargs)
+            else:
+                logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
+                return
+
     @timing_decorator
-    def commit_to_db(self, path_db=None):
+    def commit_to_db(self, path_db=None, refresh=True):
         path_db = get_default_path_db(path_db)
 
         try:
             with create_session(path_db) as session:
                 session.merge(self)
                 session.commit()
-                session.refresh(self)
+                if refresh:
+                    session.refresh(self)
                 logger.info(
                     f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet: {path_db}")
         except SQLAlchemyError as e:
@@ -70,11 +80,4 @@ class BaseClass(Base):
                 setattr(copy, attr, value)
         return copy
 
-    def for_all(self, list_name, method_name, *args, **kwargs):
-        for obj in getattr(self, list_name):
-            method = getattr(obj, method_name, None)
-            if callable(method):
-                method(*args, **kwargs)
-            else:
-                logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
-                return
+

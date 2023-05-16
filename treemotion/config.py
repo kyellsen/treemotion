@@ -9,7 +9,7 @@ class Configuration:
         """
         Initialisiert die Konfigurationswerte mit den Standardwerten.
         """
-        self.log_level = "info"  # debug, info, warning, critical, error
+        self.log_level = "debug"  # debug, info, warning, critical, error
         self.log_directory = "log"
         self.template_db_name = "database_template_1_0_0_0.db"  # Look in the "treemotion" directory for template.db
         self.default_path_db = None  # Default database path

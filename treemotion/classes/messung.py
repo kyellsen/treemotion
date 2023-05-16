@@ -49,6 +49,9 @@ class Messung(BaseClass):
         self.sensor_umfang = sensor_umfang
         self.sensor_ausrichtung = sensor_ausrichtung
 
+    def __str__(self):
+        return f"Messung(id_messung={self.id_messung}, id_messreihe={self.id_messreihe}, filename={self.filename}"
+
     @classmethod
     @timing_decorator
     def load_from_db(cls, path_db=None, id_messreihe=None):
@@ -66,12 +69,14 @@ class Messung(BaseClass):
         return copy
 
     def read_csv_tms(self):
-        try:
-            filepath = validate_and_get_filepath(self.filepath)
-        except Exception as e:
-            logger.error(f"Ungültiger Pfad: {self.filepath}. Fehler: {e}")
+        if self.filepath is None:
+            logger.warning(f"Filepath = None, Prozess abgebrochen.")
             return None
 
+        try:
+            filepath = validate_and_get_filepath(self.filepath)
+        except:
+            return None
         try:
             df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
 
@@ -106,8 +111,12 @@ class Messung(BaseClass):
             logger.error(f"new_data_obj konnte nicht erstellt werden: {e}")
             return None
 
+        if obj is None:
+            logger.warning(f"Data = None, Prozess abgebrochen")
+            return None
+
         try:
-            obj.data = self.read_csv_tms()
+            obj.df = self.read_csv_tms()
         except Exception as e:
             logger.error(f"TMS-Daten konnten nicht geladen werden: {e}")
             return None
@@ -151,7 +160,7 @@ class Messung(BaseClass):
             return None
 
         try:
-            obj.data = self.read_csv_tms()
+            obj.df = self.read_csv_tms()
         except Exception as e:
             logger.error(f"TMS-Daten konnten nicht geladen werden: {e}")
             return None
@@ -173,7 +182,12 @@ class Messung(BaseClass):
 
     @timing_decorator
     def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
-        logger.info(f"Starte für version: {version}, id_messung: {self.id_messung}")
+        if self.filepath is None:
+            logger.warning(
+                f"Prozess für {self.__str__()} abgebrochen - Filename fehlt in Datenbank (filename = None).")
+            return None
+
+        logger.info(f"Starte Prozess für {self.__str__()}")
         table_name = Data.new_table_name(version, self.id_messung)
         present_data_obj = self.find_data_by_table_name(table_name)
 
@@ -190,7 +204,7 @@ class Messung(BaseClass):
                 # Update the data relationship
                 self.data.remove(present_data_obj)
                 self.data.append(up_data_obj)
-                logger.warning(
+                logger.info(
                     f"Objekt erstellt und altes Objekt in Datenbank erfolgreich überschrieben (overwrite = True): {up_data_obj.__str__()}")
                 return up_data_obj
             if not overwrite:

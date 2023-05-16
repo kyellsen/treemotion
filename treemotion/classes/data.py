@@ -37,35 +37,20 @@ class Data(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, path_db=None, id_messung=None):
+    def load_from_db(cls, path_db=None, id_messung=None, load_related_df=False):
         objs = super().load_from_db(path_db=path_db, filter_by={'id_messung': id_messung} if id_messung else None)
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
-        return objs
-
-    @classmethod
-    @timing_decorator
-    def load_from_db_with_df(cls, path_db=None, filter_by=None):
-        path_db = get_default_path_db(path_db)
-        session = create_session(path_db)
-
-        if filter_by is not None:
-            objs = session.query(cls).filter_by(**filter_by).all()
-        else:
-            objs = session.query(cls).all()
-
-        objs = [obj.load_df() for obj in objs]
-
-        session.close()
-        logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
+        if load_related_df:
+            for obj in objs:
+                obj.load_df(path_db)
+                logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
         return objs
 
     @timing_decorator
     def load_df(self, path_db=None):
         path_db = get_default_path_db(path_db)
         self.df = pd.read_sql_table(self.table_name, create_session(path_db).bind)
-        return self.df
-
-
+        return self
 
     def commit_to_db(self, path_db=None):
         path_db = get_default_path_db(path_db)

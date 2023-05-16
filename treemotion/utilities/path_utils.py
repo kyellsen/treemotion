@@ -16,14 +16,18 @@ def validate_and_get_path(path):
     :param path: Ein String oder Path-Objekt, das den zu überprüfenden Pfad repräsentiert.
     :return: Ein gültiges Path-Objekt oder None.
     """
+    if path is None:
+        logger.warning(f"Filepath = None, Prozess abgebrochen.")
+        return None
+
     try:
         path = Path(path)
-        logger.debug(f"Path korrekt und in Path-Objekt umgewandelt: {path} ")
     except TypeError as e:
         logger.error(f"Input kann nicht in ein Path-Objekt umgewandelt werden. Fehler: {e}")
         return None
 
     return path
+
 
 def validate_and_get_filepath(filepath):
     """
@@ -34,14 +38,12 @@ def validate_and_get_filepath(filepath):
     """
     filepath = validate_and_get_path(filepath)
     if filepath is None:
-        logger.error(f"Ungültiger Pfad: {filepath}")
+        logger.warning(f"Filepath = None, Prozess abgebrochen.")
         return None
 
     if not filepath.is_file():
         logger.error(f"Die Datei {filepath} existiert nicht.")
         return None
-
-    logger.debug(f"Gültige Datei gefunden: {filepath.stem}")
     return filepath
 
 
@@ -67,7 +69,7 @@ def extract_id_sensor_list(files: List[Path]) -> List[int]:
     Extrahiert die Sensor-ID aus den Dateinamen und gibt diese als Liste zurück.
 
     :param files: Liste von Dateipfaden
-    :return: Liste mit Sensor-IDs
+    :return: Liste mit Sensor-IDs oder bei Fehler None
     """
     try:
         id_sensor_list = [int(filename.stem[-3:]) for filename in files]
@@ -77,5 +79,3 @@ def extract_id_sensor_list(files: List[Path]) -> List[int]:
 
     logger.info(f"Extrahierte Sensor-IDs: {id_sensor_list}")
     return id_sensor_list
-
-
