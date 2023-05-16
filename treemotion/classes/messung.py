@@ -2,8 +2,8 @@
 
 import pandas as pd
 
-from utilities.common_imports import *
-from utilities.path_utils import validate_and_get_path, validate_and_get_filepath
+from utilities.imports_classes import *
+from utilities.path_utils import validate_and_get_filepath
 
 from .data import Data
 from .baum import BaumBehandlung
@@ -54,15 +54,15 @@ class Messung(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, path_db=None, id_messreihe=None):
-        objs = super().load_from_db(path_db, filter_by={'id_messreihe': id_messreihe} if id_messreihe else None)
+    def load_from_db(cls, id_messreihe=None):
+        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None)
         logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, path_db=None):
+    def remove_from_db(self, *args, db_name=None):
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(path_db, id_name='id_messung')
+        super().remove_from_db(id_name='id_messung')
 
     def copy(self, copy_relationships=True):
         copy = super().copy(copy_relationships=copy_relationships)
@@ -89,6 +89,7 @@ class Messung(BaseClass):
 
         return df
 
+    # Hilfsmethode für load_dat_from_csv
     def find_data_by_table_name(self, table_name):
         matching_data = [data for data in self.data if data.table_name == table_name]
 
@@ -103,6 +104,7 @@ class Messung(BaseClass):
         logger.debug(f"Data-Instanz mit table_name {table_name} gefunden.")
         return matching_data[0]
 
+    # Hilfsmethode für load_dat_from_csv
     @timing_decorator
     def data_obj_from_csv(self, version: str, table_name: str):
         try:
@@ -130,6 +132,7 @@ class Messung(BaseClass):
         logger.debug(f"Objekt wurde erfolgreich erstellt: {obj}")
         return obj
 
+    # Hilfsmethode für load_dat_from_csv
     @timing_decorator
     def new_data_obj_to_db(self, version, table_name):
         obj = None
@@ -150,6 +153,7 @@ class Messung(BaseClass):
             return None
         return obj
 
+    # Hilfsmethode für load_dat_from_csv
     @timing_decorator
     def update_data_obj_in_db(self, present_data_obj):
         try:
@@ -180,6 +184,7 @@ class Messung(BaseClass):
             return None
         return obj
 
+    # Hilfsmethode für load_dat_from_csv
     @timing_decorator
     def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
         if self.filepath is None:

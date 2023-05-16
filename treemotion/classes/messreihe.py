@@ -1,9 +1,10 @@
 # treemotion/classes/messreihe.py
-from utilities.common_imports import *
+from utilities.imports_classes import *
 
 from utilities.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
 
 from .messung import Messung
+
 
 class Messreihe(BaseClass):
     __tablename__ = 'Messreihe'
@@ -16,7 +17,8 @@ class Messreihe(BaseClass):
     anmerkung = Column(String)
     filepath_tms = Column(String)
 
-    messungen = relationship("Messung", backref="messreihe", lazy="joined", cascade='all, delete, delete-orphan', order_by="Messung.id_messung")
+    messungen = relationship("Messung", backref="messreihe", lazy="joined", cascade='all, delete, delete-orphan',
+                             order_by="Messung.id_messung")
 
     def __init__(self, *args, id_messreihe=None, beschreibung=None, datum_beginn=None, datum_ende=None, ort=None,
                  anmerkung=None, filepath_tms=None, **kwargs):
@@ -33,15 +35,15 @@ class Messreihe(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, path_db=None, id_projekt=None):
-        objs = super().load_from_db(path_db, filter_by={'id_projekt': id_projekt} if id_projekt else None)
+    def load_from_db(cls, id_projekt=None):
+        objs = super().load_from_db(filter_by={'id_projekt': id_projekt} if id_projekt else None)
         logger.info(f"{len(objs)} Messreihen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, path_db=None):
+    def remove_from_db(self, *args, db_name=None):
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(path_db, id_name='id_messreihe')
+        super().remove_from_db(id_name='id_messreihe')
 
     @timing_decorator
     def copy(self, copy_relationships=True):

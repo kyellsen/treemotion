@@ -1,4 +1,4 @@
-from utilities.common_imports import *
+from utilities.imports_classes import *
 
 class Sensor(BaseClass):
     __tablename__ = 'Sensor'
