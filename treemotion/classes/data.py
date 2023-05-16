@@ -37,38 +37,44 @@ class Data(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, db_name=None, id_messung=None, load_related_df=False):
-        objs = super().load_from_db(db_name=db_name, filter_by={'id_messung': id_messung} if id_messung else None)
+    def load_from_db(cls, id_messung=None, load_related_df=False):
+        objs = super().load_from_db(filter_by={'id_messung': id_messung} if id_messung else None)
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
-                obj.load_df(db_name)
+                obj.load_df()
                 logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
         return objs
 
     @timing_decorator
-    def load_df(self, db_name=None):
-        self.df = pd.read_sql_table(self.table_name, db_manager.get_session(db_name).bind)
+    def load_df(self):
+        self.df = pd.read_sql_table(self.table_name, db_manager.get_session().bind)
         return self
 
-    def commit_to_db(self, db_name=None, refresh=True):
-        try:
-            with db_manager.get_session_scope(db_name) as session:
-                session.add(self)
+    @timing_decorator
+    def commit_to_db(self, refresh=True):
+        session = db_manager.get_session()
+        session.merge(self)
+        if refresh:
+            session.refresh(self)
+        db_manager.close_session()
+        logger.info(
+            f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
 
-                if self.df is not None:
-                    self.df.to_sql(self.table_name, session.bind, if_exists='replace')
-                session.refresh(self)
-                logger.debug(
-                    f"Data-Objekt erfolgreich in {db_name} committed, obj: {self.__str__()}")
-        except Exception as e:
-            logger.error(
-                f"Fehler beim committen des Data-Objekts in {db_name}, obj: {self.__str__()}, error: {e}")
+
+    def commit_to_db(self, refresh=True):
+        if self.df is not None:
+            self.df.to_sql(self.table_name, session.bind, if_exists='replace', chunksize=20000)  ### PROOOFFF
+        if refresh:
+            session.refresh(self)
+        logger.info(
+            f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
+
 
     @timing_decorator
-    def remove_from_db(self, db_name=None):
+    def remove_from_db(self):
         try:
-            with db_manager.get_session_scope(db_name) as session:
+            with db_manager.get_session_scope() as session:
                 # Start a transaction
                 session.begin()
 
@@ -78,7 +84,7 @@ class Data(BaseClass):
                     logger.info(f"Tabelle {self.table_name} wurde aus der Datenbank gelöscht.")
 
                 # Call the base class method to remove this Data object from the database
-                super().remove_from_db(db_name, id_name='id_data')
+                super().remove_from_db(id_name='id_data')
 
         except SQLAlchemyError as e:
             logger.error(f"Fehler beim Entfernen des Data-Objekts {self.__str__()} aus der Datenbank: {e}")

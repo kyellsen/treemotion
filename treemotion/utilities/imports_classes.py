@@ -19,4 +19,3 @@ logger = get_logger(__name__)
 from treemotion import db_manager
 from classes.base_class import BaseClass
 
-

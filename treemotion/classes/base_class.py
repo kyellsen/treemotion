@@ -29,34 +29,30 @@ class BaseClass(Base):
         else:
             objs = session.query(cls).all()
 
-        db_manager.close_session()
+
         logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
     def commit_to_db(self, refresh=True):
-        try:
-            with db_manager.get_session_scope() as session:
-                session.merge(self)
-                if refresh:
-                    session.refresh(self)
-                logger.info(
-                    f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
-        except SQLAlchemyError as e:
-            logger.error(f"Fehler beim Committen der Änderungen am {self.__class__.__name__} in der Datenbank: {e}")
+        # Verwenden Sie die bereits geöffnete Session
+        session.merge(self)
+        if refresh:
+            session.refresh(self)
+        logger.info(
+            f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
 
     def remove_from_db(self, id_name='id'):
+        existing_obj = session.query(type(self)).get(getattr(self, id_name))
         try:
-            with db_manager.get_session_scope() as session:
-                existing_obj = session.query(type(self)).get(getattr(self, id_name))
-
-                if existing_obj is not None:
-                    session.delete(existing_obj)
-                    logger.info(f"Objekt {self.__class__.__name__} wurde aus der Datenbank entfernt.")
-                else:
-                    logger.info(f"Objekt {self.__class__.__name__} ist nicht in der Datenbank vorhanden.")
-        except SQLAlchemyError as e:
+            if existing_obj is not None:
+                session.delete(existing_obj)
+                logger.info(f"Objekt {self.__class__.__name__} wurde aus der Datenbank entfernt.")
+            else:
+                logger.info(f"Objekt {self.__class__.__name__} ist nicht in der Datenbank vorhanden.")
+        except Exception as e:
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__} aus der Datenbank: {e}")
+
 
     def copy(self, copy_relationships=True):
         new_instance = self.__class__()

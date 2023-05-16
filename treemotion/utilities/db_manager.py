@@ -80,11 +80,10 @@ class DatabaseManager:
                         "No default database connection set. Please initialize a database with 'set_as_default=True' first.")
                     return None
                 db_name = self._default_db_name
-                logger.debug(f"_default_db_name: {self._default_db_name}")
             if db_name not in self._sessions:
-                logger.error(f"Database connection '{db_name}' is not initialized. Please call 'connect_db' first.")
+                logger.error(f"Database connection '{db_name}.db' is not initialized. Please call 'connect_db' first.")
                 return None
-            # logger.debug(f"self._sessions[db_name] {self._sessions[db_name]}")
+            logger.debug(f"Database connection to '{db_name}.db' initialized")
             return self._sessions[db_name]()
         except Exception as e:
             logger.error(f'Error getting get_session for database {db_name}: {e}')

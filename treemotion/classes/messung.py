@@ -109,12 +109,9 @@ class Messung(BaseClass):
     def data_obj_from_csv(self, version: str, table_name: str):
         try:
             obj = Data(id_data=None, id_messung=self.id_messung, version=version, table_name=table_name)
+            logger.debug(f"Objekt erfolgreich erstellt: {obj.__str__()}")
         except Exception as e:
             logger.error(f"new_data_obj konnte nicht erstellt werden: {e}")
-            return None
-
-        if obj is None:
-            logger.warning(f"Data = None, Prozess abgebrochen")
             return None
 
         try:
@@ -174,7 +171,7 @@ class Messung(BaseClass):
         except Exception as e:
             logger.error(f"Datenobjekt konnte nicht mit Data.update_metadata() aktualisiert werden: {e}")
             return None
-
+        logger.debug(f"Vorhandenes Data-Objekt erfolgreich geladen, read_csv_tms() und update_metadata() ausgeführt: {obj.__str__()} ")
         try:
             obj.commit_to_db()
             logger.debug(f"Objekt erfolgreich aktualisiert und zur Datenbank hinzugefügt: {obj.__str__()}")
