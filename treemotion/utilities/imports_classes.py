@@ -13,6 +13,7 @@ from typing import List
 from treemotion.config import configuration
 from utilities.timing import timing_decorator
 from utilities.log import get_logger
+from treemotion import db_manager
 
 from classes.base_class import BaseClass
-from database import db_manager
+

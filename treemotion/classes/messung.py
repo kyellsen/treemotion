@@ -56,18 +56,24 @@ class Messung(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, session, id_messreihe=None):
-        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None , session=session)
+    def load_from_db(cls, id_messreihe=None, session=None):
+        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None, session=session)
         logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, session, *args, db_name=None):
+    def remove(self, id_projekt='id_messung', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(id_name='id_messung')
+        super().remove(id_projekt, auto_commit, session)
 
-    def copy(self, copy_relationships=True):
-        copy = super().copy(copy_relationships=copy_relationships)
+    @timing_decorator
+    def copy(self, id_name="id_messung", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+        return new_instance
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
 
     def read_csv_tms(self):
@@ -144,7 +150,7 @@ class Messung(BaseClass):
             return None
 
         try:
-            obj.commit_to_db()
+            # obj.commit_to_db()
             logger.debug(f"Objekt erfolgreich erstellt und zur Datenbank hinzugefügt: {obj.__str__()}")
         except Exception as e:
             logger.error(
@@ -154,7 +160,7 @@ class Messung(BaseClass):
 
     # Hilfsmethode für load_dat_from_csv
     @timing_decorator
-    def update_data_obj_in_db(self, session, present_data_obj):
+    def update_data_obj_in_db(self, present_data_obj):
         try:
             # Nutzen Sie das vorhandene Datenobjekt
             obj = present_data_obj
@@ -185,7 +191,7 @@ class Messung(BaseClass):
 
     # Hilfsmethode für load_dat_from_csv
     @timing_decorator
-    def load_data_from_csv(self, session, version=configuration.data_version_default, overwrite=False):
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
         if self.filepath is None:
             logger.warning(
                 f"Prozess für {self.__str__()} abgebrochen - Filename fehlt in Datenbank (filename = None).")

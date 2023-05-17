@@ -1,16 +1,21 @@
 # main.py
-from treemotion import *
+import treemotion
+from treemotion import db_manager, Projekt, Messreihe, Messung, Data
 
 if __name__ == "__main__":
     print("Start")
-    path_db_1 = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\projekt_test_data\TREEMOTION_1.db"
+    path_db_1 = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\projekt_test_data\TREEMOTION - Kopie.db"
     path_123 = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\projekt_test_data\test_123.db"
+    csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
-    db_manager.connect_db("/path/to/database.db")
-    models.load_data()
-    models.edit_data()
-    db_manager.commit_to_db()
-    db_manager.disconnect_db()
+
+    db_manager.connect(path_db_1)
+    projekt_list = Projekt.load_from_db()
+    projekt = projekt_list[0]
+    messreihe = projekt.messreihen[0]
+    copy = messreihe.copy(reset_id=True, auto_commit=True)
+    projekt_list = Projekt.load_from_db()
+    #db_manager.disconnect()
 
     #projekt = projekt_list[0]
     # Hier würden Änderungen an Projekt-Instanz erfolgen. Projekt erbt von BaseClass.

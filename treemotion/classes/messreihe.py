@@ -42,17 +42,22 @@ class Messreihe(BaseClass):
         return objs
 
     @timing_decorator
-    def remove_from_db(self, session, *args, db_name=None):
+    def remove(self, id_projekt='id_messreihe', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(id_name='id_messreihe')
+        super().remove(id_projekt, auto_commit, session)
 
     @timing_decorator
-    def copy(self, copy_relationships=True):
-        copy = super().copy(copy_relationships=copy_relationships)
+    def copy(self, id_name="id_messreihe", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+        return new_instance
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
 
     @timing_decorator
-    def add_filenames(self, session, csv_path: str):
+    def add_filenames(self, csv_path: str):
         """
         Aktualisiert die Attribute 'filename' und 'filepath' für jede Messung dieser Messreihe,
         indem CSV-Dateien im angegebenen Pfad gesucht und deren Namen und Pfade extrahiert werden.
@@ -92,7 +97,6 @@ class Messreihe(BaseClass):
                 if corresponding_file and corresponding_file.is_file():
                     messung.filename = corresponding_file.name
                     messung.filepath = str(corresponding_file)
-                    messung.commit_to_db(refresh=False)
                 else:
                     logger.error(f"Die Datei {corresponding_file} existiert nicht oder ist keine CSV-Datei.")
                     return None

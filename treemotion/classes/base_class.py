@@ -2,6 +2,7 @@
 from utilities.imports_classes import *
 from utilities.base import Base
 
+
 logger = get_logger(__name__)
 
 class BaseClass(Base):
@@ -10,15 +11,6 @@ class BaseClass(Base):
     def __init__(self, *args, **kwargs):
         for attr, value in kwargs.items():
             setattr(self, attr, value)
-
-    def for_all(self, list_name, method_name, *args, **kwargs):
-        for obj in getattr(self, list_name):
-            method = getattr(obj, method_name, None)
-            if callable(method):
-                method(*args, **kwargs)
-            else:
-                logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
-                return
 
     @classmethod
     @timing_decorator
@@ -32,40 +24,78 @@ class BaseClass(Base):
         logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
         return objs
 
-    @timing_decorator
-    def commit_to_db(self, refresh=True, session=None):
-        session = db_manager.get_session(session)
-        session.merge(self)
-        if refresh:
-            session.refresh(self)
-        logger.info(
-            f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
-
-    def remove_from_db(self, id_name='id', session=None):
+    def remove(self, id_name='id', auto_commit=False, session=None):
         session = db_manager.get_session(session)
         existing_obj = session.query(type(self)).get(getattr(self, id_name))
         try:
             if existing_obj is not None:
                 session.delete(existing_obj)
-                logger.info(f"Objekt {self.__class__.__name__} wurde aus der Datenbank entfernt.")
+                logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
             else:
-                logger.info(f"Objekt {self.__class__.__name__} ist nicht in der Datenbank vorhanden.")
+                logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
+            if auto_commit:
+                db_manager.commit(session)
         except Exception as e:
-            logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__} aus der Datenbank: {e}")
+            session.rollback()  # Rollback the changes on error
+            logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
 
+    def for_all(self, list_name, method_name, *args, **kwargs):
+        for obj in getattr(self, list_name):
+            method = getattr(obj, method_name, None)
+            if callable(method):
+                method(*args, **kwargs)
+            else:
+                logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
+                return
 
-    def copy(self, copy_relationships=True):
+    def copy(self, id_name='id', reset_id=False, auto_commit=False, session=None):
         new_instance = self.__class__()
 
         for attr, value in self.__dict__.items():
             if attr == '_sa_instance_state':
                 continue
 
-            if isinstance(value, list) and copy_relationships:
-                setattr(new_instance, attr, [item.copy() for item in value])
-            elif isinstance(value, BaseClass) and copy_relationships:
-                setattr(new_instance, attr, value.copy())
-            else:
-                setattr(new_instance, attr, value)
+            setattr(new_instance, attr, value)
+
+        if reset_id:
+            try:
+                setattr(new_instance, id_name, None)
+                logger.debug(f"Reset id attribute {id_name} in new instance.")
+            except Exception as e:
+                logger.error(f"Error resetting id attribute {id_name}: {e}")
+
+        if auto_commit:
+            setattr(new_instance, id_name, None)
+            session = db_manager.get_session(session)
+            try:
+                session.add(new_instance)
+                db_manager.commit(session)
+                logger.info(f"New instance of {self.__class__.__name__} added to session and committed.")
+            except Exception as e:
+                session.rollback()
+                logger.error(f"Error committing new instance of {self.__class__.__name__}: {e}")
+
+        return new_instance
+
+    def copy_deep(self, copy_relationships=True):
+        new_instance = self.__class__()
+
+        for attr, value in self.__dict__.items():
+            if attr == '_sa_instance_state':
+                continue
+
+            try:
+                if isinstance(value, list) and copy_relationships:
+                    setattr(new_instance, attr, [item.copy() for item in value])
+                    logger.debug(f"Copied list attribute {attr} from {self.__class__.__name__} to new instance.")
+                elif isinstance(value, BaseClass) and copy_relationships:
+                    setattr(new_instance, attr, value.copy())
+                    logger.debug(f"Copied BaseClass attribute {attr} from {self.__class__.__name__} to new instance.")
+                else:
+                    setattr(new_instance, attr, value)
+                    logger.debug(f"Copied attribute {attr} from {self.__class__.__name__} to new instance.")
+            except Exception as e:
+                logger.error(f"Error copying attribute {attr}: {e}")
+                continue
 
         return new_instance

@@ -31,18 +31,24 @@ class Projekt(BaseClass):
         return objs
 
     @timing_decorator
-    def remove_from_db(self, session=None):
+    def remove(self, id_projekt='id_projekt', auto_commit=False, session=None):
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(id_name='id_projekt', session=session)
+        super().remove(id_projekt, auto_commit, session)
 
-    def copy(self, copy_relationships=True):
-        copy = super().copy(copy_relationships=copy_relationships)
+    @timing_decorator
+    def copy(self, id_name="id_projekt", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+        return new_instance
+
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
 
     @timing_decorator
-    def add_filenames(self, csv_path, session=None):
-        self.for_all('messreihen', 'add_filenames', csv_path, session=session)
+    def add_filenames(self, csv_path):
+        self.for_all('messreihen', 'add_filenames', csv_path=csv_path)
 
     @timing_decorator
     def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, session=None):
