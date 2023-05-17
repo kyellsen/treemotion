@@ -4,6 +4,9 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 from utilities.imports_classes import *
+from utilities.path_utils import validate_and_get_filepath
+
+logger = get_logger(__name__)
 
 
 class Data(BaseClass):
@@ -33,69 +36,117 @@ class Data(BaseClass):
         self.df = df
 
     def __str__(self):
-        return f"Data(id_data={self.id_data}, id_messung={self.id_messung}, version={self.version}, table_name={self.table_name})"
+        return f"Data(id={self.id_data}, id_messung={self.id_messung}, table_name={self.table_name})"
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, db_name=None, id_messung=None, load_related_df=False):
-        objs = super().load_from_db(db_name=db_name, filter_by={'id_messung': id_messung} if id_messung else None)
+    def load_from_db(cls, id_messung=None, load_related_df=False, session=None):
+        objs = super().load_from_db(filter_by={'id_messung': id_messung} if id_messung else None, session=session)
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
-                obj.load_df(db_name)
+                obj.get_df()
                 logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
         return objs
 
     @timing_decorator
-    def load_df(self, db_name=None):
-        self.df = pd.read_sql_table(self.table_name, db_manager.get_session(db_name).bind)
+    def get_df(self, session=None):
+        self.df = pd.read_sql_table(self.table_name, session)
         return self
 
-    def commit_to_db(self, db_name=None, refresh=True):
-        try:
-            with db_manager.get_session_scope(db_name) as session:
-                session.add(self)
+    @classmethod
 
-                if self.df is not None:
-                    self.df.to_sql(self.table_name, session.bind, if_exists='replace')
-                session.refresh(self)
-                logger.debug(
-                    f"Data-Objekt erfolgreich in {db_name} committed, obj: {self.__str__()}")
+    def load_from_csv(cls, filepath, id_data, id_messung, version, table_name):
+        if filepath is None:
+            logger.warning(f"Filepath = None, Prozess abgebrochen.")
+            return None
+        obj = cls()
+        obj.id_data = id_data
+        obj.id_messung = id_messung
+        obj.version = version
+        obj.table_name = table_name
+        obj.df = obj.read_csv_tms(filepath)
+        obj.update_metadata()
+        return obj
+
+    @staticmethod
+    @timing_decorator
+    def read_csv_tms(filepath):
+        try:
+            filepath = validate_and_get_filepath(filepath)
         except Exception as e:
-            logger.error(
-                f"Fehler beim committen des Data-Objekts in {db_name}, obj: {self.__str__()}, error: {e}")
+            return None
+        try:
+            df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
+
+        except pd.errors.ParserError:
+            logger.error(f"Fehler beim Lesen der Datei {filepath.stem}. Überprüfen Sie das Dateiformat.")
+            return None
+        except Exception as e:
+            logger.error(f"Ungewöhnlicher Fehler beim Laden der {filepath.stem}: {e}")
+            return None
+
+        return df
+
+    def update_metadata(self):
+        try:
+            # self.datetime_start = self.df['Time'].min()
+            # self.datetime_end = self.df['Time'].max()
+            # self.duration = self.datetime_end - self.datetime_start
+            self.length = len(self.df)
+            logger.debug(f"Metadaten für {self.__str__()} erfolgreich aktualisert!")
+        except Exception as e:
+            logger.error(f"Metadaten für {self.__str__()} konnten nicht aktualisiert werden: {e}")
 
     @timing_decorator
-    def remove_from_db(self, db_name=None):
+    def commit_data_obj(self, session=None):
+        logger.debug(f"Start auto_commit for load_data_from_csv")
+        session = db_manager.get_session(session)
         try:
-            with db_manager.get_session_scope(db_name) as session:
-                # Start a transaction
-                session.begin()
+            session.add(self)
+            if self.df is not None:
+                self.df.to_sql(self.table_name, session.bind, if_exists='replace', chunksize=20000)
+            db_manager.commit(session)
+            logger.debug(f"New instance of {self.__str__()} added to session and committed.")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error committing {self.__str__()} to Database: {e}")
 
-                if self.table_name:
-                    # Delete the table associated with this Data object
-                    session.execute(f"DROP TABLE IF EXISTS {self.table_name}")
-                    logger.info(f"Tabelle {self.table_name} wurde aus der Datenbank gelöscht.")
+    def remove(self, id_name='id_data', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
+        existing_obj = session.query(type(self)).get(getattr(self, id_name))
+        try:
+            if existing_obj is not None:
+                # Delete the table associated with this Data object
+                session.execute(f"DROP TABLE IF EXISTS {self.table_name}")
+                self.df = None
+                session.delete(existing_obj)
+                logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
+            else:
+                logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
+            if auto_commit:
+                db_manager.commit(session)
+        except Exception as e:
+            session.rollback()  # Rollback the changes on error
+            logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
 
-                # Call the base class method to remove this Data object from the database
-                super().remove_from_db(db_name, id_name='id_data')
+    @timing_decorator
+    def copy(self, id_name="id_data", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
 
-        except SQLAlchemyError as e:
-            logger.error(f"Fehler beim Entfernen des Data-Objekts {self.__str__()} aus der Datenbank: {e}")
+        # Create a deep copy of the DataFrame
+        if self.df is not None:
+            new_instance.df = self.df.copy(deep=True)
 
-    def copy(self, copy_relationships=False):
-        copy = super().copy(copy_relationships=copy_relationships)
+        return new_instance
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
 
     @staticmethod
     def new_table_name(version: str, id_messung: int):
         return f"auto_df_{version}_{id_messung}_messung"
-
-    def update_metadata(self):
-        # self.datetime_start = self.df['Time'].min()
-        # self.datetime_end = self.df['Time'].max()
-        # self.duration = self.datetime_end - self.datetime_start
-        self.length = len(self.df)
 
     #
     # def limit_time(self, start_time, end_time):

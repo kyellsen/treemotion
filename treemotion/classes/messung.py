@@ -1,13 +1,12 @@
 # treemotion/classes/messung.py
 
-import pandas as pd
-
 from utilities.imports_classes import *
-from utilities.path_utils import validate_and_get_filepath
 
 from .data import Data
 from .baum import BaumBehandlung
 from .sensor import Sensor, SensorOrt
+
+logger = get_logger(__name__)
 
 
 class Messung(BaseClass):
@@ -50,44 +49,29 @@ class Messung(BaseClass):
         self.sensor_ausrichtung = sensor_ausrichtung
 
     def __str__(self):
-        return f"Messung(id_messung={self.id_messung}, id_messreihe={self.id_messreihe}, filename={self.filename}"
+        return f"Messung(id={self.id_messung}, id_messreihe={self.id_messreihe}, filename={self.filename}"
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_messreihe=None):
-        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None)
+    def load_from_db(cls, id_messreihe=None, session=None):
+        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None, session=session)
         logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, db_name=None):
+    def remove(self, id_projekt='id_messung', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(id_name='id_messung')
+        super().remove(id_projekt, auto_commit, session)
 
-    def copy(self, copy_relationships=True):
-        copy = super().copy(copy_relationships=copy_relationships)
+    @timing_decorator
+    def copy(self, id_name="id_messung", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+        return new_instance
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
-
-    def read_csv_tms(self):
-        if self.filepath is None:
-            logger.warning(f"Filepath = None, Prozess abgebrochen.")
-            return None
-
-        try:
-            filepath = validate_and_get_filepath(self.filepath)
-        except:
-            return None
-        try:
-            df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
-
-        except pd.errors.ParserError:
-            logger.error(f"Fehler beim Lesen der Datei {filepath.stem}. Überprüfen Sie das Dateiformat.")
-            return None
-        except Exception as e:
-            logger.error(f"Ungewöhnlicher Fehler beim Laden der {filepath.stem}: {e}")
-            return None
-
-        return df
 
     # Hilfsmethode für load_dat_from_csv
     def find_data_by_table_name(self, table_name):
@@ -104,119 +88,44 @@ class Messung(BaseClass):
         logger.debug(f"Data-Instanz mit table_name {table_name} gefunden.")
         return matching_data[0]
 
-    # Hilfsmethode für load_dat_from_csv
     @timing_decorator
-    def data_obj_from_csv(self, version: str, table_name: str):
-        try:
-            obj = Data(id_data=None, id_messung=self.id_messung, version=version, table_name=table_name)
-        except Exception as e:
-            logger.error(f"new_data_obj konnte nicht erstellt werden: {e}")
-            return None
-
-        if obj is None:
-            logger.warning(f"Data = None, Prozess abgebrochen")
-            return None
-
-        try:
-            obj.df = self.read_csv_tms()
-        except Exception as e:
-            logger.error(f"TMS-Daten konnten nicht geladen werden: {e}")
-            return None
-
-        try:
-            obj.update_metadata()
-        except Exception as e:
-            logger.error(f"new_data_obj konnte nicht mit Data.update_metadata() aktualisiert werden: {e}")
-            return None
-
-        logger.debug(f"Objekt wurde erfolgreich erstellt: {obj}")
-        return obj
-
-    # Hilfsmethode für load_dat_from_csv
-    @timing_decorator
-    def new_data_obj_to_db(self, version, table_name):
-        obj = None
-        try:
-            obj = self.data_obj_from_csv(version, table_name)
-            logger.debug(f"Objekt {obj.__str__()} erfolgreich erstellt")
-        except Exception as e:
-            logger.error(
-                f"Objekt konnte nicht mit Data.update_metadata() aktualisiert werden, obj: {obj.__str__()}, error: {e}")
-            return None
-
-        try:
-            obj.commit_to_db()
-            logger.debug(f"Objekt erfolgreich erstellt und zur Datenbank hinzugefügt: {obj.__str__()}")
-        except Exception as e:
-            logger.error(
-                f"Objekt konnte nicht mit Data.commit_to_db() zur Datenbank hinzugefügt werden, obj: {obj.__str__()}, error: {e}")
-            return None
-        return obj
-
-    # Hilfsmethode für load_dat_from_csv
-    @timing_decorator
-    def update_data_obj_in_db(self, present_data_obj):
-        try:
-            # Nutzen Sie das vorhandene Datenobjekt
-            obj = present_data_obj
-        except Exception as e:
-            logger.error(f"Vorhandenes Datenobjekt konnte nicht geladen werden: {e}")
-            return None
-
-        try:
-            obj.df = self.read_csv_tms()
-        except Exception as e:
-            logger.error(f"TMS-Daten konnten nicht geladen werden: {e}")
-            return None
-
-        try:
-            obj.update_metadata()
-        except Exception as e:
-            logger.error(f"Datenobjekt konnte nicht mit Data.update_metadata() aktualisiert werden: {e}")
-            return None
-
-        try:
-            obj.commit_to_db()
-            logger.debug(f"Objekt erfolgreich aktualisiert und zur Datenbank hinzugefügt: {obj.__str__()}")
-        except Exception as e:
-            logger.error(
-                f"Objekt konnte nicht mit Data.commit_to_db() zur Datenbank hinzugefügt werden, obj: {obj.__str__()}, error: {e}")
-            return None
-        return obj
-
-    # Hilfsmethode für load_dat_from_csv
-    @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+                           session=None):
         if self.filepath is None:
-            logger.warning(
-                f"Prozess für {self.__str__()} abgebrochen - Filename fehlt in Datenbank (filename = None).")
+            logger.warning(f"Process for {self.__str__()} aborted, no filename for tms.csv (filename = None).")
             return None
 
-        logger.info(f"Starte Prozess für {self.__str__()}")
+        logger.info(f"Start loading csv data for {self.__str__()}")
         table_name = Data.new_table_name(version, self.id_messung)
         present_data_obj = self.find_data_by_table_name(table_name)
 
-        if present_data_obj is None:
-            new_data_obj = self.new_data_obj_to_db(version, table_name)
-            # Update the data relationship
-            self.data.append(new_data_obj)
-            logger.info(f"Objekt erfolgreich NEU erstellt und zur Datenbank hinzugefügt: {new_data_obj.__str__()}")
-            return new_data_obj
+        if present_data_obj is None or overwrite:
+            if present_data_obj and overwrite:
+                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj.__str__()}")
+            obj = self.create_or_update_data_obj(version, table_name, present_data_obj)
+        else:
+            logger.warning(
+                f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj.__str__()}")
+            return None
 
-        elif isinstance(present_data_obj, Data):
-            if overwrite:
-                up_data_obj = self.update_data_obj_in_db(present_data_obj)
-                # Update the data relationship
-                self.data.remove(present_data_obj)
-                self.data.append(up_data_obj)
-                logger.info(
-                    f"Objekt erstellt und altes Objekt in Datenbank erfolgreich überschrieben (overwrite = True): {up_data_obj.__str__()}")
-                return up_data_obj
-            if not overwrite:
-                logger.warning(
-                    f"Objekt bereits in Datenbank vorhanden, nicht überschrieben (overwrite = False), obj: {present_data_obj.__str__()} ")
+        if auto_commit:
+            obj.commit_data_obj(session)
+            logger.info(
+                f"Loading data from csv and committing to database {self.__str__()} successful (auto_commit=True)!")
+        else:
+            logger.info(f"Loading data from csv for {self.__str__()} successful (auto_commit=False)!")
+        return obj
 
-                return present_data_obj
+    def create_or_update_data_obj(self, version, table_name, present_data_obj=None):
+        obj = present_data_obj or Data.load_from_csv(filepath=self.filepath, id_data=None, id_messung=self.id_messung,
+                                                     version=version, table_name=table_name)
+        obj.df = obj.read_csv_tms(self.filepath)
+        obj.update_metadata()
+        if present_data_obj:
+            self.data.remove(present_data_obj)
+        self.data.append(obj)
+        logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
+        return obj
 
 
 class MessungStatus(BaseClass):

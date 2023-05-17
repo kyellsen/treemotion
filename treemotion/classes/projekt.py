@@ -4,6 +4,8 @@ from utilities.imports_classes import *
 
 from .messreihe import Messreihe
 
+logger = get_logger(__name__)
+
 
 class Projekt(BaseClass):
     __tablename__ = 'Projekt'
@@ -20,26 +22,41 @@ class Projekt(BaseClass):
         self.id_projekt = id_projekt
         self.name = name
 
+    def __str__(self):
+        return f"Projekt(id={self.id_projekt}, name={self.name}"
+
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_projekt=None):
-        objs = super().load_from_db(filter_by={'id_projekt': id_projekt} if id_projekt else None)
+    def load_from_db(cls, id_projekt=None, session=None):
+        session = db_manager.get_session(session)
+        objs = super().load_from_db(filter_by={'id_projekt': id_projekt} if id_projekt else None, session=session)
         logger.info(f"{len(objs)} Projekte wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, db_name=None):
+    def remove(self, id_projekt='id_projekt', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove_from_db(id_name='id_projekt')
+        super().remove(id_projekt, auto_commit, session)
 
-    def copy(self, copy_relationships=True):
-        copy = super().copy(copy_relationships=copy_relationships)
+    @timing_decorator
+    def copy(self, id_name="id_projekt", reset_id=False, auto_commit=False, session=None):
+        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+        return new_instance
+
+
+    def copy_deep(self, copy_relationships=True):
+        copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy
 
     @timing_decorator
     def add_filenames(self, csv_path):
-        self.for_all('messreihen', 'add_filenames', csv_path)
+        self.for_all('messreihen', 'add_filenames', csv_path=csv_path)
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
-        self.for_all('messreihen', 'load_data_from_csv', version, overwrite)
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+                           session=None):
+        logger.info(f"Starte Prozess zum laden aller CSV files für {self.__str__()}")
+        results = self.for_all('messreihen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+        logger.info(f"Prozess zum laden aller CSV files für {self.__str__()} erfolgreich abgeschlossen.")
+        return results

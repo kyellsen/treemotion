@@ -1,10 +1,5 @@
 .gitignore
 /.idea
 /venv_Python39/
-/data_tests/
-/projekt_data_tests/
-sandbox/old.py
-sandbox/rust.py
-sandbox/test.py
 /log/
 /projekt_test_data/

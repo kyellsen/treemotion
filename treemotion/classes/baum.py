@@ -1,5 +1,7 @@
 from utilities.imports_classes import *
 
+logger = get_logger(__name__)
+
 class Baum(BaseClass):
     __tablename__ = 'Baum'
     id_baum = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
@@ -10,6 +12,9 @@ class Baum(BaseClass):
     zwiesel_hoehe = Column(Integer)
 
     baumart = relationship("Baumart", backref="baeume", lazy="joined")
+
+    def __str__(self):
+        return f"Baum(id={self.id_baum}, hoehe={self.hoehe}"
 
 
 class Baumart(BaseClass):
