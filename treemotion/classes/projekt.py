@@ -54,5 +54,9 @@ class Projekt(BaseClass):
         self.for_all('messreihen', 'add_filenames', csv_path=csv_path)
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, session=None):
-        self.for_all('messreihen', 'load_data_from_csv', version, overwrite, session=session)
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+                           session=None):
+        logger.info(f"Starte Prozess zum laden aller CSV files für {self.__str__()}")
+        results = self.for_all('messreihen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+        logger.info(f"Prozess zum laden aller CSV files für {self.__str__()} erfolgreich abgeschlossen.")
+        return results

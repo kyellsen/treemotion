@@ -36,7 +36,7 @@ class Messreihe(BaseClass):
         self.filepath_tms = filepath_tms
 
     def __str__(self):
-        return f"Messreihe(id={self.id_messung}, id_messreihe={self.id_messreihe}"
+        return f"Messreihe(id={self.id_messreihe}, id_messreihe={self.id_messreihe}"
 
     @classmethod
     @timing_decorator
@@ -110,7 +110,7 @@ class Messreihe(BaseClass):
     @timing_decorator
     def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
                            session=None):
-        logger.info(f"Starte Prozess zum laden aller CSV files für Messreihe {self.id_messreihe}")
+        logger.info(f"Starte Prozess zum laden aller CSV files für {self.__str__()}")
         results = self.for_all('messungen', 'load_data_from_csv', version, overwrite, auto_commit, session)
-        logger.info(f"Prozess zum laden aller CSV files für Messreihe {self.id_messreihe} erfolgreich abgeschlossen")
+        logger.info(f"Prozess zum laden aller CSV files für {self.__str__()} erfolgreich abgeschlossen.")
         return results
