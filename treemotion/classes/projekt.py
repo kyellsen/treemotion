@@ -22,6 +22,9 @@ class Projekt(BaseClass):
         self.id_projekt = id_projekt
         self.name = name
 
+    def __str__(self):
+        return f"Projekt(id={self.id_projekt}, name={self.name}"
+
     @classmethod
     @timing_decorator
     def load_from_db(cls, id_projekt=None, session=None):

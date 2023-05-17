@@ -40,13 +40,16 @@ class BaseClass(Base):
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
 
     def for_all(self, list_name, method_name, *args, **kwargs):
+        results = []  # Store the method return values here
         for obj in getattr(self, list_name):
             method = getattr(obj, method_name, None)
             if callable(method):
-                method(*args, **kwargs)
+                result = method(*args, **kwargs)
+                results.append(result)  # Append the method return value to the list
             else:
                 logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
-                return
+                return None
+        return results  # Return the list of method return values
 
     def copy(self, id_name='id', reset_id=False, auto_commit=False, session=None):
         new_instance = self.__class__()

@@ -4,6 +4,7 @@ import pandas as pd
 # import matplotlib.pyplot as plt
 
 from utilities.imports_classes import *
+from utilities.path_utils import validate_and_get_filepath
 
 logger = get_logger(__name__)
 
@@ -35,7 +36,7 @@ class Data(BaseClass):
         self.df = df
 
     def __str__(self):
-        return f"Data(id_data={self.id_data}, id_messung={self.id_messung}, version={self.version}, table_name={self.table_name})"
+        return f"Data(id={self.id_data}, id_messung={self.id_messung}, table_name={self.table_name})"
 
     @classmethod
     @timing_decorator
@@ -48,10 +49,49 @@ class Data(BaseClass):
                 logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
         return objs
 
+    @staticmethod
+    def read_csv_tms(filepath):
+        try:
+            filepath = validate_and_get_filepath(filepath)
+        except:
+            return None
+        try:
+            df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
+
+        except pd.errors.ParserError:
+            logger.error(f"Fehler beim Lesen der Datei {filepath.stem}. Überprüfen Sie das Dateiformat.")
+            return None
+        except Exception as e:
+            logger.error(f"Ungewöhnlicher Fehler beim Laden der {filepath.stem}: {e}")
+            return None
+
+        return df
+
+    def update_metadata(self):
+        try:
+            # self.datetime_start = self.df['Time'].min()
+            # self.datetime_end = self.df['Time'].max()
+            # self.duration = self.datetime_end - self.datetime_start
+            self.length = len(self.df)
+            logger.debug(f"Metadaten für {self.__str__()} erfolgreich aktualisert!")
+        except Exception as e:
+            logger.error(f"Metadaten für {self.__str__()} konnten nicht aktualisiert werden: {e}")
+
+
     @classmethod
     @timing_decorator
-    def load_from_csv(cls):
-
+    def load_from_csv(cls, filepath, id_data, id_messung, version, table_name):
+        if filepath is None:
+            logger.warning(f"Filepath = None, Prozess abgebrochen.")
+            return None
+        obj = cls()
+        obj.id_data = id_data
+        obj.id_messung = id_messung
+        obj.version = version
+        obj.table_name = table_name
+        obj.df = obj.read_csv_tms(filepath)
+        obj.update_metadata()
+        return obj
 
 
     @timing_decorator
@@ -95,11 +135,7 @@ class Data(BaseClass):
     def new_table_name(version: str, id_messung: int):
         return f"auto_df_{version}_{id_messung}_messung"
 
-    def update_metadata(self):
-        # self.datetime_start = self.df['Time'].min()
-        # self.datetime_end = self.df['Time'].max()
-        # self.duration = self.datetime_end - self.datetime_start
-        self.length = len(self.df)
+
 
     #
     # def limit_time(self, start_time, end_time):

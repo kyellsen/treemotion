@@ -7,6 +7,7 @@ from .messung import Messung
 
 logger = get_logger(__name__)
 
+
 class Messreihe(BaseClass):
     __tablename__ = 'Messreihe'
     id_messreihe = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
@@ -33,6 +34,9 @@ class Messreihe(BaseClass):
         self.ort = ort
         self.anmerkung = anmerkung
         self.filepath_tms = filepath_tms
+
+    def __str__(self):
+        return f"Messreihe(id={self.id_messung}, id_messreihe={self.id_messreihe}"
 
     @classmethod
     @timing_decorator
@@ -104,5 +108,9 @@ class Messreihe(BaseClass):
         logger.info(f"Die Attribute filename und filepath wurden erfolgreich aktualisiert.")
 
     @timing_decorator
-    def load_data_from_csv(self, session, version=configuration.data_version_default, overwrite=False):
-        self.for_all('messungen', 'load_data_from_csv', session, version, overwrite)
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+                           session=None):
+        logger.info(f"Starte Prozess zum laden aller CSV files für Messreihe {self.id_messreihe}")
+        results = self.for_all('messungen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+        logger.info(f"Prozess zum laden aller CSV files für Messreihe {self.id_messreihe} erfolgreich abgeschlossen")
+        return results

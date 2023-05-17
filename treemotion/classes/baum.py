@@ -13,6 +13,9 @@ class Baum(BaseClass):
 
     baumart = relationship("Baumart", backref="baeume", lazy="joined")
 
+    def __str__(self):
+        return f"Baum(id={self.id_baum}, hoehe={self.hoehe}"
+
 
 class Baumart(BaseClass):
     __tablename__ = 'Baumart'
