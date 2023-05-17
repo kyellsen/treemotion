@@ -1,5 +1,7 @@
 from utilities.imports_classes import *
 
+logger = get_logger(__name__)
+
 class Baum(BaseClass):
     __tablename__ = 'Baum'
     id_baum = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)

@@ -14,8 +14,5 @@ from treemotion.config import configuration
 from utilities.timing import timing_decorator
 from utilities.log import get_logger
 
-logger = get_logger(__name__)
-
-from treemotion import db_manager
 from classes.base_class import BaseClass
-
+from database import db_manager

@@ -1,5 +1,8 @@
 from utilities.imports_classes import *
 
+logger = get_logger(__name__)
+
+
 class Sensor(BaseClass):
     __tablename__ = 'Sensor'
     id_sensor = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)

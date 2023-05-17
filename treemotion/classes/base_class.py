@@ -2,6 +2,7 @@
 from utilities.imports_classes import *
 from utilities.base import Base
 
+logger = get_logger(__name__)
 
 class BaseClass(Base):
     __abstract__ = True  # mark class as abstract
@@ -21,28 +22,27 @@ class BaseClass(Base):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, filter_by=None):
-        session = db_manager.get_session()
-
+    def load_from_db(cls, filter_by=None, session=None):
+        session = db_manager.get_session(session)
         if filter_by is not None:
             objs = session.query(cls).filter_by(**filter_by).all()
         else:
             objs = session.query(cls).all()
 
-
         logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def commit_to_db(self, refresh=True):
-        # Verwenden Sie die bereits geöffnete Session
+    def commit_to_db(self, refresh=True, session=None):
+        session = db_manager.get_session(session)
         session.merge(self)
         if refresh:
             session.refresh(self)
         logger.info(
             f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
 
-    def remove_from_db(self, id_name='id'):
+    def remove_from_db(self, id_name='id', session=None):
+        session = db_manager.get_session(session)
         existing_obj = session.query(type(self)).get(getattr(self, id_name))
         try:
             if existing_obj is not None:

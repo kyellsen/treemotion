@@ -5,10 +5,12 @@ import pandas as pd
 from utilities.imports_classes import *
 from utilities.path_utils import validate_and_get_filepath
 
+
 from .data import Data
 from .baum import BaumBehandlung
 from .sensor import Sensor, SensorOrt
 
+logger = get_logger(__name__)
 
 class Messung(BaseClass):
     __tablename__ = 'Messung'
@@ -54,13 +56,13 @@ class Messung(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_messreihe=None):
-        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None)
+    def load_from_db(cls, session, id_messreihe=None):
+        objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None , session=session)
         logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, db_name=None):
+    def remove_from_db(self, session, *args, db_name=None):
         # Call the base class method to remove this Data object from the database
         super().remove_from_db(id_name='id_messung')
 
@@ -152,7 +154,7 @@ class Messung(BaseClass):
 
     # Hilfsmethode für load_dat_from_csv
     @timing_decorator
-    def update_data_obj_in_db(self, present_data_obj):
+    def update_data_obj_in_db(self, session, present_data_obj):
         try:
             # Nutzen Sie das vorhandene Datenobjekt
             obj = present_data_obj
@@ -183,7 +185,7 @@ class Messung(BaseClass):
 
     # Hilfsmethode für load_dat_from_csv
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
+    def load_data_from_csv(self, session, version=configuration.data_version_default, overwrite=False):
         if self.filepath is None:
             logger.warning(
                 f"Prozess für {self.__str__()} abgebrochen - Filename fehlt in Datenbank (filename = None).")

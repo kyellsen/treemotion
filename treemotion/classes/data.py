@@ -5,6 +5,8 @@ import pandas as pd
 
 from utilities.imports_classes import *
 
+logger = get_logger(__name__)
+
 
 class Data(BaseClass):
     __tablename__ = 'Data'
@@ -37,8 +39,8 @@ class Data(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_messung=None, load_related_df=False):
-        objs = super().load_from_db(filter_by={'id_messung': id_messung} if id_messung else None)
+    def load_from_db(cls, id_messung=None, load_related_df=False, session=None):
+        objs = super().load_from_db(filter_by={'id_messung': id_messung} if id_messung else None, session=session)
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
@@ -47,29 +49,18 @@ class Data(BaseClass):
         return objs
 
     @timing_decorator
-    def load_df(self):
-        self.df = pd.read_sql_table(self.table_name, db_manager.get_session().bind)
+    def load_df(self, session=None):
+        self.df = pd.read_sql_table(self.table_name, session)
         return self
 
-    @timing_decorator
-    def commit_to_db(self, refresh=True):
-        session = db_manager.get_session()
-        session.merge(self)
-        if refresh:
-            session.refresh(self)
-        db_manager.close_session()
-        logger.info(
-            f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
 
-
-    def commit_to_db(self, refresh=True):
+    def commit_to_db(self, session, refresh=True):
         if self.df is not None:
             self.df.to_sql(self.table_name, session.bind, if_exists='replace', chunksize=20000)  ### PROOOFFF
         if refresh:
             session.refresh(self)
         logger.info(
             f"Änderungen am {self.__class__.__name__} wurden erfolgreich in der Datenbank committet.")
-
 
     @timing_decorator
     def remove_from_db(self):

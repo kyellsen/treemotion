@@ -5,6 +5,7 @@ from utilities.path_utils import validate_and_get_path, validate_and_get_file_li
 
 from .messung import Messung
 
+logger = get_logger(__name__)
 
 class Messreihe(BaseClass):
     __tablename__ = 'Messreihe'
@@ -35,13 +36,13 @@ class Messreihe(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_projekt=None):
-        objs = super().load_from_db(filter_by={'id_projekt': id_projekt} if id_projekt else None)
+    def load_from_db(cls, id_projekt=None, session=None):
+        objs = super().load_from_db(filter_by={'id_projekt': id_projekt} if id_projekt else None, session=session)
         logger.info(f"{len(objs)} Messreihen wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
-    def remove_from_db(self, *args, db_name=None):
+    def remove_from_db(self, session, *args, db_name=None):
         # Call the base class method to remove this Data object from the database
         super().remove_from_db(id_name='id_messreihe')
 
@@ -51,7 +52,7 @@ class Messreihe(BaseClass):
         return copy
 
     @timing_decorator
-    def add_filenames(self, csv_path: str):
+    def add_filenames(self, session, csv_path: str):
         """
         Aktualisiert die Attribute 'filename' und 'filepath' für jede Messung dieser Messreihe,
         indem CSV-Dateien im angegebenen Pfad gesucht und deren Namen und Pfade extrahiert werden.
@@ -99,5 +100,5 @@ class Messreihe(BaseClass):
         logger.info(f"Die Attribute filename und filepath wurden erfolgreich aktualisiert.")
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False):
-        self.for_all('messungen', 'load_data_from_csv', version, overwrite)
+    def load_data_from_csv(self, session, version=configuration.data_version_default, overwrite=False):
+        self.for_all('messungen', 'load_data_from_csv', session, version, overwrite)
