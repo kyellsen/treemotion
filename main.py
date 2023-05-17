@@ -13,7 +13,7 @@ if __name__ == "__main__":
     projekt_list = Projekt.load_from_db()
     projekt = projekt_list[0]
     messreihe = projekt.messreihen[0]
-    test_list = messreihe.load_data_from_csv(auto_commit=True)
+    test_list = messreihe.load_data_from_csv(auto_commit=True, overwrite=True)
     #db_manager.disconnect()
 
     #projekt = projekt_list[0]

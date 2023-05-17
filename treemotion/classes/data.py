@@ -45,15 +45,36 @@ class Data(BaseClass):
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
-                obj.load_df()
+                obj.get_df()
                 logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
         return objs
 
+    @timing_decorator
+    def get_df(self, session=None):
+        self.df = pd.read_sql_table(self.table_name, session)
+        return self
+
+    @classmethod
+
+    def load_from_csv(cls, filepath, id_data, id_messung, version, table_name):
+        if filepath is None:
+            logger.warning(f"Filepath = None, Prozess abgebrochen.")
+            return None
+        obj = cls()
+        obj.id_data = id_data
+        obj.id_messung = id_messung
+        obj.version = version
+        obj.table_name = table_name
+        obj.df = obj.read_csv_tms(filepath)
+        obj.update_metadata()
+        return obj
+
     @staticmethod
+    @timing_decorator
     def read_csv_tms(filepath):
         try:
             filepath = validate_and_get_filepath(filepath)
-        except:
+        except Exception as e:
             return None
         try:
             df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",")
@@ -77,27 +98,19 @@ class Data(BaseClass):
         except Exception as e:
             logger.error(f"Metadaten für {self.__str__()} konnten nicht aktualisiert werden: {e}")
 
-
-    @classmethod
     @timing_decorator
-    def load_from_csv(cls, filepath, id_data, id_messung, version, table_name):
-        if filepath is None:
-            logger.warning(f"Filepath = None, Prozess abgebrochen.")
-            return None
-        obj = cls()
-        obj.id_data = id_data
-        obj.id_messung = id_messung
-        obj.version = version
-        obj.table_name = table_name
-        obj.df = obj.read_csv_tms(filepath)
-        obj.update_metadata()
-        return obj
-
-
-    @timing_decorator
-    def load_df(self, session=None):
-        self.df = pd.read_sql_table(self.table_name, session)
-        return self
+    def commit_data_obj(self, session=None):
+        logger.debug(f"Start auto_commit for load_data_from_csv")
+        session = db_manager.get_session(session)
+        try:
+            session.add(self)
+            if self.df is not None:
+                self.df.to_sql(self.table_name, session.bind, if_exists='replace', chunksize=20000)
+            db_manager.commit(session)
+            logger.debug(f"New instance of {self.__str__()} added to session and committed.")
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Error committing {self.__str__()} to Database: {e}")
 
     def remove(self, id_name='id_data', auto_commit=False, session=None):
         session = db_manager.get_session(session)
@@ -134,8 +147,6 @@ class Data(BaseClass):
     @staticmethod
     def new_table_name(version: str, id_messung: int):
         return f"auto_df_{version}_{id_messung}_messung"
-
-
 
     #
     # def limit_time(self, start_time, end_time):

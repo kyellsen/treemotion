@@ -1,7 +1,5 @@
 # treemotion/classes/messung.py
 
-import pandas as pd
-
 from utilities.imports_classes import *
 
 from .data import Data
@@ -97,42 +95,36 @@ class Messung(BaseClass):
             logger.warning(f"Process for {self.__str__()} aborted, no filename for tms.csv (filename = None).")
             return None
 
-        logger.info(f"Starting processing for {self.__str__()}")
+        logger.info(f"Start loading csv data for {self.__str__()}")
         table_name = Data.new_table_name(version, self.id_messung)
         present_data_obj = self.find_data_by_table_name(table_name)
 
-        if present_data_obj is None:
-            obj = Data.load_from_csv(filepath=self.filepath, id_data=None, id_messung=self.id_messung, version=version,
-                                     table_name=table_name)
-            self.data.append(obj)
-            logger.info(f"Objekt {obj.__str__()} erfolgreich erstellt und an {self.__str__} angehängt.")
+        if present_data_obj is None or overwrite:
+            if present_data_obj and overwrite:
+                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj.__str__()}")
+            obj = self.create_or_update_data_obj(version, table_name, present_data_obj)
+        else:
+            logger.warning(
+                f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj.__str__()}")
+            return None
 
-        elif isinstance(present_data_obj, Data):
-            if overwrite:
-                obj = present_data_obj
-                obj.df = obj.read_csv_tms(self.filepath)
-                obj.update_metadata()
-                # Update the data relationship
-                self.data.remove(present_data_obj)
-                self.data.append(obj)
-                logger.info(
-                    f"Objekt erfolgreich aktualisiert (overwrite = True): {obj.__str__()}")
-            if not overwrite:
-                logger.warning(
-                    f"Objekt bereits vorhanden, nicht überschrieben (overwrite = False), obj: {present_data_obj.__str__()} ")
-                return None
         if auto_commit:
-            logger.debug(f"Start auto_commit für load_data_from_csv")
-            session = db_manager.get_session(session)
-            try:
-                session.add(obj)
-                if obj.df is not None:
-                    obj.df.to_sql(obj.table_name, session.bind, if_exists='replace', chunksize=20000)
-                db_manager.commit(session)
-                logger.info(f"New instance of {obj.__str__()} added to session and committed.")
-            except Exception as e:
-                session.rollback()
-                logger.error(f"Error committing {obj.__str__()} to Database: {e}")
+            obj.commit_data_obj(session)
+            logger.info(
+                f"Loading data from csv and committing to database {self.__str__()} successful (auto_commit=True)!")
+        else:
+            logger.info(f"Loading data from csv for {self.__str__()} successful (auto_commit=False)!")
+        return obj
+
+    def create_or_update_data_obj(self, version, table_name, present_data_obj=None):
+        obj = present_data_obj or Data.load_from_csv(filepath=self.filepath, id_data=None, id_messung=self.id_messung,
+                                                     version=version, table_name=table_name)
+        obj.df = obj.read_csv_tms(self.filepath)
+        obj.update_metadata()
+        if present_data_obj:
+            self.data.remove(present_data_obj)
+        self.data.append(obj)
+        logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
 
 
