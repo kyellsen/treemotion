@@ -21,6 +21,7 @@ class Configuration:
 
         # Data
         self.data_version_default = "raw"
+        self.data_version_copy_default = "copy"
         # Weitere Konstanten hier
 
 
