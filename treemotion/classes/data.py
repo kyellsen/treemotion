@@ -45,17 +45,22 @@ class Data(BaseClass):
         logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
-                obj.get_df()
-                logger.info(f"Data.df erfolgreiche geladen: {obj.__str__()}")
+                obj.load_data()
         return objs
 
     @timing_decorator
-    def get_df(self, session=None):
-        self.df = pd.read_sql_table(self.table_name, session)
+    def load_data(self, session=None):
+        session = db_manager.get_session(session)
+        try:
+            self.df = pd.read_sql_table(self.table_name, session.bind)
+            logger.info(f"Data.df erfolgreich geladen: {self.__str__()}")
+        except Exception as e:
+            logger.error(f"Data.df konnte nicht geladen werden: {self.__str__()}, error: {e}")
+            return None
         return self
 
     @classmethod
-
+    @timing_decorator
     def load_from_csv(cls, filepath, id_data, id_messung, version, table_name):
         if filepath is None:
             logger.warning(f"Filepath = None, Prozess abgebrochen.")
@@ -112,9 +117,9 @@ class Data(BaseClass):
             session.rollback()
             logger.error(f"Error committing {self.__str__()} to Database: {e}")
 
-    def remove(self, id_name='id_data', auto_commit=False, session=None):
+    def remove(self, auto_commit=False, session=None, **kwargs):
         session = db_manager.get_session(session)
-        existing_obj = session.query(type(self)).get(getattr(self, id_name))
+        existing_obj = session.query(type(self)).get(getattr(self, 'id_data'))
         try:
             if existing_obj is not None:
                 # Delete the table associated with this Data object
@@ -131,15 +136,16 @@ class Data(BaseClass):
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
 
     @timing_decorator
-    def copy(self, id_name="id_data", reset_id=False, auto_commit=False, session=None):
-        new_instance = super().copy(id_name, reset_id, auto_commit, session)
+    def copy(self, reset_id=False, auto_commit=False, session=None):
+        new_obj = super().copy('id_data', reset_id, auto_commit, session)
 
         # Create a deep copy of the DataFrame
         if self.df is not None:
-            new_instance.df = self.df.copy(deep=True)
+            new_obj.df = self.df.copy(deep=True)
 
-        return new_instance
+        return new_obj
 
+    @timing_decorator
     def copy_deep(self, copy_relationships=True):
         copy = super().copy_deep(copy_relationships=copy_relationships)
         return copy

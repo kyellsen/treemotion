@@ -52,36 +52,36 @@ class BaseClass(Base):
         return results  # Return the list of method return values
 
     def copy(self, id_name='id', reset_id=False, auto_commit=False, session=None):
-        new_instance = self.__class__()
+        new_obj = self.__class__()
 
         for attr, value in self.__dict__.items():
             if attr == '_sa_instance_state':
                 continue
 
-            setattr(new_instance, attr, value)
+            setattr(new_obj, attr, value)
 
         if reset_id:
             try:
-                setattr(new_instance, id_name, None)
+                setattr(new_obj, id_name, None)
                 logger.debug(f"Reset id attribute {id_name} in new instance.")
             except Exception as e:
                 logger.error(f"Error resetting id attribute {id_name}: {e}")
 
         if auto_commit:
-            setattr(new_instance, id_name, None)
+            setattr(new_obj, id_name, None)
             session = db_manager.get_session(session)
             try:
-                session.add(new_instance)
+                session.add(new_obj)
                 db_manager.commit(session)
                 logger.info(f"New instance of {self.__class__.__name__} added to session and committed.")
             except Exception as e:
                 session.rollback()
                 logger.error(f"Error committing new instance of {self.__class__.__name__}: {e}")
 
-        return new_instance
+        return new_obj
 
     def copy_deep(self, copy_relationships=True):
-        new_instance = self.__class__()
+        new_obj = self.__class__()
 
         for attr, value in self.__dict__.items():
             if attr == '_sa_instance_state':
@@ -89,16 +89,16 @@ class BaseClass(Base):
 
             try:
                 if isinstance(value, list) and copy_relationships:
-                    setattr(new_instance, attr, [item.copy() for item in value])
+                    setattr(new_obj, attr, [item.copy() for item in value])
                     logger.debug(f"Copied list attribute {attr} from {self.__class__.__name__} to new instance.")
                 elif isinstance(value, BaseClass) and copy_relationships:
-                    setattr(new_instance, attr, value.copy())
+                    setattr(new_obj, attr, value.copy())
                     logger.debug(f"Copied BaseClass attribute {attr} from {self.__class__.__name__} to new instance.")
                 else:
-                    setattr(new_instance, attr, value)
+                    setattr(new_obj, attr, value)
                     logger.debug(f"Copied attribute {attr} from {self.__class__.__name__} to new instance.")
             except Exception as e:
                 logger.error(f"Error copying attribute {attr}: {e}")
                 continue
 
-        return new_instance
+        return new_obj

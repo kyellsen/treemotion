@@ -12,13 +12,12 @@ if __name__ == "__main__":
     db_manager.connect(path_db_1)
     projekt_list = Projekt.load_from_db()
     projekt = projekt_list[0]
-    test_list = projekt.load_data_from_csv(auto_commit=True, overwrite=False)
-    #db_manager.disconnect()
-##
-    #projekt = projekt_list[0]
-    # Hier würden Änderungen an Projekt-Instanz erfolgen. Projekt erbt von BaseClass.
-    #projekt.commit_to_db()
-    # projekt.add_filenames(csv_path)
-    #projekt.load_data_from_csv(overwrite=True)
+    messreihe = projekt.messreihen[0]
+    messung = messreihe.messungen[0]
+    result = messung.load_data_version(version="raw")
+    copy = messung.copy_version(version_new="test_version", version_source="raw")
+    # results_list = messreihe.load_data_version(version="raw")
+    # copy_list = messreihe.copy_version(version_new="test_version", version_source="raw")
+    # db_manager.disconnect()
 
     print("Ende")

@@ -34,15 +34,15 @@ class Projekt(BaseClass):
         return objs
 
     @timing_decorator
-    def remove(self, id_projekt='id_projekt', auto_commit=False, session=None):
+    def remove(self, auto_commit=False, session=None):
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove(id_projekt, auto_commit, session)
+        super().remove('id_projekt', auto_commit, session)
 
     @timing_decorator
-    def copy(self, id_name="id_projekt", reset_id=False, auto_commit=False, session=None):
-        new_instance = super().copy(id_name, reset_id, auto_commit, session)
-        return new_instance
+    def copy(self, reset_id=False, auto_commit=False, session=None):
+        new_obj = super().copy("id_projekt", reset_id, auto_commit, session)
+        return new_obj
 
 
     def copy_deep(self, copy_relationships=True):
@@ -53,10 +53,15 @@ class Projekt(BaseClass):
     def add_filenames(self, csv_path):
         self.for_all('messreihen', 'add_filenames', csv_path=csv_path)
 
+
     @timing_decorator
     def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
                            session=None):
-        logger.info(f"Starte Prozess zum laden aller CSV files für {self.__str__()}")
-        results = self.for_all('messreihen', 'load_data_from_csv', version, overwrite, auto_commit, session)
-        logger.info(f"Prozess zum laden aller CSV files für {self.__str__()} erfolgreich abgeschlossen.")
+        logger.info(f"Starte Prozess zum laden aller CSV-Files für {self.__str__()}")
+        try:
+            results = self.for_all('messreihen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+        except Exception as e:
+            logger.error(f"Fehler beim Laden aller CSV-Files für {self.__str__()}, Error: {e}")
+            return None
+        logger.info(f"Prozess zum laden von CSV-Files für {len(results)} Messreihen aus {self.__str__()} erfolgreich abgeschlossen.")
         return results
