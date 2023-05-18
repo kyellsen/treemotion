@@ -11,7 +11,7 @@ from typing import List
 # Import utilities
 
 from treemotion.config import configuration
-from utilities.timing import timing_decorator
+from utilities.runtime import timing_decorator
 from utilities.log import get_logger
 from treemotion import db_manager
 

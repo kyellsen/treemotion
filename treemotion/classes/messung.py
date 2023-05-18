@@ -1,7 +1,6 @@
 # treemotion/classes/messung.py
 
 from utilities.imports_classes import *
-from copy import deepcopy
 
 from .data import Data
 from .baum import BaumBehandlung
@@ -32,9 +31,25 @@ class Messung(BaseClass):
     data = relationship("Data", backref="messung", lazy="joined", cascade="all, delete, delete-orphan",
                         order_by="Data.id_data")
 
-    def __init__(self, *args, id_messung=None, id_messreihe=None, id_baum_behandlung=None, id_sensor=None,
-                 id_messung_status=None, filename=None, filepath=None, id_sensor_ort=None, sensor_hoehe=None,
-                 sensor_umfang=None, sensor_ausrichtung=None, **kwargs):
+    def __init__(self, *args, id_messung: int = None, id_messreihe: int = None, id_baum_behandlung: int = None,
+                 id_sensor: int = None, id_messung_status: int = None, filename: str = None, filepath: str = None,
+                 id_sensor_ort: int = None, sensor_hoehe: int = None, sensor_umfang: int = None,
+                 sensor_ausrichtung: int = None, **kwargs):
+        """
+        Initialisieren Sie eine neue Instanz der Messung-Klasse.
+
+        :param id_messung: Die ID der Messung
+        :param id_messreihe: Die ID der Messreihe
+        :param id_baum_behandlung: Die ID der Baumbehandlung
+        :param id_sensor: Die ID des Sensors
+        :param id_messung_status: Der Status der Messung
+        :param filename: Der Name der TMS.csv-Datei
+        :param filepath: Der Pfad zur TMS.csv-Datei
+        :param id_sensor_ort: Die ID des Sensororts
+        :param sensor_hoehe: Die Höhe des Sensors
+        :param sensor_umfang: Der Umfang des Baumstammes auf Sensorhoehe
+        :param sensor_ausrichtung: Die Ausrichtung des Sensors (Grad gegen Nord)
+        """
         super().__init__(*args, **kwargs)
         # in SQLite Database
         self.id_messung = id_messung
@@ -52,15 +67,32 @@ class Messung(BaseClass):
     def __str__(self):
         return f"Messung(id={self.id_messung}, id_messreihe={self.id_messreihe}, filename={self.filename}"
 
+    # Geerbt von BaseClass
     @classmethod
     @timing_decorator
     def load_from_db(cls, id_messreihe=None, session=None):
+        """
+        Laden Sie Messungsobjekte aus der Datenbank basierend auf der ID der Messreihe.
+
+        :param id_messreihe: Die ID der Messreihe, nach der gefiltert werden soll.
+        :param session: Die SQL-Alchemie-Sitzung, die zum Interagieren mit der Datenbank verwendet wird.
+        :return: Eine Liste von geladenen Messungsobjekten.
+        """
         objs = super().load_from_db(filter_by={'id_messreihe': id_messreihe} if id_messreihe else None, session=session)
-        logger.info(f"{len(objs)} Messungen wurden erfolgreich geladen.")
+        if not objs:
+            logger.error(f"Keine Daten gefunden für id_messreihe={id_messreihe}")
+        else:
+            logger.info(f"{len(objs)} Messung-Objekte wurden erfolgreich geladen.")
         return objs
 
     @timing_decorator
     def remove(self, auto_commit=False, session=None):
+        """
+        Entfernen Sie dieses Messungs-Objekt aus der Datenbank.
+
+        :param auto_commit: Ein Flag, das angibt, ob die Änderungen automatisch übernommen werden sollen.
+        :param session: Die SQL-Alchemie-Sitzung, die zum Interagieren mit der Datenbank verwendet wird.
+        """
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
         super().remove('id_messung', auto_commit, session)
@@ -70,11 +102,7 @@ class Messung(BaseClass):
         new_obj = super().copy("id_messung", reset_id, auto_commit, session)
         return new_obj
 
-    def copy_deep(self, copy_relationships=True):
-        copy = super().copy_deep(copy_relationships=copy_relationships)
-        return copy
-
-    def find_instance_by_version(self, version):
+    def get_data_by_version(self, version):
         """
         Diese Methode findet eine Instanz in self.data, die die gegebene Version hat.
         Es wird ein kritischer Fehler protokolliert und None zurückgegeben, wenn mehr als eine Instanz gefunden wird.
@@ -83,17 +111,21 @@ class Messung(BaseClass):
         matching_versions = [data for data in self.data if data.version == version]
         if len(matching_versions) > 1:
             logger.critical(
-                f"Mehr als eine Dateninstanz mit Version {version} gefunden.")
+                    f"Mehrere Data-Instanzen mit version '{version}' für '{self.__str__()}' nicht verfügbar.")
             return None
         if len(matching_versions) == 0:
-            logger.error(f"Keine Dateninstanz mit Version {version} gefunden.")
+            logger.warning(f"Keine Data-Instanzen mit version '{version}' für '{self.__str__()}' gefunden.")
             return None
+        logger.debug(f"Dateninstanz {matching_versions[0].__str__()} zurückgegeben")
         return matching_versions[0]
 
-    def load_data_version(self, version, session=None):
-        obj = self.find_instance_by_version(version)
+    def load_data_by_version(self, version, session=None):
+        obj = self.get_data_by_version(version)
+        if obj is None:
+            return None
         result = obj.load_data(session)
         return result
+
 
     @timing_decorator
     def copy_version(self, version_new=configuration.data_version_copy_default,
@@ -106,23 +138,28 @@ class Messung(BaseClass):
         """
         if version_new == version_source:
             logger.error(
-                f"Fehler: version_new ({version_new}) darf nicht gleich version_source ({version_source}) sein!")
+                f"Fehler: version_new '{version_new}' darf nicht gleich version_source '{version_source}' sein!")
             return None
 
-        source_obj = self.find_instance_by_version(version_source)
+        for data_instance in self.data:
+            if data_instance.version == version_new:
+                logger.info(
+                    f"Eine Instanz von Data mit der Version '{version_new}' existiert bereits. Alte Instanz wird zurückgegeben.")
+                return data_instance
+
+        source_obj = self.get_data_by_version(version_source)
         if source_obj is None:
+            logger.warning(
+                f"Prozess zum Kopieren von '{self.__str__()}' von Version '{version_source}' zu Version '{version_new}' abgebrochen.")
             return None
 
-        try:
-            new_obj = deepcopy(source_obj)
-        except Exception as e:
-            logger.error(f"Fehler beim Erstellen der Kopie der Dateninstanz: {e}")
+        #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
+        source_obj.load_data_if_needed(session=session)
+
+        new_obj = Data.create_new_version(source_obj, version_new)
+
+        if new_obj is None:
             return None
-
-        new_obj.id_data = None
-        new_obj.version = version_new
-
-        new_obj.table_name = new_obj.new_table_name(new_obj.version, new_obj.id_messung)
 
         if new_obj.table_name == source_obj.table_name:
             logger.critical(
@@ -133,23 +170,32 @@ class Messung(BaseClass):
 
         if auto_commit:
             try:
-                new_obj.commit_data_obj(session=session)
+                new_obj.commit_data(session=session)
             except Exception as e:
                 logger.error(f"Fehler beim Commit der neuen Dateninstanz: {e}")
                 return None
 
-        logger.info(f"Erfolgreiche Erstellung von {version_new.__str__()} (auto_commit = {auto_commit}).")
+        logger.info(f"Erfolgreiche Erstellung von '{version_new.__str__()}' (auto_commit = '{auto_commit}').")
 
         return new_obj
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
-                           session=None):
+    def load_data_from_csv(self, version: str = configuration.data_version_default, overwrite: bool = False,
+                           auto_commit: bool = False, session=None):
+        """
+        Lädt Daten aus einer CSV-Datei und aktualisiert ggf. bestehende Daten.
+
+        :param version: Version der Daten.
+        :param overwrite: Bestimmt, ob bestehende Daten überschrieben werden sollen.
+        :param auto_commit: Bestimmt, ob die Daten sofort in der Datenbank gespeichert werden sollen.
+        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
+        :return: Das aktualisierte oder neu erstellte Datenobjekt oder None, wenn ein Fehler auftritt.
+        """
         if self.filepath is None:
-            logger.warning(f"Process for {self.__str__()} aborted, no filename for tms.csv (filename = None).")
+            logger.warning(f"Process for '{self.__str__()}' aborted, no filename for tms.csv (filename = None).")
             return None
 
-        logger.info(f"Start loading csv data for {self.__str__()}")
+        logger.info(f"Start loading csv data for '{self.__str__()}'")
         table_name = Data.new_table_name(version, self.id_messung)
         present_data_obj = self.find_data_by_table_name(table_name)
 
@@ -163,7 +209,7 @@ class Messung(BaseClass):
             return None
 
         if auto_commit:
-            obj.commit_data_obj(session)
+            obj.commit_data(session)
             logger.info(
                 f"Loading data from csv and committing to database {self.__str__()} successful (auto_commit=True)!")
         else:
@@ -171,7 +217,13 @@ class Messung(BaseClass):
         return obj
 
     # Hilfsmethode für load_data_from_csv
-    def find_data_by_table_name(self, table_name):
+    def find_data_by_table_name(self, table_name: str):
+        """
+        Findet ein Datenobjekt anhand seines Tabellennamens.
+
+        :param table_name: Der Name der Tabelle, die gesucht wird.
+        :return: Das gefundene Datenobjekt oder None, wenn kein passendes gefunden wurde.
+        """
         matching_data = [data for data in self.data if data.table_name == table_name]
 
         if not matching_data:
@@ -186,7 +238,16 @@ class Messung(BaseClass):
         return matching_data[0]
 
     # Hilfsmethode für load_data_from_csv
-    def create_or_update_data_obj_from_csv(self, version, table_name, present_data_obj=None):
+    def create_or_update_data_obj_from_csv(self, version: str, table_name: str,
+                                           present_data_obj=None):
+        """
+        Erstellt oder aktualisiert ein Datenobjekt aus einer CSV-Datei.
+
+        :param version: Die Version der Daten.
+        :param table_name: Der Name der Tabelle für das Datenobjekt.
+        :param present_data_obj: Ein bestehendes Datenobjekt, das aktualisiert werden soll.
+        :return: Das erstellte oder aktualisierte Datenobjekt.
+        """
         obj = present_data_obj or Data.load_from_csv(filepath=self.filepath, id_data=None, id_messung=self.id_messung,
                                                      version=version, table_name=table_name)
         obj.df = obj.read_csv_tms(self.filepath)
@@ -196,6 +257,17 @@ class Messung(BaseClass):
         self.data.append(obj)
         logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
+
+    def limit_version_by_time(self, version, start_time: str, end_time: str, auto_commit: bool = False, session=None):
+        obj = self.get_data_by_version(version)
+        if obj is None:
+            logger.warning(f"Prozess zur Zeitbegrenzung für {self.__str__()} abgebrochen.")
+            return None
+        #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
+        obj.load_data_if_needed(session=session)
+
+        result = obj.limit_by_time(start_time, end_time, auto_commit, session)
+        return result
 
 
 class MessungStatus(BaseClass):

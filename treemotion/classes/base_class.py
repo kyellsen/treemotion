@@ -2,8 +2,8 @@
 from utilities.imports_classes import *
 from utilities.base import Base
 
-
 logger = get_logger(__name__)
+
 
 class BaseClass(Base):
     __abstract__ = True  # mark class as abstract
@@ -50,6 +50,18 @@ class BaseClass(Base):
                 logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
                 return None
         return results  # Return the list of method return values
+
+    # def for_all_data_version(self, list_name, method_name, version, *args, **kwargs):
+    #     results = []
+    #     for obj in getattr(self, list_name):
+    #         method = getattr(obj, method_name, None)
+    #         if callable(method):
+    #             result = method(version, *args, **kwargs)
+    #             results.append(result)
+    #         else:
+    #             logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
+    #             return None
+    #     return results
 
     def copy(self, id_name='id', reset_id=False, auto_commit=False, session=None):
         new_obj = self.__class__()

@@ -56,10 +56,6 @@ class Messreihe(BaseClass):
         new_obj = super().copy("id_messreihe", reset_id, auto_commit, session)
         return new_obj
 
-    def copy_deep(self, copy_relationships=True):
-        copy = super().copy_deep(copy_relationships=copy_relationships)
-        return copy
-
     @timing_decorator
     def add_filenames(self, csv_path: str):
         """
@@ -120,14 +116,23 @@ class Messreihe(BaseClass):
         return results
 
     @timing_decorator
-    def load_data_version(self, version, session=None):
+    def load_data_by_version(self, version, session=None):
         logger.info(f"Starte Prozess zum Laden der Data-Frames in {self.__str__()} mit Version: {version}")
         try:
-            results = self.for_all('messungen', 'load_data_version', version, session)
+            results = self.for_all('messungen', 'load_data_by_version', version, session)
         except Exception as e:
             logger.error(f"Fehler beim Laden der Data-Frames für {self.__str__()}, Error: {e}")
             return None
         logger.info(f"Prozess zum Laden der Data-Frames für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        return results
+
+    @timing_decorator
+    def get_data_by_version(self, version):
+        try:
+            results = self.for_all('messungen', 'get_data_by_version', version)
+        except Exception as e:
+            logger.error(f"Fehler beim Suchen der Data-Instanzen mit Version '{version}' aus {self.__str__()}, Error: {e}")
+            return None
         return results
 
 
@@ -141,4 +146,16 @@ class Messreihe(BaseClass):
             logger.error(f"Fehler beim Kopieren aller Data-Objekte für {self.__str__()}, Error: {e}")
             return None
         logger.info(f"Prozess zum Kopieren aller Data-Objekte für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        return results
+
+
+    @timing_decorator
+    def limit_version_by_time(self, version, start_time: str, end_time: str, auto_commit: bool = False, session=None):
+        logger.info(f"Starte Prozess zur Zeiteinschränkung aller Data-Objekte in {self.__str__()} mit Version: {version}")
+        try:
+            results = self.for_all('messungen', 'limit_version_by_time', version, start_time, end_time, auto_commit, session)
+        except Exception as e:
+            logger.error(f"Fehler bei Zeiteinschränkung aller Data-Objekte für {self.__str__()}, Error: {e}")
+            return None
+        logger.info(f"Prozess zur Zeiteinschränkung aller Data-Objekte für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
         return results

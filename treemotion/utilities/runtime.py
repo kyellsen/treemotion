@@ -1,4 +1,4 @@
-# treemotion/utilities/timing.py
+# treemotion/utilities/runtime.py
 import time
 import functools
 from utilities.log import get_logger
