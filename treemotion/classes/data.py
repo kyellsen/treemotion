@@ -6,7 +6,8 @@ from datetime import datetime
 
 from utilities.imports_classes import *
 from utilities.path_utils import validate_and_get_filepath
-from tms.time_utils import validate_time_format, limit_df_by_time
+from tms.time_utils import validate_time_format, limit_df_by_time, optimal_time_frame
+from tms.find_peaks import find_n_peaks
 
 logger = get_logger(__name__)
 
@@ -54,40 +55,6 @@ class Data(BaseClass):
     def __str__(self):
         return f"Data(id={self.id_data}, table_name={self.table_name})"
 
-    @timing_decorator
-    def load_data(self, session=None):
-        """
-        Lädt die Daten für diese Data-Instanz aus der Datenbank.
-
-        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
-        :return: Das Datenobjekt mit geladenen Daten oder None, wenn ein Fehler aufgetreten ist.
-        """
-        session = db_manager.get_session(session)
-        try:
-            self.df = pd.read_sql_table(self.table_name, session.bind)
-            logger.info(f"Data.df erfolgreich geladen: {self.__str__()}")
-        except Exception as e:
-            logger.error(f"Data.df konnte nicht geladen werden: {self.__str__()}, error: {e}")
-            return None
-        return self
-
-    def load_data_if_needed(self, session=None):
-        """
-        Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
-
-        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
-        :return: True, wenn das Laden erfolgreich war, sonst False.
-        """
-        if not hasattr(self, 'df') or self.df is None:
-            logger.warning(
-                f"Für Ausgangsversion {self.__str__()} fehlt der DataFrame (Data.df). Es wird automatisch Data.load_data() ausgeführt.")
-            try:
-                self.load_data(session=session)
-                return True
-            except Exception as e:
-                logger.critical(f"Data.load_data konnte für {self.__str__()} nicht ausgeführt werden, error: {e}")
-                return False
-
     # Geerbt von BaseClass
     @classmethod
     @timing_decorator
@@ -107,7 +74,7 @@ class Data(BaseClass):
             logger.info(f"{len(objs)} Data-Objekte wurden erfolgreich geladen.")
         if load_related_df:
             for obj in objs:
-                obj.load_data()
+                obj.load_df()
         return objs
 
     @classmethod
@@ -131,7 +98,10 @@ class Data(BaseClass):
         obj.id_messung = id_messung
         obj.version = version
         obj.table_name = table_name
-        obj.df = obj.read_csv_tms(filepath)
+        try:
+            obj.df = obj.read_csv_tms(filepath)
+        except Exception as e:
+            logger.error(f"Fehler beim Lesen der CSV Datei, error: {e}")
         obj.update_metadata()
         return obj
 
@@ -149,13 +119,47 @@ class Data(BaseClass):
             new_obj.id_data = None
             new_obj.id_messung = source_obj.id_messung
             new_obj.version = version_new
-            new_obj.table_name = new_obj.new_table_name(new_obj.version, new_obj.id_messung)
-            new_obj.df = source_obj.df.copy(deep=True)
+            new_obj.table_name = new_obj.get_table_name(new_obj.version, new_obj.id_messung)
+            new_obj.df = source_obj.df.copy(deep=True)  # nicht copy von Data, sondern auf pd.df
             new_obj.update_metadata()
             return new_obj
         except Exception as e:
             logger.error(f"Fehler beim Erstellen der Kopie der Dateninstanz: {e}")
             return None
+
+    @timing_decorator
+    def load_df(self, session=None):
+        """
+        Lädt die Daten für diese Data-Instanz aus der Datenbank.
+
+        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
+        :return: Das Datenobjekt mit geladenen Daten oder None, wenn ein Fehler aufgetreten ist.
+        """
+        session = db_manager.get_session(session)
+        try:
+            self.df = pd.read_sql_table(self.table_name, session.bind)
+            logger.info(f"Data.df erfolgreich geladen: {self.__str__()}")
+        except Exception as e:
+            logger.error(f"Data.df konnte nicht geladen werden: {self.__str__()}, error: {e}")
+            return None
+        return self
+
+    def load_df_if_missing(self, session=None):
+        """
+        Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
+
+        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
+        :return: True, wenn das Laden erfolgreich war, sonst False.
+        """
+        if not hasattr(self, 'df') or self.df is None:
+            logger.warning(
+                f"Für Ausgangsversion {self.__str__()} fehlt der DataFrame (Data.df). Es wird automatisch Data.load_df() ausgeführt.")
+            try:
+                self.load_df(session=session)
+                return True
+            except Exception as e:
+                logger.critical(f"Data.load_df konnte für {self.__str__()} nicht ausgeführt werden, error: {e}")
+                return False
 
     @staticmethod
     @timing_decorator
@@ -169,21 +173,21 @@ class Data(BaseClass):
         try:
             filepath = validate_and_get_filepath(filepath)
         except Exception as e:
-            return None
+            raise e
         try:
             df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",", index_col=False)
 
-        except pd.errors.ParserError:
+        except pd.errors.ParserError as e:
             logger.error(f"Fehler beim Lesen der Datei {filepath.stem}. Überprüfen Sie das Dateiformat.")
-            return None
+            raise e
         except Exception as e:
             logger.error(f"Ungewöhnlicher Fehler beim Laden der {filepath.stem}: {e}")
-            return None
+            raise e
 
         return df
 
     @staticmethod
-    def new_table_name(version: str, id_messung: int) -> str:
+    def get_table_name(version: str, id_messung: int) -> str:
         """
         Erzeugt einen neuen Tabellennamen.
 
@@ -210,12 +214,32 @@ class Data(BaseClass):
         except Exception as e:
             logger.error(f"Metadaten für {self.__str__()} konnten nicht aktualisiert werden: {e}")
 
+    # Geerbt von BaseClass
     @timing_decorator
-    def commit_data(self, session=None):
+    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None):
+        """
+        Erstellt eine Kopie des Datenobjekts.
+
+        :param reset_id: Ob die ID des neuen Objekts zurückgesetzt werden soll.
+        :param auto_commit: Ob ein automatischer Commit nach dem Kopieren erfolgen soll.
+        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
+        :return: Kopiertes Datenobjekt.
+        """
+        new_obj = super().copy('id_data', reset_id, auto_commit, session)
+
+        # Create a deep copy of the DataFrame
+        if self.df is not None:
+            new_obj.df = self.df.copy(deep=True)
+
+        return new_obj
+
+    @timing_decorator
+    def commit(self, session=None):
         """
         Fügt das Datenobjekt zur Datenbank hinzu und führt den Commit aus.
 
         :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
+        :return: True, wenn commit erfolgreich; False, wenn fehlgeschlagen
         """
         session = db_manager.get_session(session)
         try:
@@ -223,10 +247,12 @@ class Data(BaseClass):
             if self.df is not None:
                 self.df.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
             db_manager.commit(session)
-            logger.debug(f"Instance {self.__str__()} committed.")
+            logger.debug(f"Instanz '{self.__str__()}' zur Datenbank committed.")
+            return True
         except Exception as e:
             session.rollback()
-            logger.error(f"Error committing {self.__str__()} to Database: {e}")
+            logger.error(f"Fehler beim Commiten '{self.__str__()}' zur Datenbank: {e}")
+            return False
 
     # Geerbt von BaseClass
     def remove(self, session=None, **kwargs):
@@ -253,25 +279,6 @@ class Data(BaseClass):
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
 
     # Geerbt von BaseClass
-    @timing_decorator
-    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None):
-        """
-        Erstellt eine Kopie des Datenobjekts.
-
-        :param reset_id: Ob die ID des neuen Objekts zurückgesetzt werden soll.
-        :param auto_commit: Ob ein automatischer Commit nach dem Kopieren erfolgen soll.
-        :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
-        :return: Kopiertes Datenobjekt.
-        """
-        new_obj = super().copy('id_data', reset_id, auto_commit, session)
-
-        # Create a deep copy of the DataFrame
-        if self.df is not None:
-            new_obj.df = self.df.copy(deep=True)
-
-        return new_obj
-
-    # Geerbt von BaseClass
     def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False, session=None):
         """
         Begrenzt die Daten auf einen bestimmten Zeitraum.
@@ -280,38 +287,65 @@ class Data(BaseClass):
         :param end_time: Endzeitpunkt der Begrenzung.
         :param auto_commit: Ob ein automatischer Commit nach dem Begrenzen des Zeitraums erfolgen soll.
         :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
-        :return: Selbstreferenz für Methodenverkettung, None bei Fehler.
+        :return: True wenn erfolgreich, False wenn Fehler
         """
         # Überprüfung der Zeitangaben
         start_time = validate_time_format(start_time)
         end_time = validate_time_format(end_time)
         if start_time is None or end_time is None:
             logger.error(f"Das Zeitformat ist ungültig.")
-            return self.df
+            return False
 
         # Überprüfung des DataFrames
         if self.df is None or self.df.empty:
             logger.warning(f"Der DataFrame von {self.__str__()} ist None oder leer.")
-            return self.df
+            return False
 
         # Limitierung Zeit
         try:
             self.df = limit_df_by_time(self.df, time_col="Time", start_time=start_time, end_time=end_time)
         except Exception as e:
             logger.error(f"Fehler der Limitierung der Daten von '{self.__str__()}', error: {str(e)}")
-            return self.df
+            return False
 
         logger.debug(f"Limitierung der Daten von '{self.__str__()}' zwischen {start_time} und {end_time} erfolgreich.")
         self.update_metadata()
 
         if auto_commit:
-            self.commit_data(session=session)
+            self.commit(session=session)
 
-        return self
+        return True
+
+    def limit_time_by_peaks(self, duration: int, values_col: str = 'Absolute-Inclination - drift compensated',
+                                time_col: str = 'Time', n_peaks: int = 10,
+                                sample_rate: float = 20, min_time_diff: float = 60,
+                                prominence: int = None, auto_commit: bool = False, session=None):
+
+        # Überprüfung des DataFrames
+        if self.df is None or self.df.empty:
+            logger.warning(f"Der DataFrame von {self.__str__()} ist None oder leer.")
+            return False
+
+        # Überprüfen, ob die Spalten im DataFrame vorhanden sind
+        if values_col not in self.df.columns or time_col not in self.df.columns:
+            logger.warning(f"Die Spalten {values_col} und/oder {time_col} existieren nicht im DataFrame.")
+            return False
+
+        peaks_dict = find_n_peaks(self.df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
+
+        timeframe_dict = optimal_time_frame(duration, peaks_dict)
+        self.df = limit_df_by_time(self.df, time_col="Time", start_time=timeframe_dict['start_time'], end_time=timeframe_dict['end_time'])
+
+        logger.info(f"Limitierung der Daten von '{self.__str__()}' zwischen {timeframe_dict['start_time']} und {timeframe_dict['end_time']} erfolgreich.")
+        self.update_metadata()
+        if auto_commit:
+            self.commit(session=session)
+
+        return True
 
     def random_sample(self, n: int, auto_commit: bool = False, session=None):
         """
-        Wählt eine zufällige Stichprobe von Daten aus.
+        Wählt eine zufällige Stichprobe von Daten aus und behält die ursprüngliche Reihenfolge bei.
 
         :param n: Anzahl der auszuwählenden Datenpunkte.
         :param auto_commit: Ob ein automatischer Commit nach der Auswahl erfolgen soll.
@@ -326,7 +360,9 @@ class Data(BaseClass):
             n = len(self.df)
 
         try:
-            self.df = self.df.sample(n)
+            sampled_indices = self.df.sample(n).index
+            sampled_indices = sorted(sampled_indices)
+            self.df = self.df.loc[sampled_indices]
             self.update_metadata()
             logger.debug(f"Zufällige Stichprobe von {n} Datenpunkten wurde ausgewählt: {self.__str__()}")
         except Exception as e:
@@ -334,7 +370,7 @@ class Data(BaseClass):
             return self
 
         if auto_commit:
-            self.commit_data(session=session)
+            self.commit(session=session)
 
         return self
 

@@ -3,6 +3,9 @@ from utilities.imports_classes import *
 
 from utilities.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
 
+from tms.time_utils import limit_df_by_time, optimal_time_frame
+from tms.find_peaks import find_n_peaks
+
 from .messung import Messung
 
 logger = get_logger(__name__)
@@ -46,15 +49,28 @@ class Messreihe(BaseClass):
         return objs
 
     @timing_decorator
-    def remove(self, auto_commit=False, session=None):
-        session = db_manager.get_session(session)
-        # Call the base class method to remove this Data object from the database
-        super().remove('id_messreihe', auto_commit, session)
+    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+                           session=None):
+        logger.info(f"Starte Prozess zum laden aller CSV-Files für {self.__str__()}")
+        try:
+            results = self.for_all('messungen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+        except Exception as e:
+            logger.error(f"Fehler beim Laden aller CSV-Files für {self.__str__()}, Error: {e}")
+            return None
+        logger.info(
+            f"Prozess zum laden von CSV-Files für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        return results
 
     @timing_decorator
     def copy(self, reset_id=False, auto_commit=False, session=None):
         new_obj = super().copy("id_messreihe", reset_id, auto_commit, session)
         return new_obj
+
+    @timing_decorator
+    def remove(self, auto_commit=False, session=None):
+        session = db_manager.get_session(session)
+        # Call the base class method to remove this Data object from the database
+        super().remove('id_messreihe', auto_commit, session)
 
     @timing_decorator
     def add_filenames(self, csv_path: str):
@@ -104,15 +120,13 @@ class Messreihe(BaseClass):
         logger.info(f"Die Attribute filename und filepath wurden erfolgreich aktualisiert.")
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
-                           session=None):
-        logger.info(f"Starte Prozess zum laden aller CSV-Files für {self.__str__()}")
+    def get_data_by_version(self, version):
         try:
-            results = self.for_all('messungen', 'load_data_from_csv', version, overwrite, auto_commit, session)
+            results = self.for_all('messungen', 'get_data_by_version', version)
         except Exception as e:
-            logger.error(f"Fehler beim Laden aller CSV-Files für {self.__str__()}, Error: {e}")
+            logger.error(
+                f"Fehler beim Suchen der Data-Instanzen mit Version '{version}' aus {self.__str__()}, Error: {e}")
             return None
-        logger.info(f"Prozess zum laden von CSV-Files für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
         return results
 
     @timing_decorator
@@ -123,39 +137,105 @@ class Messreihe(BaseClass):
         except Exception as e:
             logger.error(f"Fehler beim Laden der Data-Frames für {self.__str__()}, Error: {e}")
             return None
-        logger.info(f"Prozess zum Laden der Data-Frames für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        logger.info(
+            f"Prozess zum Laden der Data-Frames für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
         return results
 
     @timing_decorator
-    def get_data_by_version(self, version):
-        try:
-            results = self.for_all('messungen', 'get_data_by_version', version)
-        except Exception as e:
-            logger.error(f"Fehler beim Suchen der Data-Instanzen mit Version '{version}' aus {self.__str__()}, Error: {e}")
-            return None
-        return results
-
-
-    @timing_decorator
-    def copy_version(self, version_new=configuration.data_version_copy_default,
-                     version_source=configuration.data_version_default, auto_commit=False, session=None):
+    def copy_data_by_version(self, version_new=configuration.data_version_copy_default,
+                             version_source=configuration.data_version_default, auto_commit=False, session=None):
         logger.info(f"Starte Prozess zum kopieren aller Data-Objekte in {self.__str__()} mit Version: {version_source}")
         try:
-            results = self.for_all('messungen', 'copy_version', version_new, version_source, auto_commit, session)
+            results = self.for_all('messungen', 'copy_data_by_version', version_new, version_source, auto_commit,
+                                   session)
         except Exception as e:
             logger.error(f"Fehler beim Kopieren aller Data-Objekte für {self.__str__()}, Error: {e}")
             return None
-        logger.info(f"Prozess zum Kopieren aller Data-Objekte für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        logger.info(
+            f"Prozess zum Kopieren aller Data-Objekte für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
         return results
 
+    @timing_decorator
+    def commit_data_by_version(self, version, session=None):
+        logger.info(f"Starte Prozess zum Commiten aller Data-Objekte in {self.__str__()} mit Version: {session}")
+        try:
+            results = self.for_all('messungen', 'commit_data_by_version', version, session)
+        except Exception as e:
+            logger.error(f"Fehler beim Commiten aller Data-Objekte für {self.__str__()}, Error: {e}")
+            return False
+        # Zählt die Anzahl der erfolgreichen Ergebnisse (die nicht False sind)
+        successful = sum(1 for result in results if result is not False)
+        logger.info(
+            f"Prozess zum Commiten von Data-Objekten für {successful}/{len(results)} für Messungen aus {self.__str__()} erfolgreich.")
+        return results
 
     @timing_decorator
-    def limit_version_by_time(self, version, start_time: str, end_time: str, auto_commit: bool = False, session=None):
-        logger.info(f"Starte Prozess zur Zeiteinschränkung aller Data-Objekte in {self.__str__()} mit Version: {version}")
+    def limit_time_data_by_version(self, version, start_time: str, end_time: str, auto_commit: bool = False,
+                                   session=None):
+        logger.info(
+            f"Starte Prozess zur Zeiteinschränkung aller Data-Objekte in {self.__str__()} mit Version: {version}")
         try:
-            results = self.for_all('messungen', 'limit_version_by_time', version, start_time, end_time, auto_commit, session)
+            results = self.for_all('messungen', 'limit_time_data_by_version', version, start_time, end_time,
+                                   auto_commit, session)
         except Exception as e:
             logger.error(f"Fehler bei Zeiteinschränkung aller Data-Objekte für {self.__str__()}, Error: {e}")
             return None
-        logger.info(f"Prozess zur Zeiteinschränkung aller Data-Objekte für {len(results)} Messungen aus {self.__str__()} erfolgreich abgeschlossen.")
+        # Zählt die Anzahl der erfolgreichen Ergebnisse (die nicht False sind)
+        successful = sum(1 for result in results if result is not False)
+        logger.info(
+            f"Prozess zur Zeiteinschränkung von Data-Objekten für {successful}/{len(results)} für Messungen aus {self.__str__()} erfolgreich.")
         return results
+
+    def limit_time_by_peaks(self, version, duration: int, show_peaks: bool = False,
+                            values_col: str = 'Absolute-Inclination - drift compensated',
+                            time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
+                            min_time_diff: float = 60, prominence: int = None, auto_commit: bool = False,
+                            session=None):
+        """
+        Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
+        """
+
+        objs = self.get_data_by_version(version)
+        peak_dicts = []
+
+        for obj in objs:
+            if not self.validate_dataframe(obj.df, values_col, time_col):
+                return False
+            peaks = find_n_peaks(obj.df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
+            peak_dicts.append(peaks)
+            if show_peaks:
+                logger.info(f"Peaks in {obj.__str__()}gefunden: {peaks.__str__()}")
+
+        # Hier aus vielen peaks_dicts in Liste einen peaks_dict zusammensetzen
+        merged_peaks = self.merge_peak_dicts(peak_dicts)
+        timeframe_dict = optimal_time_frame(duration, merged_peaks)
+
+        for obj in objs:
+            obj.limit_by_time(timeframe_dict['start_time'], timeframe_dict['end_time'], auto_commit, session)
+
+        return True
+
+    @staticmethod
+    def validate_dataframe(df, values_col, time_col):
+        """
+        Überprüft, ob das DataFrame gültig und die benötigten Spalten vorhanden sind.
+        Gibt einen Fehler aus und gibt False zurück, wenn das DataFrame ungültig ist.
+        """
+        if df is None or df.empty:
+            logger.warning("Das DataFrame ist leer oder nicht vorhanden.")
+            return False
+        if values_col not in df.columns or time_col not in df.columns:
+            logger.warning(f"Die Spalten {values_col} und/oder {time_col} existieren nicht im DataFrame.")
+            return False
+        return True
+
+    @staticmethod
+    def merge_peak_dicts(peak_dicts):
+        """
+        Führt eine Liste von 'peak' Wörterbüchern zusammen.
+        """
+        return {
+            'peak_indexes': [index for peaks in peak_dicts for index in peaks['peak_indexes']],
+            'peak_times': [time for peaks in peak_dicts for time in peaks['peak_times']],
+            'peak_values': [value for peaks in peak_dicts for value in peaks['peak_values']]
+        }

@@ -86,102 +86,8 @@ class Messung(BaseClass):
         return objs
 
     @timing_decorator
-    def remove(self, auto_commit=False, session=None):
-        """
-        Entfernen Sie dieses Messungs-Objekt aus der Datenbank.
-
-        :param auto_commit: Ein Flag, das angibt, ob die Änderungen automatisch übernommen werden sollen.
-        :param session: Die SQL-Alchemie-Sitzung, die zum Interagieren mit der Datenbank verwendet wird.
-        """
-        session = db_manager.get_session(session)
-        # Call the base class method to remove this Data object from the database
-        super().remove('id_messung', auto_commit, session)
-
-    @timing_decorator
-    def copy(self, reset_id=False, auto_commit=False, session=None):
-        new_obj = super().copy("id_messung", reset_id, auto_commit, session)
-        return new_obj
-
-    def get_data_by_version(self, version):
-        """
-        Diese Methode findet eine Instanz in self.data, die die gegebene Version hat.
-        Es wird ein kritischer Fehler protokolliert und None zurückgegeben, wenn mehr als eine Instanz gefunden wird.
-        Es wird ein Fehler protokolliert und None zurückgegeben, wenn keine Instanz gefunden wird.
-        """
-        matching_versions = [data for data in self.data if data.version == version]
-        if len(matching_versions) > 1:
-            logger.critical(
-                    f"Mehrere Data-Instanzen mit version '{version}' für '{self.__str__()}' nicht verfügbar.")
-            return None
-        if len(matching_versions) == 0:
-            logger.warning(f"Keine Data-Instanzen mit version '{version}' für '{self.__str__()}' gefunden.")
-            return None
-        logger.debug(f"Dateninstanz {matching_versions[0].__str__()} zurückgegeben")
-        return matching_versions[0]
-
-    def load_data_by_version(self, version, session=None):
-        obj = self.get_data_by_version(version)
-        if obj is None:
-            return None
-        result = obj.load_data(session)
-        return result
-
-
-    @timing_decorator
-    def copy_version(self, version_new=configuration.data_version_copy_default,
-                     version_source=configuration.data_version_default, auto_commit=False, session=None):
-        """
-        Diese Methode kopiert eine Dateninstanz mit version_source zu einer neuen Instanz mit version_new.
-        Es wird ein Fehler protokolliert und None zurückgegeben, wenn version_new und version_source identisch sind.
-        Es wird ein kritischer Fehler protokolliert und None zurückgegeben, wenn der Tabellenname der neuen Instanz mit dem der Quellinstanz übereinstimmt.
-        Es wird ein Fehler protokolliert und None zurückgegeben, wenn ein Fehler beim Kopieren der Instanz oder beim Commit auftritt.
-        """
-        if version_new == version_source:
-            logger.error(
-                f"Fehler: version_new '{version_new}' darf nicht gleich version_source '{version_source}' sein!")
-            return None
-
-        for data_instance in self.data:
-            if data_instance.version == version_new:
-                logger.info(
-                    f"Eine Instanz von Data mit der Version '{version_new}' existiert bereits. Alte Instanz wird zurückgegeben.")
-                return data_instance
-
-        source_obj = self.get_data_by_version(version_source)
-        if source_obj is None:
-            logger.warning(
-                f"Prozess zum Kopieren von '{self.__str__()}' von Version '{version_source}' zu Version '{version_new}' abgebrochen.")
-            return None
-
-        #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
-        source_obj.load_data_if_needed(session=session)
-
-        new_obj = Data.create_new_version(source_obj, version_new)
-
-        if new_obj is None:
-            return None
-
-        if new_obj.table_name == source_obj.table_name:
-            logger.critical(
-                f"Tabellenname für neue Instanz ist gleich dem Quellinstanz-Tabellennamen.")
-            return None
-
-        self.data.append(new_obj)
-
-        if auto_commit:
-            try:
-                new_obj.commit_data(session=session)
-            except Exception as e:
-                logger.error(f"Fehler beim Commit der neuen Dateninstanz: {e}")
-                return None
-
-        logger.info(f"Erfolgreiche Erstellung von '{version_new.__str__()}' (auto_commit = '{auto_commit}').")
-
-        return new_obj
-
-    @timing_decorator
     def load_data_from_csv(self, version: str = configuration.data_version_default, overwrite: bool = False,
-                           auto_commit: bool = False, session=None):
+                              auto_commit: bool = False, session=None):
         """
         Lädt Daten aus einer CSV-Datei und aktualisiert ggf. bestehende Daten.
 
@@ -196,7 +102,7 @@ class Messung(BaseClass):
             return None
 
         logger.info(f"Start loading csv data for '{self.__str__()}'")
-        table_name = Data.new_table_name(version, self.id_messung)
+        table_name = Data.get_table_name(version, self.id_messung)
         present_data_obj = self.find_data_by_table_name(table_name)
 
         if present_data_obj is None or overwrite:
@@ -209,7 +115,7 @@ class Messung(BaseClass):
             return None
 
         if auto_commit:
-            obj.commit_data(session)
+            obj.commit(session)
             logger.info(
                 f"Loading data from csv and committing to database {self.__str__()} successful (auto_commit=True)!")
         else:
@@ -258,16 +164,125 @@ class Messung(BaseClass):
         logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
 
-    def limit_version_by_time(self, version, start_time: str, end_time: str, auto_commit: bool = False, session=None):
+    @timing_decorator
+    def copy(self, reset_id=False, auto_commit=False, session=None):
+        new_obj = super().copy("id_messung", reset_id, auto_commit, session)
+        return new_obj
+
+    @timing_decorator
+    def remove(self, auto_commit=False, session=None):
+        """
+        Entfernen Sie dieses Messungs-Objekt aus der Datenbank.
+
+        :param auto_commit: Ein Flag, das angibt, ob die Änderungen automatisch übernommen werden sollen.
+        :param session: Die SQL-Alchemie-Sitzung, die zum Interagieren mit der Datenbank verwendet wird.
+        """
+        session = db_manager.get_session(session)
+        # Call the base class method to remove this Data object from the database
+        super().remove('id_messung', auto_commit, session)
+
+
+    def get_data_by_version(self, version):
+        """
+        Diese Methode findet eine Instanz in self.data, die die gegebene Version hat.
+        Es wird ein kritischer Fehler protokolliert und None zurückgegeben, wenn mehr als eine Instanz gefunden wird.
+        Es wird ein Fehler protokolliert und None zurückgegeben, wenn keine Instanz gefunden wird.
+        """
+        matching_versions = [data for data in self.data if data.version == version]
+        if len(matching_versions) > 1:
+            logger.critical(
+                f"Mehrere Data-Instanzen mit version '{version}' für '{self.__str__()}' nicht verfügbar. Erste zurückgegeben.")
+        if len(matching_versions) == 0:
+            logger.warning(f"Keine Data-Instanzen mit version '{version}' für '{self.__str__()}' gefunden.")
+            return None
+        logger.debug(f"Dateninstanz {matching_versions[0].__str__()} zurückgegeben")
+        return matching_versions[0]
+
+
+    def load_data_by_version(self, version, session=None):
+        obj = self.get_data_by_version(version)
+        if obj is None:
+            return None
+        result = obj.load_df(session)
+        return result
+
+    @timing_decorator
+    def copy_data_by_version(self, version_new=configuration.data_version_copy_default,
+                             version_source=configuration.data_version_default, auto_commit=False, session=None):
+        """
+        Diese Methode kopiert eine Dateninstanz mit version_source zu einer neuen Instanz mit version_new.
+        Es wird ein Fehler protokolliert und None zurückgegeben, wenn version_new und version_source identisch sind.
+        Es wird ein kritischer Fehler protokolliert und None zurückgegeben, wenn der Tabellenname der neuen Instanz mit dem der Quellinstanz übereinstimmt.
+        Es wird ein Fehler protokolliert und None zurückgegeben, wenn ein Fehler beim Kopieren der Instanz oder beim Commit auftritt.
+        """
+        if version_new == version_source:
+            logger.error(
+                f"Fehler: version_new '{version_new}' darf nicht gleich version_source '{version_source}' sein!")
+            return None
+
+        for old_obj in self.data:
+            if old_obj.version == version_new:
+                logger.info(
+                    f"Eine Instanz von Data mit der Version '{version_new}' existiert bereits. Alte Instanz wird zurückgegeben.")
+                return old_obj
+
+        source_obj = self.get_data_by_version(version_source)
+        if source_obj is None:
+            logger.warning(
+                f"Prozess zum Kopieren von '{self.__str__()}' von Version '{version_source}' zu Version '{version_new}' abgebrochen.")
+            return None
+
+        #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
+        source_obj.load_df_if_missing(session=session)
+
+        new_obj = Data.create_new_version(source_obj, version_new)
+
+        if new_obj is None:
+            return None
+
+        if new_obj.table_name == source_obj.table_name:
+            logger.critical(
+                f"Tabellenname für neue Instanz ist gleich dem Quellinstanz-Tabellennamen.")
+            return None
+
+        self.data.append(new_obj)
+
+        if auto_commit:
+            try:
+                new_obj.commit(session=session)
+            except Exception as e:
+                logger.error(f"Fehler beim Commit der neuen Dateninstanz: {e}")
+                return None
+
+        logger.info(f"Erfolgreiche Erstellung von '{version_new.__str__()}' (auto_commit = '{auto_commit}').")
+
+        return new_obj
+
+    def commit_data_by_version(self, version, session=None):
+        obj = self.get_data_by_version(version)
+        if obj is None:
+            logger.warning(f"Commit für {self.__str__()} abgebrochen.")
+            return False
+        #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
+        obj.load_df_if_missing(session=session)
+        result = obj.commit()
+        return result
+
+    def limit_time_data_by_version(self, version, start_time: str, end_time: str, auto_commit: bool = False,
+                                   session=None):
         obj = self.get_data_by_version(version)
         if obj is None:
             logger.warning(f"Prozess zur Zeitbegrenzung für {self.__str__()} abgebrochen.")
             return None
         #  Lädt die Daten für diese Data-Instanz, falls sie noch nicht geladen wurden.
-        obj.load_data_if_needed(session=session)
+        obj.load_df_if_missing(session=session)
 
         result = obj.limit_by_time(start_time, end_time, auto_commit, session)
         return result
+
+
+
+
 
 
 class MessungStatus(BaseClass):

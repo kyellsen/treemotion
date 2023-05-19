@@ -11,7 +11,7 @@ from .utilities.database import DatabaseManager
 
 # Erstellen Sie eine Instanz des DatabaseManagers, die im Rest Ihres Pakets verwendet wird
 db_manager = DatabaseManager()
-logger.info(f"Instanze von db_manager erstellt")
+logger.debug(f"Instanze von db_manager erstellt")
 
 
 from .classes.projekt import Projekt
@@ -19,4 +19,4 @@ from .classes.messreihe import Messreihe
 from .classes.messung import Messung
 from .classes.data import Data
 
-logger.info(f"TreeMotion Package imported!")
+logger.debug(f"TreeMotion Package imported!")

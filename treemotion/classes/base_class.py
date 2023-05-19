@@ -12,33 +12,6 @@ class BaseClass(Base):
         for attr, value in kwargs.items():
             setattr(self, attr, value)
 
-    @classmethod
-    @timing_decorator
-    def load_from_db(cls, filter_by=None, session=None):
-        session = db_manager.get_session(session)
-        if filter_by is not None:
-            objs = session.query(cls).filter_by(**filter_by).all()
-        else:
-            objs = session.query(cls).all()
-
-        logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
-        return objs
-
-    def remove(self, id_name='id', auto_commit=False, session=None):
-        session = db_manager.get_session(session)
-        existing_obj = session.query(type(self)).get(getattr(self, id_name))
-        try:
-            if existing_obj is not None:
-                session.delete(existing_obj)
-                logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
-            else:
-                logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
-            if auto_commit:
-                db_manager.commit(session)
-        except Exception as e:
-            session.rollback()  # Rollback the changes on error
-            logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
-
     def for_all(self, list_name, method_name, *args, **kwargs):
         results = []  # Store the method return values here
         for obj in getattr(self, list_name):
@@ -51,17 +24,17 @@ class BaseClass(Base):
                 return None
         return results  # Return the list of method return values
 
-    # def for_all_data_version(self, list_name, method_name, version, *args, **kwargs):
-    #     results = []
-    #     for obj in getattr(self, list_name):
-    #         method = getattr(obj, method_name, None)
-    #         if callable(method):
-    #             result = method(version, *args, **kwargs)
-    #             results.append(result)
-    #         else:
-    #             logger.error(f"Die Methode {method_name} existiert nicht in der Klasse {obj.__class__.__name__}.")
-    #             return None
-    #     return results
+    @classmethod
+    @timing_decorator
+    def load_from_db(cls, filter_by=None, session=None):
+        session = db_manager.get_session(session)
+        if filter_by is not None:
+            objs = session.query(cls).filter_by(**filter_by).all()
+        else:
+            objs = session.query(cls).all()
+
+        logger.info(f"{len(objs)} {cls.__name__} Objekte wurden erfolgreich geladen.")
+        return objs
 
     def copy(self, id_name='id', reset_id=False, auto_commit=False, session=None):
         new_obj = self.__class__()
@@ -114,3 +87,18 @@ class BaseClass(Base):
                 continue
 
         return new_obj
+
+    def remove(self, id_name='id', auto_commit=False, session=None):
+        session = db_manager.get_session(session)
+        existing_obj = session.query(type(self)).get(getattr(self, id_name))
+        try:
+            if existing_obj is not None:
+                session.delete(existing_obj)
+                logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
+            else:
+                logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
+            if auto_commit:
+                db_manager.commit(session)
+        except Exception as e:
+            session.rollback()  # Rollback the changes on error
+            logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
