@@ -1,13 +1,12 @@
 # treemotion/classes/data.py
-from sqlalchemy import text
 import pandas as pd
-from datetime import datetime
-# import matplotlib.pyplot as plt
+from sqlalchemy import text
 
 from utilities.imports_classes import *
 from utilities.path_utils import validate_and_get_filepath
+from utilities.dataframe_utils import validate_dataframe
 from tms.time_utils import validate_time_format, limit_df_by_time, optimal_time_frame
-from tms.find_peaks import find_n_peaks
+from tms.find_peaks import find_max_peak, find_n_peaks
 
 logger = get_logger(__name__)
 
@@ -20,12 +19,17 @@ class Data(BaseClass):
     table_name = Column(String)
     datetime_start = Column(DateTime)
     datetime_end = Column(DateTime)
-    duration = Column(DateTime)
+    duration = Column(Float)
     length = Column(Integer)
+    tempdrift_method = Column(String)
+    peak_index = Column(Integer)
+    peak_time = Column(DateTime)
+    peak_value = Column(Float)
 
     def __init__(self, *args, id_data: int = None, id_messung: int = None, version: str = None, table_name: str = None,
                  datetime_start: datetime = None, datetime_end: datetime = None, duration: datetime = None,
-                 length: int = None, df: pd.DataFrame = None, **kwargs):
+                 length: int = None, tempdrift_method: str = None, peak_index: int = None, peak_time: datetime = None,
+                 peak_value: float = None, df: pd.DataFrame = None, df_wind: pd.DataFrame = None, **kwargs):
         """
         Initialisiert eine Data-Instanz.
 
@@ -49,8 +53,17 @@ class Data(BaseClass):
         self.datetime_end = datetime_end  # metadata
         self.duration = duration  # metadata
         self.length = length  # metadata
-        # additional only in class-object, own table in database
+        self.tempdrift_method = tempdrift_method   # metadata
+        self.peak_index = peak_index   # metadata
+        self.peak_time = peak_time   # metadata
+        self.peak_value = peak_value   # metadata
+        # additional only in class-object
+        self.peaks_indexs = None
+        self.peaks_times = None
+        self.peaks_values = None
+        # additional only in class-object, own table in database "auto_df_{version}_{id_messung}_messung
         self.df = df
+        self.df_wind = df_wind
 
     def __str__(self):
         return f"Data(id={self.id_data}, table_name={self.table_name})"
@@ -153,7 +166,7 @@ class Data(BaseClass):
         """
         if not hasattr(self, 'df') or self.df is None:
             logger.warning(
-                f"Für Ausgangsversion {self.__str__()} fehlt der DataFrame (Data.df). Es wird automatisch Data.load_df() ausgeführt.")
+                f"Für Instanz {self.__str__()} fehlt der DataFrame (Data.df). Es wird automatisch Data.load_df() ausgeführt.")
             try:
                 self.load_df(session=session)
                 return True
@@ -197,22 +210,94 @@ class Data(BaseClass):
         """
         return f"auto_df_{version}_{str(id_messung).zfill(3)}_messung"
 
-    def update_metadata(self):
+    def validate_dataframe(self):
+        """
+        Überprüft, ob das DataFrame Data.df gültig und die benötigten Spalten vorhanden sind.
+        """
+        if not hasattr(self, 'df'):
+            logger.error("Das Objekt hat kein Attribut 'df'.")
+            return False
+
+        try:
+            validate_dataframe(self.df, columns=configuration.df_columns)
+        except Exception as e:
+            logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
+            return False
+        return True
+
+
+    def update_metadata(self, auto_commit: bool = False, session=None):
         """
         Aktualisiert die Metadaten des Datenobjekts (Data.df).
-        """
-        try:
-            # self.datetime_start = self.df['Time'].min()
-            # self.datetime_end = self.df['Time'].max()
-            # self.duration = self.datetime_end - self.datetime_start
-            self.length = len(self.df)
 
-            if self.length == 0:
-                logger.warning(
-                    f"Die Aktualisierung der Metadata von {self.__str__()} ergibt einen leeren DataFrame (self.length = 0).")
-            # logger.debug(f"Metadaten für {self.__str__()} erfolgreich aktualisert!")
-        except Exception as e:
+        Überprüft zunächst, ob das DataFrame gültig ist. Wenn das DataFrame ungültig ist,
+        gibt die Methode False zurück. Wenn das DataFrame gültig ist, aktualisiert sie
+        die Metadaten und gibt True zurück.
+
+        :param auto_commit:
+        :param session:
+
+        Returns
+        -------
+        bool
+            Gibt True zurück, wenn die Aktualisierung der Metadaten erfolgreich war, und
+            False, wenn das DataFrame ungültig ist oder ein Fehler aufgetreten ist.
+        """
+
+        if not self.validate_dataframe():
+            return False
+
+        try:
+            self.datetime_start = pd.to_datetime(self.df['Time'].min(), format='%Y-%m-%d %H:%M:%S.%f')
+            self.datetime_end = pd.to_datetime(self.df['Time'].max(), format='%Y-%m-%d %H:%M:%S.%f')
+            self.duration = (self.datetime_end - self.datetime_start).total_seconds()
+            self.length = len(self.df)
+            peak = self.find_max_peak()
+            if peak is None:
+                logger.warning(f"Kein Peak für {self.__str__()}, sonstige Metadaten für {self.__str__()} aktualisiert!")
+                if auto_commit:
+                    self.commit(df_commit=False, session=session)
+                return True
+            self.peak_index = peak['peak_index']
+            self.peak_time = peak['peak_time']
+            self.peak_value = peak['peak_value']
+            logger.debug(f"Metadaten für {self.__str__()} erfolgreich aktualisiert!")
+            if auto_commit:
+                self.commit(df_commit=False, session=session)
+        except (KeyError, ValueError) as e:
             logger.error(f"Metadaten für {self.__str__()} konnten nicht aktualisiert werden: {e}")
+            return False
+        return True
+
+    def find_max_peak(self, show_peak: bool = False, value_col: str = "Absolute-Inclination - drift compensated",
+                      time_col: str = "Time"):
+        result = self.validate_dataframe()
+        if not result:
+            return None
+        try:
+            peak = find_max_peak(self.df, value_col, time_col)
+        except Exception as e:
+            logger.warning(f"Kein Peak für {self.__str__()} gefunden, error: {e}")
+            return None
+
+        if show_peak:
+            logger.info(f"Peak in {self.__str__()}: {peak.__str__()}")
+        return peak
+
+    def find_n_peaks(self, show_peaks: bool = False, values_col: str = 'Absolute-Inclination - drift compensated',
+                     time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
+                     min_time_diff: float = 60, prominence: int = None):
+        result = self.validate_dataframe()
+        if not result:
+            return None
+        try:
+            peaks = find_n_peaks(self.df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
+        except Exception as e:
+            logger.warning(f"Keine Peaks für {self.__str__()} gefunden, error: {e}")
+            return None
+        if show_peaks:
+            logger.info(f"Peaks in {self.__str__()} gefunden: {peaks.__str__()}")
+        return peaks
 
     # Geerbt von BaseClass
     @timing_decorator
@@ -234,17 +319,18 @@ class Data(BaseClass):
         return new_obj
 
     @timing_decorator
-    def commit(self, session=None):
+    def commit(self, df_commit=True, session=None):
         """
         Fügt das Datenobjekt zur Datenbank hinzu und führt den Commit aus.
 
+        :param df_commit: Wenn True wird Data.df commited, wenn False wird Data.df nicht commited (default).
         :param session: SQL-Alchemie-Session zur Interaktion mit der Datenbank.
         :return: True, wenn commit erfolgreich; False, wenn fehlgeschlagen
         """
         session = db_manager.get_session(session)
         try:
             session.add(self)
-            if self.df is not None:
+            if self.df is not None and df_commit:
                 self.df.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
             db_manager.commit(session)
             logger.debug(f"Instanz '{self.__str__()}' zur Datenbank committed.")
@@ -272,11 +358,14 @@ class Data(BaseClass):
                 session.delete(existing_obj)
                 logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
                 db_manager.commit(session)
+                return True
             else:
                 logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
+                return False
         except Exception as e:
             session.rollback()  # Rollback the changes on error
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
+            return False
 
     # Geerbt von BaseClass
     def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False, session=None):
@@ -317,9 +406,9 @@ class Data(BaseClass):
         return True
 
     def limit_time_by_peaks(self, duration: int, values_col: str = 'Absolute-Inclination - drift compensated',
-                                time_col: str = 'Time', n_peaks: int = 10,
-                                sample_rate: float = 20, min_time_diff: float = 60,
-                                prominence: int = None, auto_commit: bool = False, session=None):
+                            time_col: str = 'Time', n_peaks: int = 10,
+                            sample_rate: float = 20, min_time_diff: float = 60,
+                            prominence: int = None, auto_commit: bool = False, session=None):
 
         # Überprüfung des DataFrames
         if self.df is None or self.df.empty:
@@ -334,9 +423,11 @@ class Data(BaseClass):
         peaks_dict = find_n_peaks(self.df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
 
         timeframe_dict = optimal_time_frame(duration, peaks_dict)
-        self.df = limit_df_by_time(self.df, time_col="Time", start_time=timeframe_dict['start_time'], end_time=timeframe_dict['end_time'])
+        self.df = limit_df_by_time(self.df, time_col="Time", start_time=timeframe_dict['start_time'],
+                                   end_time=timeframe_dict['end_time'])
 
-        logger.info(f"Limitierung der Daten von '{self.__str__()}' zwischen {timeframe_dict['start_time']} und {timeframe_dict['end_time']} erfolgreich.")
+        logger.info(
+            f"Limitierung der Daten von '{self.__str__()}' zwischen {timeframe_dict['start_time']} und {timeframe_dict['end_time']} erfolgreich.")
         self.update_metadata()
         if auto_commit:
             self.commit(session=session)

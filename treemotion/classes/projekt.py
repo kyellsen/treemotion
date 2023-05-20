@@ -55,7 +55,8 @@ class Projekt(BaseClass):
     def remove(self, auto_commit=False, session=None):
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove('id_projekt', auto_commit, session)
+        result = super().remove('id_projekt', auto_commit, session)
+        return result
 
     @timing_decorator
     def add_filenames(self, csv_path):
@@ -103,7 +104,7 @@ class Projekt(BaseClass):
             results = self.for_all('messreihen', 'commit_data_by_version', version, session)
         except Exception as e:
             logger.error(f"Fehler beim Commiten aller Data-Objekte für {self.__str__()}, Error: {e}")
-            return None
+            return False
         # Zählt die Anzahl der erfolgreichen Ergebnisse (die nicht False sind)
         successful = sum(1 for result in results if result is not False)
         logger.info(

@@ -157,7 +157,7 @@ class Messung(BaseClass):
         obj = present_data_obj or Data.load_from_csv(filepath=self.filepath, id_data=None, id_messung=self.id_messung,
                                                      version=version, table_name=table_name)
         obj.df = obj.read_csv_tms(self.filepath)
-        obj.update_metadata()
+        obj.update_metadata(auto_commit=True)
         if present_data_obj:
             self.data.remove(present_data_obj)
         self.data.append(obj)
@@ -179,8 +179,8 @@ class Messung(BaseClass):
         """
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove('id_messung', auto_commit, session)
-
+        result = super().remove('id_messung', auto_commit, session)
+        return result
 
     def get_data_by_version(self, version):
         """

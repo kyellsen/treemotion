@@ -70,7 +70,8 @@ class Messreihe(BaseClass):
     def remove(self, auto_commit=False, session=None):
         session = db_manager.get_session(session)
         # Call the base class method to remove this Data object from the database
-        super().remove('id_messreihe', auto_commit, session)
+        result = super().remove('id_messreihe', auto_commit, session)
+        return result
 
     @timing_decorator
     def add_filenames(self, csv_path: str):
@@ -199,34 +200,22 @@ class Messreihe(BaseClass):
         peak_dicts = []
 
         for obj in objs:
-            if not self.validate_dataframe(obj.df, values_col, time_col):
-                return False
-            peaks = find_n_peaks(obj.df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
+            peaks = obj.find_n_peaks(show_peaks, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
+            if peaks is None:
+                continue
             peak_dicts.append(peaks)
-            if show_peaks:
-                logger.info(f"Peaks in {obj.__str__()}gefunden: {peaks.__str__()}")
 
         # Hier aus vielen peaks_dicts in Liste einen peaks_dict zusammensetzen
         merged_peaks = self.merge_peak_dicts(peak_dicts)
-        timeframe_dict = optimal_time_frame(duration, merged_peaks)
+        try:
+            timeframe_dict = optimal_time_frame(duration, merged_peaks)
+        except Exception as e:
+            logger.error(f"Optimaler Timeframe konnte nicht ermittelt werden, error: {e}")
+            return False
 
         for obj in objs:
             obj.limit_by_time(timeframe_dict['start_time'], timeframe_dict['end_time'], auto_commit, session)
 
-        return True
-
-    @staticmethod
-    def validate_dataframe(df, values_col, time_col):
-        """
-        Überprüft, ob das DataFrame gültig und die benötigten Spalten vorhanden sind.
-        Gibt einen Fehler aus und gibt False zurück, wenn das DataFrame ungültig ist.
-        """
-        if df is None or df.empty:
-            logger.warning("Das DataFrame ist leer oder nicht vorhanden.")
-            return False
-        if values_col not in df.columns or time_col not in df.columns:
-            logger.warning(f"Die Spalten {values_col} und/oder {time_col} existieren nicht im DataFrame.")
-            return False
         return True
 
     @staticmethod
@@ -235,7 +224,7 @@ class Messreihe(BaseClass):
         Führt eine Liste von 'peak' Wörterbüchern zusammen.
         """
         return {
-            'peak_indexes': [index for peaks in peak_dicts for index in peaks['peak_indexes']],
-            'peak_times': [time for peaks in peak_dicts for time in peaks['peak_times']],
-            'peak_values': [value for peaks in peak_dicts for value in peaks['peak_values']]
+            'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
+            'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
+            'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
         }

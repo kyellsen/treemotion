@@ -20,6 +20,12 @@ class Configuration:
         # Messung
 
         # Data
+        self.df_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
+                           'Absolute-Inclination', 'Inclination direction of the tree',
+                           'Temperature', 'East-West-Inclination - drift compensated',
+                           'North-South-Inclination - drift compensated',
+                           'Absolute-Inclination - drift compensated',
+                           'Inclination direction of the tree - drift compensated']
         self.data_version_default = "raw"
         self.data_version_copy_default = "copy"
         # Weitere Konstanten hier

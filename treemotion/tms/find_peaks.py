@@ -1,8 +1,30 @@
 import pandas as pd
 from scipy.signal import find_peaks
 
+def find_max_peak(df: pd.DataFrame, value_col: str, time_col: str) -> dict:
+    """
+    Findet den höchsten Peak in einem gegebenen Pandas DataFrame.
 
-def find_n_peaks(df: pd.DataFrame, values_col: str, time_col: str, n_peaks: int,
+    Parameter:
+    df (DataFrame): Der DataFrame, in dem Peak gesucht werden sollen.
+    values_col (str): Der Name der Spalte im DataFrame, die die Werte enthält.
+    time_col (str): Der Name der Spalte im DataFrame, die die Zeitstempel enthält.
+
+    Returns:
+    dict: Ein Wörterbuch mit dem Index, der Zeit und dem Wert des gefundenen Peaks.
+    """
+
+    # Auswahl des maximalen Peaks
+    max_peak_index = df[value_col].idxmax()
+
+    return {
+        'peak_index': max_peak_index,
+        'peak_time': df[time_col].iloc[max_peak_index],
+        'peak_value': df[value_col].iloc[max_peak_index]
+    }
+
+
+def find_n_peaks(df: pd.DataFrame, value_col: str, time_col: str, n_peaks: int,
                  sample_rate: float, min_time_diff: float=None,
                  prominence: int = None) -> dict:
     """
@@ -43,13 +65,13 @@ def find_n_peaks(df: pd.DataFrame, values_col: str, time_col: str, n_peaks: int,
         min_samples_diff = None
 
     # Finden Sie alle Peaks
-    peaks, _ = find_peaks(df[values_col], distance=min_samples_diff, prominence=prominence)
+    peaks, _ = find_peaks(df[value_col], distance=min_samples_diff, prominence=prominence)
 
     # Sortieren Sie die Peaks nach ihren Werten und behalten Sie nur die Top-n_peaks
-    peaks = sorted(peaks, key=lambda x: df[values_col].iloc[x], reverse=True)[:n_peaks]
+    peaks = sorted(peaks, key=lambda x: df[value_col].iloc[x], reverse=True)[:n_peaks]
 
     return {
-        'peak_indexes': peaks,
-        'peak_times': df[time_col].iloc[peaks].tolist(),
-        'peak_values': df[values_col].iloc[peaks].tolist()
+        'peak_index': peaks,
+        'peak_time': df[time_col].iloc[peaks].tolist(),
+        'peak_value': df[value_col].iloc[peaks].tolist()
     }

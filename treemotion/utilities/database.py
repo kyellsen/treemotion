@@ -33,11 +33,14 @@ class DatabaseManager:
             db_path (str): Pfad zur Datenbank.
         """
         db_path = Path(db_path)
-        if not db_path.is_file():
-            logger.error(f"Die angegebene Datenbankdatei {db_path} existiert nicht.")
-            raise FileNotFoundError(f"Die angegebene Datenbankdatei {db_path} existiert nicht.")
-
         DATABASE_URI = f'sqlite:///{db_path}'
+
+        # Überprüfung, ob die Datenbank bereits existiert
+        if db_path.is_file():
+            logger.info(f"Die existierende Datenbank unter {DATABASE_URI} wird genutzt.")
+        else:
+            logger.info(f"Die Datenbank unter {DATABASE_URI} existiert nicht und wird erstellt.")
+
         try:
             self.engine = create_engine(DATABASE_URI)
             Base.metadata.create_all(self.engine)  # Erstellt alle Tabellen, definiert in Ihrem Base ORM-Objekt
@@ -133,7 +136,7 @@ class DatabaseManager:
             raise e
 
     @staticmethod
-    def create_db(path: str, name: str):
+    def create_template_db(path: str, name: str):
         """
         Erstellt eine neue Datenbank indem die Vorlagendatenbank kopiert wird.
         Args:
@@ -149,7 +152,7 @@ class DatabaseManager:
 
         if database_path.exists():
             logger.error(f"Eine Datenbank namens '{database_filename}' existiert bereits in {path}.")
-            return None
+            return str(database_path)
 
         template_database_filename = configuration.template_db_name
         template_database_path = Path(__file__).parent.parent / template_database_filename

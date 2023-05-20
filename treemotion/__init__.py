@@ -18,5 +18,6 @@ from .classes.projekt import Projekt
 from .classes.messreihe import Messreihe
 from .classes.messung import Messung
 from .classes.data import Data
+from .classes.wind_messreihe import WindMessreihe
 
 logger.debug(f"TreeMotion Package imported!")

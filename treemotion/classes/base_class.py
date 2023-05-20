@@ -97,8 +97,11 @@ class BaseClass(Base):
                 logger.info(f"Objekt {self.__class__.__name__} wurde entfernt.")
             else:
                 logger.info(f"Objekt {self.__class__.__name__} ist nicht vorhanden.")
+                return False
             if auto_commit:
                 db_manager.commit(session)
+            return True
         except Exception as e:
             session.rollback()  # Rollback the changes on error
             logger.error(f"Fehler beim Entfernen des Objekts {self.__class__.__name__}: {e}")
+            return False
