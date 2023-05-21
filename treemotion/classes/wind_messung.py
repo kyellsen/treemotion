@@ -8,7 +8,6 @@ class WindMessung(Base):
     __tablename__ = 'WindMessung'
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     id_wind_messreihe = Column(Integer, ForeignKey('WindMessreihe.id', onupdate='CASCADE'))
-    station_id = Column(Integer)
     datetime = Column(DateTime)
     quality_level_wind_avg = Column(Float)
     wind_speed_10min_avg = Column(Float)

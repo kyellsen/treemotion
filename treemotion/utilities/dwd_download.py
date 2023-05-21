@@ -12,41 +12,95 @@ from utilities.log import get_logger
 
 logger = get_logger(__name__)
 
-def download_dwd_txt(stations_id, folder_path, link_1=None, link_2=None):
-    links = [link_1, link_2]
+
+def download_dwd_files(stations_id, folder_path, link_wind, link_wind_extreme, link_stations_liste):
+    """
+    Download and extract data files from DWD and return their names.
+
+    :param stations_id: the id of the station
+    :param folder_path: the folder where the files will be saved
+    :param link_wind: the url of the wind data
+    :param link_wind_extreme: the url of the wind extreme data
+    :param link_stations_liste: the url of the stations list
+    :return: the path of the folder and the names of the files
+    """
+    create_folder(folder_path)
+
+    links = [link_wind, link_wind_extreme]
     filenames = []
-    folder_path = Path(folder_path)
-    folder_path.mkdir(parents=True, exist_ok=True)  # Erstellen des Verzeichnisses, wenn es nicht existiert
 
     for link in links:
-        # Anforderung der Website und Erstellung des Soup-Objekts
         response = requests.get(link)
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Suche nach der ZIP-Datei mit der passenden Stations-ID
         file = soup.find('a', href=re.compile(f"{stations_id}_akt.zip"))
         if file is not None:
-            # Herunterladen und Speichern der ZIP-Datei
             url = link + file['href']
-            r = requests.get(url, stream=True)
-            zip_path = folder_path / f"{file['href']}"
-            with zip_path.open('wb') as f:
-                f.write(r.content)
-            logger.info(f"ZIP file {file['href']} downloaded at {folder_path}")
-
-            # Entpacken der ZIP-Datei
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(folder_path)
-                # Speichern des Namens der extrahierten TXT-Datei
-                filename = zip_ref.namelist()[0]
-                filenames.append(filename)
-                logger.info(f"ZIP file {file['href']} extracted, TXT file {filename} saved at {folder_path}")
-
-            # Löschen der ZIP-Datei
-            zip_path.unlink()
-            logger.info(f"ZIP file {file['href']} deleted from {folder_path}")
+            filename = download_wind_files(url, folder_path, stations_id)
+            filenames.append(filename)
         else:
             logger.warning(f"No file found for station {stations_id} at {link}")
             filenames.append(None)
 
-    return folder_path, filenames[0], filenames[1]
+    filename = download_stations_list_file(link_stations_liste, folder_path)
+    filenames.append(filename)
+
+    return folder_path, filenames[0], filenames[1], filenames[2]
+
+
+def create_folder(folder_path):
+    """
+    Create a folder if it doesn't exist.
+
+    :param folder_path: the path of the folder to be created
+    """
+    folder_path = Path(folder_path)
+    folder_path.mkdir(parents=True, exist_ok=True)
+
+
+def download_wind_files(url, folder_path, stations_id):
+    """
+    Download a zip file from a given url, extract it in a given folder, and then delete the zip file.
+
+    :param url: the url of the zip file
+    :param folder_path: the folder where the zip file will be extracted
+    :param stations_id: the id of the station
+    :return filename: the name of the extracted file
+    """
+    r = requests.get(url, stream=True)
+    folder_path = Path(folder_path)
+    zip_path = folder_path / f"{stations_id}_akt.zip"
+    with zip_path.open('wb') as f:
+        f.write(r.content)
+    logger.info(f"ZIP file {stations_id}_akt.zip downloaded at {folder_path}")
+
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(folder_path)
+        filename = zip_ref.namelist()[0]
+    logger.info(f"ZIP file {stations_id}_akt.zip extracted, TXT file {filename} saved at {folder_path}")
+
+    zip_path.unlink()
+    logger.info(f"ZIP file {stations_id}_akt.zip deleted from {folder_path}")
+
+    return filename
+
+
+def download_stations_list_file(url, folder_path):
+    """
+    Download a text file from a given url and save it in a given folder.
+
+    :param url: the url of the text file
+    :param folder_path: the folder where the text file will be saved
+    :return filename: the name of the downloaded file
+    """
+    response = requests.get(url)
+    filename = url.split('/')[-1]
+    folder_path = Path(folder_path)
+    txt_path = folder_path / filename
+    with txt_path.open('wb') as f:
+        f.write(response.content)
+    logger.info(f"TXT file {filename} downloaded at {folder_path}")
+
+    return filename
+
+
+

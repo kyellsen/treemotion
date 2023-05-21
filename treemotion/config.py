@@ -1,5 +1,7 @@
 # treemotion/config.py
 
+from pathlib import Path
+
 class Configuration:
     """
     Eine Klasse zur Verwaltung der Konfigurationseinstellungen für das Treemotion-Paket.
@@ -9,8 +11,15 @@ class Configuration:
         """
         Initialisiert die Konfigurationswerte mit den Standardwerten.
         """
+        self.working_directory = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_2"
+        # Erstelle Directory und Parents falls erforderlich
+        Path(self.working_directory).mkdir(exist_ok=True, parents=True)
+
+        # Logging
         self.log_level = "debug"  # debug, info, warning, critical, error
         self.log_directory = "log"
+
+        # Database
         self.template_db_name = "database_template_1_0_0_0.db"  # Look in the "treemotion" directory for template.db
 
         # Projekt
@@ -28,11 +37,33 @@ class Configuration:
                            'Inclination direction of the tree - drift compensated']
         self.data_version_default = "raw"
         self.data_version_copy_default = "copy"
+
+        # WindMessreihe
+
+        self.dwd_data_directory = "wind_data_dwd"
         # Weitere Konstanten hier
 
+    def set_working_directory(self, directory: str):
+        from .utilities.log import get_logger
+        logger = get_logger(__name__)
 
-# Eine Instanz der Configuration-Klasse erstellen
-configuration = Configuration()
+        try:
+            path = Path(directory)
+            if not path.exists():
+                path.mkdir(parents=True)  # Verzeichnis erstellen, falls es nicht existiert
+                logger.info(f"Das Verzeichnis {directory} wurde erfolgreich erstellt.")
+            else:
+                logger.warning(f"Das Verzeichnis {directory} existiert bereits.")
+                self.working_directory = str(path.resolve())  # Verwende das bestehende Verzeichnis
+
+            self.working_directory = str(path.resolve())
+            logger.info("Arbeitsverzeichnis festgelegt!")
+            return True
+
+        except Exception as e:
+            logger.error(f"Fehler beim Festlegen des Arbeitsverzeichnisses: {str(e)}")
+            return False
+
 
 ### README
 

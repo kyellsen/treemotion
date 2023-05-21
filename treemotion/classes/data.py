@@ -261,7 +261,7 @@ class Data(BaseClass):
             self.peak_index = peak['peak_index']
             self.peak_time = peak['peak_time']
             self.peak_value = peak['peak_value']
-            logger.debug(f"Metadaten für {self.__str__()} erfolgreich aktualisiert!")
+            logger.info(f"Metadaten für {self.__str__()} erfolgreich aktualisiert!")
             if auto_commit:
                 self.commit(df_commit=False, session=session)
         except (KeyError, ValueError) as e:
@@ -333,7 +333,7 @@ class Data(BaseClass):
             if self.df is not None and df_commit:
                 self.df.to_sql(self.table_name, session.bind, if_exists='replace', index=False)
             db_manager.commit(session)
-            logger.debug(f"Instanz '{self.__str__()}' zur Datenbank committed.")
+            logger.info(f"Instanz '{self.__str__()}' zur Datenbank committed.")
             return True
         except Exception as e:
             session.rollback()

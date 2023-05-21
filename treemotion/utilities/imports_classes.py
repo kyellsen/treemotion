@@ -16,7 +16,7 @@ from sqlalchemy.orm import relationship
 
 # Import utilities
 
-from treemotion.config import configuration
+from treemotion import configuration
 from utilities.runtime import timing_decorator
 from utilities.log import get_logger
 from treemotion import db_manager

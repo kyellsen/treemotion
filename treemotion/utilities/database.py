@@ -5,7 +5,6 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from pathlib import Path
 from shutil import copy
 
-from config import configuration
 from utilities.log import get_logger
 from utilities.base import Base
 
@@ -26,27 +25,33 @@ class DatabaseManager:
         self.session_factory = None
         self.current_session = None
 
-    def connect(self, db_path: str):
+    def connect(self, db_filename: str, directory: str = None):
         """
         Verbindet zur Datenbank und erstellt eine neue session_factory.
         Args:
-            db_path (str): Pfad zur Datenbank.
+            db_filename (str): Pfad zur Datenbank.
+            db_directory (str: Optional, normalerweise im working_directory
         """
-        db_path = Path(db_path)
-        DATABASE_URI = f'sqlite:///{db_path}'
+        if directory is None:
+            from treemotion import configuration
+            directory = configuration.working_directory
+
+        db_path = Path(directory) / db_filename  # DB-Pfad aus Filename und Working directory erstellen
+
+        DATABASE_URI = f'sqlite:///{db_path.__str__()}'
 
         # Überprüfung, ob die Datenbank bereits existiert
         if db_path.is_file():
-            logger.info(f"Die existierende Datenbank unter {DATABASE_URI} wird genutzt.")
+            logger.info(f"Die existierende Datenbank unter {db_path.__str__()} wird genutzt.")
         else:
-            logger.info(f"Die Datenbank unter {DATABASE_URI} existiert nicht und wird erstellt.")
+            logger.info(f"Die Datenbank unter {db_path.__str__()} existiert nicht und wird erstellt.")
 
         try:
             self.engine = create_engine(DATABASE_URI)
             Base.metadata.create_all(self.engine)  # Erstellt alle Tabellen, definiert in Ihrem Base ORM-Objekt
             self.session_factory = sessionmaker(bind=self.engine)
             self.current_session = self.session_factory()
-            logger.info(f"Verbindung zur Datenbank unter {DATABASE_URI} erfolgreich hergestellt.")
+            logger.info(f"Verbindung zur Datenbank unter {db_path.__str__()} erfolgreich hergestellt.")
         except Exception as e:
             logger.error(f"Fehler beim Verbinden zur Datenbank: {e}")
             raise e
@@ -136,7 +141,7 @@ class DatabaseManager:
             raise e
 
     @staticmethod
-    def create_template_db(path: str, name: str):
+    def create_template_db(name: str, path: str = None):
         """
         Erstellt eine neue Datenbank indem die Vorlagendatenbank kopiert wird.
         Args:
@@ -146,6 +151,11 @@ class DatabaseManager:
         Returns:
             str: Der Pfad zur neuen Datenbank oder None, wenn die Datenbank nicht erstellt werden konnte. Bei Fehler = None
         """
+
+        if path is None:
+            from treemotion import configuration
+            path = configuration
+
         path = Path(path)
         database_filename = f"{name}.db"
         database_path = path / database_filename
@@ -155,7 +165,7 @@ class DatabaseManager:
             return str(database_path)
 
         template_database_filename = configuration.template_db_name
-        template_database_path = Path(__file__).parent.parent / template_database_filename
+        template_database_path = Path(__file__).parent.parent / "resources" / template_database_filename
 
         if not template_database_path.is_file():
             logger.error(f"Die Datei {template_database_filename} wurde nicht gefunden.")

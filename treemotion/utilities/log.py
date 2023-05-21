@@ -3,16 +3,14 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from treemotion import configuration
-
 
 class ColorfulFormatter(logging.Formatter):
     COLOR_CODES = {
         logging.CRITICAL: '\033[91m',  # Red
-        logging.ERROR: '\033[91m',     # Red
-        logging.WARNING: '\033[93m',   # Yellow
-        logging.INFO: '\033[92m',      # Green
-        logging.DEBUG: '\033[94m',     # Blue
+        logging.ERROR: '\033[91m',  # Red
+        logging.WARNING: '\033[93m',  # Yellow
+        logging.INFO: '\033[92m',  # Green
+        logging.DEBUG: '\033[94m',  # Blue
     }
 
     RESET_CODE = '\033[0m'
@@ -23,10 +21,16 @@ class ColorfulFormatter(logging.Formatter):
         return super().format(record)
 
 
-def configure_logger(log_level=configuration.log_level, log_directory=configuration.log_directory, log_format=None, date_format=None, log_file=None):
+def configure_logger(log_level=None, log_directory=None, log_format=None, date_format=None, log_file=None):
+    from treemotion import configuration
+    if log_level is None:
+        log_level = configuration.log_level
+    if log_directory is None:
+        log_directory = Path(configuration.working_directory) / configuration.log_directory
+
     log_level = LOG_LEVELS.get(log_level.lower(), logging.INFO)
-    log_directory = Path(log_directory)
-    log_directory.mkdir(exist_ok=True)
+    # Erstelle Directory und Parents falls erforderlich
+    log_directory.mkdir(exist_ok=True, parents=True)
 
     if log_format is None:
         log_format = "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s"
@@ -51,9 +55,9 @@ def configure_logger(log_level=configuration.log_level, log_directory=configurat
     return
 
 
-
 def get_logger(name):
     return logging.getLogger(name)
+
 
 LOG_LEVELS = {
     'error': logging.ERROR,

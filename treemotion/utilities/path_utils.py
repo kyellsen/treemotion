@@ -79,3 +79,18 @@ def extract_id_sensor_list(files: List[Path]) -> List[int]:
 
     logger.info(f"Extrahierte Sensor-IDs: {id_sensor_list}")
     return id_sensor_list
+
+
+def validate_files_exist(folder_path: Path, filename: str) -> bool:
+    """
+    Checks if given files exist at the provided folder path.
+
+    :param folder_path: The Path where the txt files are located.
+    :param filename: Name of the first txt file.
+    :return: True if file exist, False otherwise.
+    """
+    # Check if the files exist
+    if not folder_path.joinpath(filename).exists():
+        logger.error(f"File {filename} do not exist.")
+        return False
+    return True
