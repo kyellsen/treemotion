@@ -24,4 +24,6 @@ from .classes.messung import Messung
 from .classes.data import Data
 from .classes.wind_messreihe import WindMessreihe
 
+from .plotting.plot_manager import PlotManager
+
 logger.info(f"TreeMotion Package importiert!")

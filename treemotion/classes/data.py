@@ -53,17 +53,16 @@ class Data(BaseClass):
         self.datetime_end = datetime_end  # metadata
         self.duration = duration  # metadata
         self.length = length  # metadata
-        self.tempdrift_method = tempdrift_method   # metadata
-        self.peak_index = peak_index   # metadata
-        self.peak_time = peak_time   # metadata
-        self.peak_value = peak_value   # metadata
+        self.tempdrift_method = tempdrift_method  # metadata
+        self.peak_index = peak_index  # metadata
+        self.peak_time = peak_time  # metadata
+        self.peak_value = peak_value  # metadata
         # additional only in class-object
         self.peaks_indexs = None
         self.peaks_times = None
         self.peaks_values = None
         # additional only in class-object, own table in database "auto_df_{version}_{id_messung}_messung
         self.df = df
-        self.df_wind = df_wind
 
     def __str__(self):
         return f"Data(id={self.id_data}, table_name={self.table_name})"
@@ -210,21 +209,29 @@ class Data(BaseClass):
         """
         return f"auto_df_{version}_{str(id_messung).zfill(3)}_messung"
 
-    def validate_dataframe(self):
+    def validate_dataframe(self, wind_data=False):
         """
         Überprüft, ob das DataFrame Data.df gültig und die benötigten Spalten vorhanden sind.
         """
         if not hasattr(self, 'df'):
             logger.error("Das Objekt hat kein Attribut 'df'.")
             return False
+        if wind_data:
+            df_columns = configuration.df_columns
+            wind_df_columns_selected = configuration.wind_df_columns_selected
+            try:
+                validate_dataframe(self.df, columns=df_columns + wind_df_columns_selected)
+            except Exception as e:
+                logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
+                return False
 
-        try:
-            validate_dataframe(self.df, columns=configuration.df_columns)
-        except Exception as e:
-            logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
-            return False
+        else:
+            try:
+                validate_dataframe(self.df, columns=configuration.df_columns)
+            except Exception as e:
+                logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
+                return False
         return True
-
 
     def update_metadata(self, auto_commit: bool = False, session=None):
         """

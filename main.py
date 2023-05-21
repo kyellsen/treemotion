@@ -10,9 +10,12 @@ csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Dat
 
 db_manager.connect(db_filename=filename_db_1)
 
-test = WindMessreihe.load_from_dwd_online(name="Bosau", stations_id=6163, overwrite=True, auto_commit=True)
+session = db_manager.get_session()
+test = session.query(WindMessreihe).first()
 
-projekt = Projekt.load_from_db()[0]
+
+
+#projekt = Projekt.load_from_db()[0]
 # projekt.add_filenames(csv_path=csv_path)
 # projekt.load_data_from_csv(version="raw", overwrite=False, auto_commit=False)
 # data_list = Data.load_from_db()

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+
 class Configuration:
     """
     Eine Klasse zur Verwaltung der Konfigurationseinstellungen für das Treemotion-Paket.
@@ -11,7 +12,7 @@ class Configuration:
         """
         Initialisiert die Konfigurationswerte mit den Standardwerten.
         """
-        self.working_directory = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_2"
+        self.working_directory = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_1"
         # Erstelle Directory und Parents falls erforderlich
         Path(self.working_directory).mkdir(exist_ok=True, parents=True)
 
@@ -39,8 +40,16 @@ class Configuration:
         self.data_version_copy_default = "copy"
 
         # WindMessreihe
-
         self.dwd_data_directory = "wind_data_dwd"
+        self.wind_df_columns = ['id', 'id_wind_messreihe', 'datetime', 'quality_level_wind_avg',
+                                'wind_speed_10min_avg', 'wind_direction_10min_avg',
+                                'quality_level_wind_extremes', 'wind_speed_max_10min',
+                                'wind_speed_min_10min', 'wind_speed_max_10min_moving_avg',
+                                'wind_direction_max_wind_speed']
+        self.wind_df_columns_selected = ['datetime', 'wind_speed_10min_avg', 'wind_direction_10min_avg',
+                                         'wind_speed_max_10min', 'wind_direction_max_wind_speed']
+
+
         # Weitere Konstanten hier
 
     def set_working_directory(self, directory: str):
@@ -63,7 +72,6 @@ class Configuration:
         except Exception as e:
             logger.error(f"Fehler beim Festlegen des Arbeitsverzeichnisses: {str(e)}")
             return False
-
 
 ### README
 

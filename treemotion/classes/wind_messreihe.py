@@ -56,6 +56,67 @@ class WindMessreihe(Base):
     def __str__(self):
         return f"WindMessreihe(id={self.id}, name={self.name})"
 
+    def get_wind_df(self, datetime_start=None, datetime_end=None, time_col: str = 'datetime', columns=None,
+                      session=None):
+        """
+        Extracts wind data for the current instance from the Windmessung table as Pandas DataFrame.
+        It filters the data by a specified time period and includes only specified columns if specified.
+
+        Parameters
+        ----------
+        datetime_start : datetime-like, optional
+            The start of the time period to extract data for.
+            If None, extraction is not bounded by start time.
+        datetime_end : datetime-like, optional
+            The end of the time period to extract data for.
+            If None, extraction is not bounded by end time.
+        time_col : str, optional
+            The name of the column to use for time filtering. Default is 'datetime'.
+        columns : list of str, optional
+            The columns to include in the output. If None, all columns are included.
+        session : sqlalchemy.orm.Session, optional
+            The session to use for the query. If None, a new session is created.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the extracted data.
+
+        Raises
+        ------
+        AttributeError
+            If 'time_col' or any column in 'columns' do not exist in WindMessung.
+        """
+        try:
+            session = db_manager.get_session(session)
+
+            # Verify that the time_col exists
+            if not hasattr(WindMessung, time_col):
+                logger.error(f"Invalid column name for time_col: {time_col}")
+                raise AttributeError(f"Invalid column name for time_col: {time_col}")
+
+            if columns is not None:
+                # Verify that all specified columns exist
+                for col in columns:
+                    if not hasattr(WindMessung, col):
+                        logger.error(f"Invalid column name in columns: {col}")
+                        raise AttributeError(f"Invalid column name in columns: {col}")
+                query = session.query(*[getattr(WindMessung, col) for col in columns]).filter(
+                    WindMessung.id_wind_messreihe == self.id)
+            else:
+                query = session.query(WindMessung).filter(WindMessung.id_wind_messreihe == self.id)
+
+            if datetime_start is not None:
+                query = query.filter(getattr(WindMessung, time_col) >= datetime_start)
+            if datetime_end is not None:
+                query = query.filter(getattr(WindMessung, time_col) <= datetime_end)
+
+            logger.info(f"Executing query for WindMessreihe with id {self.id} from {datetime_start} to {datetime_end}")
+            return pd.read_sql(query.statement, session.bind)
+        except Exception as e:
+            logger.error(f"Error while getting wind data for WindMessreihe with id {self.id}: {str(e)}")
+            raise e
+
     def update_metadata(self):
         """
         Aktualisiert die Metadaten der WindMessreihe basierend auf den verknüpften WindMessung-Instanzen.
