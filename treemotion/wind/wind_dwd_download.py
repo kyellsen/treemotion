@@ -7,24 +7,24 @@ from bs4 import BeautifulSoup
 import zipfile
 import re
 
+from utils.path_utils import get_directory
 from utils.log import get_logger
-
 
 logger = get_logger(__name__)
 
 
-def download_dwd_files(stations_id, folder_path, link_wind, link_wind_extreme, link_stations_liste):
+def download_dwd_files(stations_id, directory, link_wind, link_wind_extreme, link_stations_liste):
     """
     Download and extract data files from DWD and return their names.
 
     :param stations_id: the id of the station
-    :param folder_path: the folder where the files will be saved
+    :param directory: the folder where the files will be saved
     :param link_wind: the url of the wind data
     :param link_wind_extreme: the url of the wind extreme data
     :param link_stations_liste: the url of the stations list
     :return: the path of the folder and the names of the files
     """
-    create_folder(folder_path)
+    get_directory(directory)
 
     links = [link_wind, link_wind_extreme]
     filenames = []
@@ -35,26 +35,16 @@ def download_dwd_files(stations_id, folder_path, link_wind, link_wind_extreme, l
         file = soup.find('a', href=re.compile(f"{stations_id}_akt.zip"))
         if file is not None:
             url = link + file['href']
-            filename = download_wind_files(url, folder_path, stations_id)
+            filename = download_wind_files(url, directory, stations_id)
             filenames.append(filename)
         else:
             logger.warning(f"No file found for station {stations_id} at {link}")
             filenames.append(None)
 
-    filename = download_stations_list_file(link_stations_liste, folder_path)
+    filename = download_stations_list_file(link_stations_liste, directory)
     filenames.append(filename)
 
-    return folder_path, filenames[0], filenames[1], filenames[2]
-
-
-def create_folder(folder_path):
-    """
-    Create a folder if it doesn't exist.
-
-    :param folder_path: the path of the folder to be created
-    """
-    folder_path = Path(folder_path)
-    folder_path.mkdir(parents=True, exist_ok=True)
+    return directory, filenames[0], filenames[1], filenames[2]
 
 
 def download_wind_files(url, folder_path, stations_id):
@@ -101,6 +91,3 @@ def download_stations_list_file(url, folder_path):
     logger.info(f"TXT file {filename} downloaded at {folder_path}")
 
     return filename
-
-
-

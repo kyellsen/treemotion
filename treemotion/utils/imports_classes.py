@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
-from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime
+from sqlalchemy import Column, Boolean, Integer, Float, String, ForeignKey, DateTime
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import relationship
 
@@ -16,7 +16,7 @@ from sqlalchemy.orm import relationship
 
 # Import utils
 
-from treemotion import configuration
+from treemotion import config
 from utils.runtime import timing_decorator
 from utils.log import get_logger
 from treemotion import db_manager

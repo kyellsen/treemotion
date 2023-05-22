@@ -1,30 +1,12 @@
+import pandas as pd
+import numpy as np
 from sklearn.linear_model import LinearRegression
 from typing import Optional
-import numpy as np
+
+from utils.dataframe_utils import validate_df
 
 REGRESSION_METHODS = ['linear', 'polynomial']
 
-def _validate_regression_inputs(df: pd.DataFrame, column1: str, column2: str, regression_method: str, degree: int) -> None:
-    """
-    Validate the input dataframe, column names, regression method and degree.
-
-    Parameters:
-    df: The dataframe to be validated.
-    column1, column2: The columns to be validated.
-    regression_method: The regression method to be validated.
-    degree: The degree to be validated if regression method is polynomial.
-
-    Raises:
-    ValueError: If the dataframe, columns, regression method or degree is invalid.
-    """
-    _validate_inputs(df, df, column1)
-    _validate_inputs(df, df, column2)
-
-    if regression_method not in REGRESSION_METHODS:
-        raise ValueError(f"Invalid regression method: {regression_method}")
-
-    if regression_method == 'polynomial' and degree < 1:
-        raise ValueError("Degree must be at least 1 for polynomial regression.")
 
 def calculate_regression(df: pd.DataFrame, column1: str, column2: str,
                          regression_method: str = 'linear',
@@ -60,9 +42,31 @@ def calculate_regression(df: pd.DataFrame, column1: str, column2: str,
         model.fit(x, y)
         result = model.coef_[0], model.intercept_
 
-    elif regression_method == 'polynomial':
+    else:  # regression_method == 'polynomial'
         coefficients = np.polyfit(x.flatten(), y, degree)
         result = coefficients
 
-    logger.info(f"Calculated {regression_method} regression between {column1} and {column2}. Result: {result}")
     return result
+
+
+def _validate_regression_inputs(df: pd.DataFrame, column1: str, column2: str, regression_method: str,
+                                degree: int) -> None:
+    """
+    Validate the input dataframe, column names, regression method and degree.
+
+    Parameters:
+    df: The dataframe to be validated.
+    column1, column2: The columns to be validated.
+    regression_method: The regression method to be validated.
+    degree: The degree to be validated if regression method is polynomial.
+
+    Raises:
+    ValueError: If the dataframe, columns, regression method or degree is invalid.
+    """
+    validate_df(df, columns=[column1, column2])
+
+    if regression_method not in REGRESSION_METHODS:
+        raise ValueError(f"Invalid regression method: {regression_method}")
+
+    if regression_method == 'polynomial' and degree < 1:
+        raise ValueError("Degree must be at least 1 for polynomial regression.")

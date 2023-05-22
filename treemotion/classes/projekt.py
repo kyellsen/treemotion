@@ -34,8 +34,8 @@ class Projekt(BaseClass):
         return objs
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
-                              session=None):
+    def load_data_from_csv(self, version=config.default_load_data_from_csv_version_name, overwrite=False, auto_commit=False,
+                           session=None):
         logger.info(f"Starte Prozess zum laden aller CSV-Files für {self.__str__()}")
         try:
             results = self.for_all('messreihen', 'load_data_from_csv', version, overwrite, auto_commit, session)
@@ -84,8 +84,8 @@ class Projekt(BaseClass):
         return results
 
     @timing_decorator
-    def copy_data_by_version(self, version_new=configuration.data_version_copy_default,
-                             version_source=configuration.data_version_default, auto_commit=False, session=None):
+    def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
+                             version_source=config.default_load_data_from_csv_version_name, auto_commit=False, session=None):
         logger.info(f"Starte Prozess zum kopieren aller Data-Objekte in {self.__str__()} mit Version: {version_source}")
         try:
             results = self.for_all('messreihen', 'copy_data_by_version', version_new, version_source, auto_commit,

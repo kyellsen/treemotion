@@ -1,13 +1,15 @@
 from pathlib import Path
+from datetime import datetime
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.io as pio
 
 
 class PlotManager:
-    def __init__(self, folder_path, figsize=(8, 6), dpi=300, style='default', grid=True, wide_format=False):
-        self.folder_path = Path(folder_path)
-        self.folder_path.mkdir(parents=True, exist_ok=True)  # Erstelle den Ordner, falls er noch nicht existiert.
+    def __init__(self, figsize=(8, 6), dpi=300, style='default', grid=True, wide_format=False):
+
+        self.plot_directory = None
+        self.set_plot_directory()
 
         # Setzen der initialen Plot-Attribute
         self.figsize = figsize
@@ -16,14 +18,19 @@ class PlotManager:
         self.grid = grid
         self.wide_format = wide_format
 
+    def set_plot_directory(self):
+        from treemotion import config
+        self.plot_directory = config.plot_directory
+        self.plot_directory.mkdir(parents=True, exist_ok=True)
+
     def save_matplotlib_plot(self, fig, filename):
         """Speichern Sie ein Matplotlib-Diagramm als jpg-Datei"""
-        full_path = self.folder_path / f"{filename}.jpg"
+        full_path = self.plot_directory / f"{filename}.jpg"
         fig.savefig(str(full_path), dpi=self.dpi)
 
     def save_plotly_plot(self, fig, filename):
         """Speichern Sie ein Plotly-Diagramm als html-Datei"""
-        full_path = self.folder_path / f"{filename}.html"
+        full_path = self.plot_directory / f"{filename}.html"
         pio.write_html(fig, str(full_path))
 
     def apply_attributes(self, plot_type):

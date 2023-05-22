@@ -1,4 +1,4 @@
-# treemotion/utils/database.py
+# treemotion/utils/db_manager.py
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -30,13 +30,16 @@ class DatabaseManager:
         Verbindet zur Datenbank und erstellt eine neue session_factory.
         Args:
             db_filename (str): Pfad zur Datenbank.
-            db_directory (str: Optional, normalerweise im working_directory
+            directory (str: Optional, normalerweise im working_directory
         """
         if directory is None:
-            from treemotion import configuration
-            directory = configuration.working_directory
+            from treemotion import config
+            directory = config.working_directory
+        else:
+            directory = Path(directory)
 
-        db_path = Path(directory) / db_filename  # DB-Pfad aus Filename und Working directory erstellen
+        directory.mkdir(parents=True, exist_ok=True)
+        db_path = directory / db_filename  # DB-Pfad aus Working directory und Filename erstellen
 
         DATABASE_URI = f'sqlite:///{db_path.__str__()}'
 
@@ -153,8 +156,8 @@ class DatabaseManager:
         """
 
         if path is None:
-            from treemotion import configuration
-            path = configuration
+            from treemotion import config
+            path = config.working_directory
 
         path = Path(path)
         database_filename = f"{name}.db"
@@ -164,7 +167,7 @@ class DatabaseManager:
             logger.error(f"Eine Datenbank namens '{database_filename}' existiert bereits in {path}.")
             return str(database_path)
 
-        template_database_filename = configuration.template_db_name
+        template_database_filename = config.template_db_name
         template_database_path = Path(__file__).parent.parent / "resources" / template_database_filename
 
         if not template_database_path.is_file():

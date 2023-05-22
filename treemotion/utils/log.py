@@ -1,7 +1,6 @@
 # treemotion/utils/log.py
 import logging
 from datetime import datetime
-from pathlib import Path
 
 
 class ColorfulFormatter(logging.Formatter):
@@ -21,24 +20,20 @@ class ColorfulFormatter(logging.Formatter):
         return super().format(record)
 
 
-def configure_logger(log_level=None, log_directory=None, log_format=None, date_format=None, log_file=None):
-    from treemotion import configuration
-    if log_level is None:
-        log_level = configuration.log_level
-    if log_directory is None:
-        log_directory = Path(configuration.working_directory) / configuration.log_directory
+def configure_logger():
+    from treemotion import config
+    log_directory = config.log_directory
+    log_directory.mkdir(parents=True, exist_ok=True)
 
+    log_level = config.log_level
     log_level = LOG_LEVELS.get(log_level.lower(), logging.INFO)
-    # Erstelle Directory und Parents falls erforderlich
-    log_directory.mkdir(exist_ok=True, parents=True)
 
-    if log_format is None:
-        log_format = "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s"
-    if date_format is None:
-        date_format = "%Y-%m-%d %H:%M:%S"
-    if log_file is None:
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        log_file = log_directory / f"treemotion_log_{timestamp}.txt"
+    log_format = "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s: %(message)s"
+
+    date_format = "%Y-%m-%d %H:%M:%S"
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_file = log_directory / f"treemotion_log_{timestamp}.txt"
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(ColorfulFormatter(log_format, datefmt=date_format))

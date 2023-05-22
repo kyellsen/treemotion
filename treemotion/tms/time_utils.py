@@ -62,7 +62,7 @@ def optimal_time_frame(duration: int, peaks: dict) -> dict:
     Parameters:
     -----------
     duration : int
-        Dauer des optimalen Zeitfensters Sekunden'.
+        Dauer des optimalen Zeitfensters in Sekunden'.
 
     peaks : dict
         Ein Wörterbuch mit den Indizes, Zeiten und Werten der gefundenen Peaks.

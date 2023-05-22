@@ -49,7 +49,8 @@ class Messreihe(BaseClass):
         return objs
 
     @timing_decorator
-    def load_data_from_csv(self, version=configuration.data_version_default, overwrite=False, auto_commit=False,
+    def load_data_from_csv(self, version=config.default_load_data_from_csv_version_name, overwrite=False,
+                           auto_commit=False,
                            session=None):
         logger.info(f"Starte Prozess zum laden aller CSV-Files für {self.__str__()}")
         try:
@@ -143,8 +144,9 @@ class Messreihe(BaseClass):
         return results
 
     @timing_decorator
-    def copy_data_by_version(self, version_new=configuration.data_version_copy_default,
-                             version_source=configuration.data_version_default, auto_commit=False, session=None):
+    def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
+                             version_source=config.default_load_data_from_csv_version_name, auto_commit=False,
+                             session=None):
         logger.info(f"Starte Prozess zum kopieren aller Data-Objekte in {self.__str__()} mit Version: {version_source}")
         try:
             results = self.for_all('messungen', 'copy_data_by_version', version_new, version_source, auto_commit,
@@ -187,11 +189,11 @@ class Messreihe(BaseClass):
             f"Prozess zur Zeiteinschränkung von Data-Objekten für {successful}/{len(results)} für Messungen aus {self.__str__()} erfolgreich.")
         return results
 
-    def limit_time_by_peaks(self, version, duration: int, show_peaks: bool = False,
-                            values_col: str = 'Absolute-Inclination - drift compensated',
-                            time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
-                            min_time_diff: float = 60, prominence: int = None, auto_commit: bool = False,
-                            session=None):
+    def limit_time_by_version_and_peaks(self, version, duration: int, show_peaks: bool = False,
+                                        values_col: str = 'Absolute-Inclination - drift compensated',
+                                        time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
+                                        min_time_diff: float = 60, prominence: int = None, auto_commit: bool = False,
+                                        session=None):
         """
         Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
         """

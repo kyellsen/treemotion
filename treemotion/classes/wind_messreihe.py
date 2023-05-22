@@ -1,5 +1,6 @@
 # treemotion/classes/wind_messreihe.py
 from utils.imports_classes import *
+from utils.dataframe_utils import validate_df
 
 from utils.base import Base
 from wind.wind_dwd_download import download_dwd_files
@@ -39,12 +40,12 @@ class WindMessreihe(Base):
         """
         self.id = id
         self.name = name
-        station_id = None
-        station_name = None
-        bundesland = None
-        station_hoehe = None
-        station_geo_breite = None
-        station_geo_laenge = None
+        self.station_id = None
+        self.station_name = None
+        self.bundesland = None
+        self.station_hoehe = None
+        self.station_geo_breite = None
+        self.station_geo_laenge = None
         self.quelle = quelle
         self.datetime_added = func.datetime('now')
         self.datetime_last_edit = func.datetime('now')
@@ -57,7 +58,7 @@ class WindMessreihe(Base):
         return f"WindMessreihe(id={self.id}, name={self.name})"
 
     def get_wind_df(self, datetime_start=None, datetime_end=None, time_col: str = 'datetime', columns=None,
-                      session=None):
+                    session=None):
         """
         Extracts wind data for the current instance from the Windmessung table as Pandas DataFrame.
         It filters the data by a specified time period and includes only specified columns if specified.
@@ -111,8 +112,10 @@ class WindMessreihe(Base):
             if datetime_end is not None:
                 query = query.filter(getattr(WindMessung, time_col) <= datetime_end)
 
+            df = pd.read_sql(query.statement, session.bind)
+
             logger.info(f"Executing query for WindMessreihe with id {self.id} from {datetime_start} to {datetime_end}")
-            return pd.read_sql(query.statement, session.bind)
+            return df
         except Exception as e:
             logger.error(f"Error while getting wind data for WindMessreihe with id {self.id}: {str(e)}")
             raise e
@@ -158,12 +161,16 @@ class WindMessreihe(Base):
         :param folder_path: The folder path to store downloaded files.
         :param link_wind: Link to online resource for average wind data.
         :param link_wind_extrem: Link to online resource for extreme wind data.
+        :param link_stations_liste:
+        :param overwrite:
+        :param auto_commit:
+        :param session:
         :return: An instance of WindMessreihe class filled with wind measurement data.
         """
         logger.info("Start loading data from online DWD resources.")
 
         if folder_path is None:
-            folder_path = Path(configuration.working_directory) / configuration.dwd_data_directory
+            folder_path = Path(config.working_directory) / config.dwd_data_directory
 
         folder_path, filename_wind, filename_wind_extreme, filename_stations_liste = download_dwd_files(stations_id,
                                                                                                         folder_path,
@@ -295,7 +302,8 @@ class WindMessreihe(Base):
                         "station_name": " ".join(line_data[6:-1]),
                         "bundesland": line_data[-1]
                     }
-                    logger.debug(f"Station_metadata aus {filename_stations_liste} geladen: {station_metadata.__str__()}")
+                    logger.debug(
+                        f"Station_metadata aus {filename_stations_liste} geladen: {station_metadata.__str__()}")
                     return station_metadata
 
         raise ValueError(f"No data found for station id {stations_id}")

@@ -2,10 +2,29 @@
 
 from pathlib import Path
 
-from typing import List
+from typing import List, Union
 from utils.log import get_logger
 
 logger = get_logger(__name__)
+
+
+def get_directory(directory: Union[str, Path]) -> Union[Path, None]:
+    """
+    Creates a folder at the specified path if it doesn't exist and returns the Path object.
+
+    Args:
+        directory (Union[str, Path]): The path to the folder.
+
+    Returns:
+        Union[Path, None]: The Path object representing the folder path, or None if an error occurred.
+    """
+    try:
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.critical(f"Failed to find or create folder, error: {e}")
+        return None
+    return directory
 
 
 def validate_and_get_path(path):
@@ -47,7 +66,7 @@ def validate_and_get_filepath(filepath):
     return filepath
 
 
-def validate_and_get_file_list(search_path: Path) -> List[Path]:
+def validate_and_get_file_list(search_path: Path) -> None:
     """
     Sucht nach CSV-Dateien im angegebenen Pfad und gibt diese als Liste zurück.
 
@@ -64,7 +83,7 @@ def validate_and_get_file_list(search_path: Path) -> List[Path]:
     return files
 
 
-def extract_id_sensor_list(files: List[Path]) -> List[int]:
+def extract_id_sensor_list(files: List[Path]) -> None:
     """
     Extrahiert die Sensor-ID aus den Dateinamen und gibt diese als Liste zurück.
 

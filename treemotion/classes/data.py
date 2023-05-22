@@ -1,12 +1,14 @@
 # treemotion/classes/data.py
-import pandas as pd
 from sqlalchemy import text
+from datetime import timedelta
 
 from utils.imports_classes import *
 from utils.path_utils import validate_and_get_filepath
-from utils.dataframe_utils import validate_dataframe
+from utils.dataframe_utils import validate_df
 from tms.time_utils import validate_time_format, limit_df_by_time, optimal_time_frame
 from tms.find_peaks import find_max_peak, find_n_peaks
+
+from .wind_messreihe import WindMessreihe
 
 logger = get_logger(__name__)
 
@@ -25,11 +27,12 @@ class Data(BaseClass):
     peak_index = Column(Integer)
     peak_time = Column(DateTime)
     peak_value = Column(Float)
+    wind_in_df = Column(Boolean)
 
     def __init__(self, *args, id_data: int = None, id_messung: int = None, version: str = None, table_name: str = None,
                  datetime_start: datetime = None, datetime_end: datetime = None, duration: datetime = None,
                  length: int = None, tempdrift_method: str = None, peak_index: int = None, peak_time: datetime = None,
-                 peak_value: float = None, df: pd.DataFrame = None, df_wind: pd.DataFrame = None, **kwargs):
+                 peak_value: float = None, df: pd.DataFrame = None, wind_in_df: bool = None, **kwargs):
         """
         Initialisiert eine Data-Instanz.
 
@@ -61,11 +64,51 @@ class Data(BaseClass):
         self.peaks_indexs = None
         self.peaks_times = None
         self.peaks_values = None
+        self.wind_in_df = wind_in_df
         # additional only in class-object, own table in database "auto_df_{version}_{id_messung}_messung
         self.df = df
+        # additional only in class-object
+        self.wind_df = None
+
 
     def __str__(self):
         return f"Data(id={self.id_data}, table_name={self.table_name})"
+
+    def describe(self):
+        """
+        Beschreibt ausführlich die Attribute dieser Data-Instanz.
+        """
+        print(f"Data ID: {self.id_data}")
+        print(f"Messung ID: {self.id_messung}")
+        print(f"Messreihe ID: {self.messung.id_messreihe}")
+        print(f"Sensor ID: {self.messung.id_sensor}")
+        print(f"Version: {self.version}")
+        print(f"Tabellenname in Datenbank: {self.table_name}")
+
+        if self.datetime_start:
+            print(f"Startzeitpunkt: {self.datetime_start.strftime('%d.%m.%Y %H:%M:%S')}")
+
+        if self.datetime_end:
+            print(f"Endzeitpunkt: {self.datetime_end.strftime('%d.%m.%Y %H:%M:%S')}")
+
+        print(f"Dauer: {self.duration} Sekunden")
+        print(f"Zeilen im Datensatz: {self.length}")
+        print(f"Temperaturdrift-Methode: {self.tempdrift_method}")
+        print(f"Peak Index: {self.peak_index}")
+
+        if self.peak_time:
+            print(f"Peak Zeit: {self.peak_time.strftime('%d.%m.%Y %H:%M:%S')}")
+
+        print(f"Peak Wert: {self.peak_value}")
+        print(f"Wind in Daten: {self.wind_in_df}")
+
+        if self.df is not None:
+            print(f"Datenrahmen: {len(self.df)} Zeilen")
+        else:
+            print("Datenrahmen: nicht festgelegt")
+
+        return True
+
 
     # Geerbt von BaseClass
     @classmethod
@@ -209,25 +252,25 @@ class Data(BaseClass):
         """
         return f"auto_df_{version}_{str(id_messung).zfill(3)}_messung"
 
-    def validate_dataframe(self, wind_data=False):
+    def _validate_df(self, wind_in_df=False):
         """
         Überprüft, ob das DataFrame Data.df gültig und die benötigten Spalten vorhanden sind.
         """
         if not hasattr(self, 'df'):
             logger.error("Das Objekt hat kein Attribut 'df'.")
             return False
-        if wind_data:
-            df_columns = configuration.df_columns
-            wind_df_columns_selected = configuration.wind_df_columns_selected
+        if wind_in_df:
+            df_columns = config.df_columns
+            wind_df_columns_selected = config.wind_df_columns_selected
             try:
-                validate_dataframe(self.df, columns=df_columns + wind_df_columns_selected)
+                validate_df(self.df, columns=df_columns + wind_df_columns_selected)
             except Exception as e:
                 logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
                 return False
 
         else:
             try:
-                validate_dataframe(self.df, columns=configuration.df_columns)
+                validate_df(self.df, columns=config.df_columns)
             except Exception as e:
                 logger.error(f"Fehler bei der Validierung des DataFrame: {e}")
                 return False
@@ -251,7 +294,7 @@ class Data(BaseClass):
             False, wenn das DataFrame ungültig ist oder ein Fehler aufgetreten ist.
         """
 
-        if not self.validate_dataframe():
+        if not self._validate_df():
             return False
 
         try:
@@ -471,6 +514,64 @@ class Data(BaseClass):
             self.commit(session=session)
 
         return self
+
+    def get_wind_df(self, id_wind_messreihe, time_extension_secs=0, session=None):
+        """
+        Abfrage der Winddaten anhand einer gegebenen Windmessreihe ID und speichert das resultierende DataFrame.
+
+        Parameters
+        ----------
+        id_wind_messreihe : int
+            Die ID der Windmessreihe, für die die Daten abgefragt werden.
+        time_extension_secs : int, optional
+            Zeitspanne in Sekunden, um die der Abfragezeitraum erweitert wird. Default ist 0.
+        session : sqlalchemy.orm.Session, optional
+            Die Session, die für die Abfrage verwendet werden soll. Wenn None, wird eine neue Session erstellt.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            Ein DataFrame, das die abgefragten Daten enthält, oder None, wenn keine Daten gefunden wurden.
+
+        """
+        try:
+            session = db_manager.get_session(session)
+            windmessreihe = session.query(WindMessreihe).filter_by(id=id_wind_messreihe).first()
+
+            if windmessreihe is None:
+                logger.warning(f'Keine Windmessreihe gefunden mit der ID: {id_wind_messreihe}')
+                return None
+
+            extended_datetime_start = self.datetime_start - timedelta(seconds=time_extension_secs)
+            extended_datetime_end = self.datetime_end + timedelta(seconds=time_extension_secs)
+
+            df = windmessreihe.get_wind_df(extended_datetime_start, extended_datetime_end,
+                                           columns=config.wind_df_columns_selected, session=session)
+
+            self.wind_df = df
+            logger.info(f'Winddaten erfolgreich abgerufen für Windmessreihe mit ID {id_wind_messreihe}')
+            return df
+
+        except Exception as e:
+            logger.error(
+                f'Fehler beim Abrufen der Winddaten für die Windmessreihe mit ID {id_wind_messreihe}: {str(e)}')
+            raise e
+
+    def sync_wind_df(self, id_wind_messreihe, max_time_shift_secs=0, session=None):
+
+        tms_df = self.df
+        wind_df = self.get_wind_df(id_wind_messreihe, time_extension_secs=max_time_shift_secs, session=session)
+
+        if not self._validate_df(wind_in_df=False):
+            logger.error(f"")
+            return None
+        if not validate_df(wind_df, columns=config.wind_df_columns_selected):
+            logger.error(f"")
+            return None
+
+        # tms_time_col =
+
+
 
     #
     # @timing_decorator

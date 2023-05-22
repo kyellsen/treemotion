@@ -86,8 +86,8 @@ class Messung(BaseClass):
         return objs
 
     @timing_decorator
-    def load_data_from_csv(self, version: str = configuration.data_version_default, overwrite: bool = False,
-                              auto_commit: bool = False, session=None):
+    def load_data_from_csv(self, version: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
+                           auto_commit: bool = False, session=None):
         """
         Lädt Daten aus einer CSV-Datei und aktualisiert ggf. bestehende Daten.
 
@@ -207,8 +207,8 @@ class Messung(BaseClass):
         return result
 
     @timing_decorator
-    def copy_data_by_version(self, version_new=configuration.data_version_copy_default,
-                             version_source=configuration.data_version_default, auto_commit=False, session=None):
+    def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
+                             version_source=config.default_load_data_from_csv_version_name, auto_commit=False, session=None):
         """
         Diese Methode kopiert eine Dateninstanz mit version_source zu einer neuen Instanz mit version_new.
         Es wird ein Fehler protokolliert und None zurückgegeben, wenn version_new und version_source identisch sind.
