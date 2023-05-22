@@ -1,12 +1,12 @@
-# treemotion/utilities/database.py
+# treemotion/utils/database.py
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from pathlib import Path
 from shutil import copy
 
-from utilities.log import get_logger
-from utilities.base import Base
+from utils.log import get_logger
+from utils.base import Base
 
 logger = get_logger(__name__)
 

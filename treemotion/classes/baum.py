@@ -1,4 +1,4 @@
-from utilities.imports_classes import *
+from utils.imports_classes import *
 
 logger = get_logger(__name__)
 

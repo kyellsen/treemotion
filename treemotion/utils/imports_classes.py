@@ -1,4 +1,4 @@
-# treemotion/utilities/common.py
+# treemotion/utils/common.py
 
 # Import packages
 import pandas as pd
@@ -14,11 +14,11 @@ from sqlalchemy.orm import relationship
 
 
 
-# Import utilities
+# Import utils
 
 from treemotion import configuration
-from utilities.runtime import timing_decorator
-from utilities.log import get_logger
+from utils.runtime import timing_decorator
+from utils.log import get_logger
 from treemotion import db_manager
 
 from classes.base_class import BaseClass

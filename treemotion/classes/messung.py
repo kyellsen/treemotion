@@ -1,6 +1,6 @@
 # treemotion/classes/messung.py
 
-from utilities.imports_classes import *
+from utils.imports_classes import *
 
 from .data import Data
 from .baum import BaumBehandlung
@@ -98,7 +98,7 @@ class Messung(BaseClass):
         :return: Das aktualisierte oder neu erstellte Datenobjekt oder None, wenn ein Fehler auftritt.
         """
         if self.filepath is None:
-            logger.warning(f"Process for '{self.__str__()}' aborted, no filename for tms.csv (filename = None).")
+            logger.warning(f"Process for '{self.__str__()}' aborted, no filename for tms_utils.csv (filename = None).")
             return None
 
         logger.info(f"Start loading csv data for '{self.__str__()}'")

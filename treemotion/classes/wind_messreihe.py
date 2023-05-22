@@ -1,9 +1,9 @@
 # treemotion/classes/wind_messreihe.py
-from utilities.imports_classes import *
+from utils.imports_classes import *
 
-from utilities.base import Base
-from utilities.dwd_download import download_dwd_files
-from utilities.path_utils import validate_files_exist
+from utils.base import Base
+from wind.wind_dwd_download import download_dwd_files
+from utils.path_utils import validate_files_exist
 
 from sqlalchemy import func
 

@@ -2,9 +2,9 @@
 import pandas as pd
 from sqlalchemy import text
 
-from utilities.imports_classes import *
-from utilities.path_utils import validate_and_get_filepath
-from utilities.dataframe_utils import validate_dataframe
+from utils.imports_classes import *
+from utils.path_utils import validate_and_get_filepath
+from utils.dataframe_utils import validate_dataframe
 from tms.time_utils import validate_time_format, limit_df_by_time, optimal_time_frame
 from tms.find_peaks import find_max_peak, find_n_peaks
 

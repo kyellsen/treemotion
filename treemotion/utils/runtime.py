@@ -1,7 +1,7 @@
-# treemotion/utilities/runtime.py
+# treemotion/utils/runtime.py
 import time
 import functools
-from utilities.log import get_logger
+from utils.log import get_logger
 
 ENABLE_TIMING = True
 

@@ -1,4 +1,4 @@
-# treemotion/utilities/dwd_download.py
+# treemotion/utils/wind_dwd_download.py
 
 from pathlib import Path
 
@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import zipfile
 import re
 
-from utilities.log import get_logger
+from utils.log import get_logger
 
 
 logger = get_logger(__name__)

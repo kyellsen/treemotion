@@ -1,6 +1,6 @@
 .gitignore
 /.idea
 /venv_Python39/
-/log/
-/projekt_test_data/
-/sandbox/classes_old/
+/sandbox/
+/working_directory_1/
+/.ipynb_checkpoints/

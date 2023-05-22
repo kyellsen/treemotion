@@ -1,6 +1,6 @@
 # treemotionen/classes/base_class.py
-from utilities.imports_classes import *
-from utilities.base import Base
+from utils.imports_classes import *
+from utils.base import Base
 
 logger = get_logger(__name__)
 

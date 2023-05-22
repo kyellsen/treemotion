@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 
-# from treemotion.utilities.basics import limit_data_by_time
-# from treemotion.utilities.basics import random_sample
-# from treemotion.utilities.basics import get_absolute_inclination
+# from treemotion.utils.basics import limit_data_by_time
+# from treemotion.utils.basics import random_sample
+# from treemotion.utils.basics import get_absolute_inclination
 from tms.inclination import get_inclination_direction
 
 def test_get_inclination_direction():

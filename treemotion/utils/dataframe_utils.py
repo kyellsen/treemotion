@@ -1,7 +1,8 @@
 import pandas as pd
+from typing import List
 
 
-def validate_dataframe(df, columns):
+def validate_dataframe(df, columns: List = None):
     """
     Prüft, ob ein Objekt ein gültiger Pandas DataFrame ist.
 
@@ -37,3 +38,22 @@ def validate_dataframe(df, columns):
         raise ValueError('Der DataFrame hat keine Zeilen.')
 
     return True
+
+
+def _validate_inputs(df1: pd.DataFrame, df2: pd.DataFrame, column: str) -> None:
+    """
+    Validate the input dataframes and column names.
+
+    Parameters:
+    df1, df2: The two dataframes to be validated.
+    column: The column to be validated.
+
+    Raises:
+    ValueError: If the dataframes or the column are invalid.
+    """
+    for df in (df1, df2):
+        if not isinstance(df, pd.DataFrame):
+            raise ValueError(f"Expected a DataFrame, but got {type(df).__name__}.")
+
+    if not isinstance(column, str):
+        raise ValueError(f"Expected a string for column, but got {type(column).__name__}.")

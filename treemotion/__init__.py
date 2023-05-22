@@ -1,8 +1,8 @@
 # treemotion/__init__.py
 
 from .config import Configuration
-from .utilities.log import get_logger, configure_logger
-from .utilities.database import DatabaseManager
+from .utils.log import get_logger, configure_logger
+from .utils.database import DatabaseManager
 
 # Eine Instanz der Configuration-Klasse erstellen
 configuration = Configuration()

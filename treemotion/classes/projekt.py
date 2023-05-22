@@ -1,6 +1,6 @@
 # treemotion/classes/projekt.py
 
-from utilities.imports_classes import *
+from utils.imports_classes import *
 
 from .messreihe import Messreihe
 

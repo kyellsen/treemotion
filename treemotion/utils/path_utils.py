@@ -1,9 +1,9 @@
-# treemotion/utilities/path_utils.py
+# treemotion/utils/path_utils.py
 
 from pathlib import Path
 
 from typing import List
-from utilities.log import get_logger
+from utils.log import get_logger
 
 logger = get_logger(__name__)
 

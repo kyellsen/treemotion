@@ -9,8 +9,10 @@ import numpy as np
 
 
 def wind_station_to_site(df, distance, direction, front_speed_factor):
+    # Addiere auf die Windrichtung die Ausrichtung der Achse von Punkt A nach B. Werte belieb zwischen 0 und 359
+
     df['wind_direction_10min_avg'] = (df['wind_direction_10min_avg'] + direction) % 360
-    # Konvertiere den Winkel von Grad in Radiant und berücksichtige die anfängliche Richtung
+    # Konvertiere den Winkel von Grad in Radiant
     angle_radians = np.radians(df['wind_direction_10min_avg'])
 
     # Anwenden des Kosinussatzes

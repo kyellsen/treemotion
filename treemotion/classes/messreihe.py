@@ -1,7 +1,7 @@
 # treemotion/classes/messreihe.py
-from utilities.imports_classes import *
+from utils.imports_classes import *
 
-from utilities.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
+from utils.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
 
 from tms.time_utils import limit_df_by_time, optimal_time_frame
 from tms.find_peaks import find_n_peaks

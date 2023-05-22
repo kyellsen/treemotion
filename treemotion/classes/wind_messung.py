@@ -1,7 +1,7 @@
 # treemotion/classes/wind_messung.py
 from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
 
-from utilities.base import Base
+from utils.base import Base
 
 
 class WindMessung(Base):
