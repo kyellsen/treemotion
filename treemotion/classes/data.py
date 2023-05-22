@@ -5,7 +5,7 @@ from datetime import timedelta
 from utils.imports_classes import *
 from utils.path_utils import validate_and_get_filepath
 from utils.dataframe_utils import validate_df
-from tms.time_utils import validate_time_format, limit_df_by_time, optimal_time_frame
+from tms.time_limits import validate_time_format, limit_df_by_time, optimal_time_frame
 from tms.find_peaks import find_max_peak, find_n_peaks
 
 from .wind_messreihe import WindMessreihe
@@ -31,7 +31,7 @@ class Data(BaseClass):
 
     def __init__(self, *args, id_data: int = None, id_messung: int = None, version: str = None, table_name: str = None,
                  datetime_start: datetime = None, datetime_end: datetime = None, duration: datetime = None,
-                 length: int = None, tempdrift_method: str = None, peak_index: int = None, peak_time: datetime = None,
+                 length: int = None, tempdrift_method: str = 'default', peak_index: int = None, peak_time: datetime = None,
                  peak_value: float = None, df: pd.DataFrame = None, wind_in_df: bool = None, **kwargs):
         """
         Initialisiert eine Data-Instanz.
@@ -84,28 +84,16 @@ class Data(BaseClass):
         print(f"Sensor ID: {self.messung.id_sensor}")
         print(f"Version: {self.version}")
         print(f"Tabellenname in Datenbank: {self.table_name}")
-
-        if self.datetime_start:
-            print(f"Startzeitpunkt: {self.datetime_start.strftime('%d.%m.%Y %H:%M:%S')}")
-
-        if self.datetime_end:
-            print(f"Endzeitpunkt: {self.datetime_end.strftime('%d.%m.%Y %H:%M:%S')}")
-
+        print(f"Startzeitpunkt: {self.datetime_start.strftime('%d.%m.%Y %H:%M:%S')}")
+        print(f"Endzeitpunkt: {self.datetime_end.strftime('%d.%m.%Y %H:%M:%S')}")
         print(f"Dauer: {self.duration} Sekunden")
         print(f"Zeilen im Datensatz: {self.length}")
         print(f"Temperaturdrift-Methode: {self.tempdrift_method}")
         print(f"Peak Index: {self.peak_index}")
-
-        if self.peak_time:
-            print(f"Peak Zeit: {self.peak_time.strftime('%d.%m.%Y %H:%M:%S')}")
-
+        print(f"Peak Zeit: {self.peak_time.strftime('%d.%m.%Y %H:%M:%S')}")
         print(f"Peak Wert: {self.peak_value}")
         print(f"Wind in Daten: {self.wind_in_df}")
 
-        if self.df is not None:
-            print(f"Datenrahmen: {len(self.df)} Zeilen")
-        else:
-            print("Datenrahmen: nicht festgelegt")
 
         return True
 
