@@ -18,7 +18,7 @@ class Configuration:
 
         # Default Directory´s
         self.working_directory = None
-        self.set_working_directory(r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_en")
+        self.set_working_directory(r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory")
 
         # noinspection PyUnresolvedReferences
         self.log_directory = self.working_directory / "logs"

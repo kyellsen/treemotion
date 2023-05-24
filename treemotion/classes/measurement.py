@@ -19,7 +19,6 @@ class Measurement(BaseClass):
     __tablename__ = 'Measurement'
     measurement_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     series_id = Column(Integer, ForeignKey('Series.series_id', onupdate='CASCADE'))
-    tree_id = Column(Integer, ForeignKey('Tree.tree_id', onupdate='CASCADE'))
     tree_treatment_id = Column(Integer, ForeignKey('TreeTreatment.tree_treatment_id', onupdate='CASCADE'))
     sensor_id = Column(Integer, ForeignKey('Sensor.sensor_id', onupdate='CASCADE'))
     measurement_status_id = Column(Integer, ForeignKey('MeasurementStatus.measurement_status_id',
@@ -32,12 +31,12 @@ class Measurement(BaseClass):
     sensor_compass_direction = Column(Integer)
 
     sensor = relationship(Sensor, backref="measurement", lazy="joined")
-    tree = relationship(Tree, backref="measurement", lazy="joined")
     tree_treatment = relationship(TreeTreatment, backref="measurement", lazy="joined")
     measurement_status = relationship(MeasurementStatus, backref="measurement", lazy="joined")
     sensor_location = relationship(SensorLocation, backref="measurement", lazy="joined")
+    series = relationship('Series', back_populates='measurement')
 
-    version = relationship(Version, backref="measurement", lazy="joined", cascade="all, delete, delete-orphan",
+    version = relationship(Version, back_populates="measurement", lazy="joined", cascade="all, delete, delete-orphan",
                            order_by=Version.version_id)
 
     def __init__(self, *args, measurement_id: int = None, series_id: int = None, tree_id: int = None,
@@ -167,7 +166,7 @@ class Measurement(BaseClass):
         obj = present_data_obj or Version.load_from_csv(filepath=self.filepath, id_data=None,
                                                         id_measurement=self.measurement_id, version=version,
                                                         table_name=table_name)
-        obj.df = obj.read_csv_tms(self.filepath)
+        obj.tms_df = obj.read_csv_tms(self.filepath)
         obj.update_metadata(auto_commit=True)
         if present_data_obj:
             self.version.remove(present_data_obj)
@@ -251,7 +250,7 @@ class Measurement(BaseClass):
         if new_obj is None:
             return None
 
-        if new_obj.table_name == source_obj.table_name:
+        if new_obj.tms_table_name == source_obj.table_name:
             logger.critical(
                 f"Table name for new instance is the same as the source instance table name.")
             return None

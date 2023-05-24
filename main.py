@@ -4,14 +4,16 @@ from treemotion import config, logger, db_manager, Project, Series, Measurement,
 
 logger.setLevel(level="DEBUG")
 
-filename_db_1 = r"TREEMOTION_TEMPLATE.db"
+filename_db_1 = r"TREEMOTION_BOSAU.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
 
 db_manager.connect(db_filename=filename_db_1)
-db_manager.create_template_db(name="Test")
 
-# WindMeasurement.load_from_dwd_online(name="Dörnick_2022", station_id=6163, auto_commit=True, overwrite=False)
+session = db_manager.get_session()
+series_1 = session.query(Series).first()
+
+# WindMeasurement.load_from_dwd_online(name="Dornick", station_id=6163, auto_commit=True, overwrite=False)
 # session = db_manager.get_session()
 # windmessreihe = session.query(WindMeasurement).first()
 # validation_manager = ValidationManager()

@@ -15,7 +15,7 @@ class Project(BaseClass):
     researcher = Column(String)
     datetime_start = Column(DateTime)
 
-    series = relationship(Series, backref="project", lazy="joined", cascade="all, delete, delete-orphan",
+    series = relationship(Series, back_populates="project", lazy="joined", cascade="all, delete, delete-orphan",
                           order_by=Series.series_id)
 
     def __init__(self, *args, project_id=None, name=None, location=None, researcher=None,

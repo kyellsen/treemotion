@@ -10,7 +10,7 @@ db_file = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\py_tms_tools\test\test
 
 messung_1 = Measurement.read_from_csv(source_path=csv_file, messung_id=1, feedback=True)
 
-df = messung_1.version
+df = messung_1.name
 
 df = df.set_index(pd.DatetimeIndex(df['Time']))
 
@@ -18,7 +18,7 @@ print(df['Absolute-Inclination'].idxmax())
 start_time = pd.Timestamp('2023-03-22 15:25:00')
 end_time = pd.Timestamp('2023-03-22 15:30:00')
 messung_1.limit_time(start_time, end_time)
-dfk = messung_1.version
+dfk = messung_1.name
 
 plt.plot(dfk['East-West-Inclination - drift compensated'])
 plt.show()

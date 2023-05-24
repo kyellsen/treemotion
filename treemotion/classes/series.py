@@ -4,6 +4,7 @@ from utils.path_utils import validate_and_get_path, validate_and_get_file_list, 
 from tms.time_limits import optimal_time_frame
 
 from .measurement import Measurement
+from .wind_measurement import WindMeasurement
 
 logger = get_logger(__name__)
 
@@ -14,19 +15,21 @@ class Series(BaseClass):
     """
     __tablename__ = 'Series'
     series_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    project_id = Column(Integer, ForeignKey('Project.project_id'))
+    project_id = Column(Integer, ForeignKey('Project.project_id', onupdate='CASCADE'))
+    wind_measurement_id = Column(Integer, ForeignKey('WindMeasurement.wind_measurement_id', onupdate='CASCADE'))
     description = Column(String)
     datetime_start = Column(DateTime)
     datetime_end = Column(DateTime)
     location = Column(String)
     annotation = Column(String)
     filepath_tms = Column(String)
-
-    measurement = relationship(Measurement, backref="series", lazy="joined", cascade='all, delete, delete-orphan',
-                               order_by=Measurement.measurement_id)
+    project = relationship("Project", back_populates="series", lazy="joined", order_by="Project.project_id")
+    measurement = relationship(Measurement, back_populates="series", lazy="joined",
+                               cascade='all, delete, delete-orphan', order_by=Measurement.measurement_id)
+    wind_measurement = relationship(WindMeasurement, lazy="joined")
 
     def __init__(self, *args, series_id=None, description=None, datetime_start=None, datetime_end=None, location=None,
-                 annotation=None, filepath_tms=None, **kwargs):
+                 annotation=None, filepath_tms=None, wind_measurement_id=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         # in SQLite Database
@@ -37,6 +40,7 @@ class Series(BaseClass):
         self.location = location
         self.annotation = annotation
         self.filepath_tms = filepath_tms
+        self.wind_measurement_id = wind_measurement_id
 
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id}"
