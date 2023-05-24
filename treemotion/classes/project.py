@@ -61,7 +61,7 @@ class Project(BaseClass):
 
     @timing_decorator
     def load_data_from_csv(self, version: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
-                           auto_commit: bool = False, session=None) -> Optional[List]:
+                           auto_commit: bool = False) -> Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
 
@@ -76,7 +76,7 @@ class Project(BaseClass):
         """
         logger.info(f"Starting process to load all CSV files for {self.__str__()}")
         try:
-            results = self.for_all('series', 'load_data_from_csv', version, overwrite, auto_commit, session)
+            results = self.for_all('series', 'load_data_from_csv', version, overwrite, auto_commit)
         except Exception as e:
             logger.error(f"Error loading all CSV files for {self.__str__()}, Error: {e}")
             return None
@@ -86,8 +86,7 @@ class Project(BaseClass):
 
     @timing_decorator
     def load_data_from_csv_2(self, version_name: str = config.default_load_data_from_csv_version_name,
-                             overwrite: bool = False,
-                             auto_commit: bool = False) -> Optional[List]:
+                             overwrite: bool = False, auto_commit: bool = False) -> Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
 
@@ -110,6 +109,7 @@ class Project(BaseClass):
         return results
 
     @timing_decorator
+    @auto_commit
     def add_filenames(self, csv_path: str):
         """
         Add filenames to all associated series.
@@ -138,20 +138,19 @@ class Project(BaseClass):
         return results
 
     @timing_decorator
-    def load_data_by_version(self, version: str, session=None) -> Optional[List]:
+    def load_data_by_version(self, version: str) -> Optional[List]:
         """
         Load data frames for all associated series with the specified version.
 
         Args:
             version (str): The version of the data.
-            session (Session, optional): The database session to use.
 
         Returns:
             Optional[List]: A list of loaded data frames.
         """
         logger.info(f"Starting process to load data frames in {self.__str__()} with version: {version}")
         try:
-            results = self.for_all('series', 'load_data_by_version', version, session)
+            results = self.for_all('series', 'load_data_by_version', version)
         except Exception as e:
             logger.error(f"Error loading data frames for {self.__str__()}, Error: {e}")
             return None

@@ -13,7 +13,9 @@ db_manager.connect(db_filename=filename_db_1)
 measurement_1 = Measurement.load_from_db(measurement_id=1)[0]
 series_1 = Series.load_from_db(series_id=1)[0]
 project_1 = Project.load_from_db()[0]
-project_1.add_filenames(csv_path)
+project_1.add_filenames(csv_path, auto_commit=True)
+project_1.copy(auto_commit=True)
+project_1.remove(auto_commit=True)
 
 # WindMeasurement.load_from_dwd_online(name="Dornick", station_id=6163, auto_commit=True, overwrite=False)
 # session = db_manager.get_session()

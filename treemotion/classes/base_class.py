@@ -201,7 +201,8 @@ class BaseClass(Base):
 
         return new_obj
 
-    def remove(self, auto_commit: bool = False, session: Optional[Session] = None) -> bool:
+    @auto_commit
+    def remove(self) -> bool:
         """
         Remove the instance from the database.
 
@@ -212,7 +213,7 @@ class BaseClass(Base):
         Returns:
             bool: True if the instance was successfully removed, False otherwise.
         """
-        session = db_manager.get_session(session)
+        session = db_manager.get_session()
         primary_key_attr = self.__mapper__.primary_key[0].name
         existing_obj = session.get(type(self), getattr(self, primary_key_attr))
         try:
@@ -222,10 +223,7 @@ class BaseClass(Base):
             else:
                 logger.info(f"Object {self.__class__.__name__} does not exist.")
                 return False
-            if auto_commit:
-                db_manager.commit(session)
             return True
         except Exception as e:
-            session.rollback()  # Rollback the changes on error
             logger.error(f"Error removing the object {self.__class__.__name__}: {e}")
             return False

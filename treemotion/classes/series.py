@@ -69,6 +69,7 @@ class Series(BaseClass):
         return results
 
     @timing_decorator
+    @auto_commit
     def add_filenames(self, csv_path: str):
         """
         Update the 'filename' and 'filepath' attributes for each measurement in this series

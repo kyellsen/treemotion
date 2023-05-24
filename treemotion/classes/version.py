@@ -91,7 +91,6 @@ class Version(BaseClass):
         except Exception as e:
             raise e
 
-
     # tms_df
     @property
     @timing_decorator
@@ -111,7 +110,8 @@ class Version(BaseClass):
     def tms_df(self, tms_df):
         session = db_manager.get_session()
         try:
-            tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace')
+            tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace',
+                          index=False)  # maybe self. at row beginning
             logger.info(f"{self.__class__.__name__}.tms_df set successfully: {self.__str__()}")
         except Exception as e:
             logger.error(f"{self.__class__.__name__}.tms_df could not be set: {self.__str__()}, error: {e}")
@@ -157,7 +157,7 @@ class Version(BaseClass):
     @timing_decorator
     def load_from_csv(cls, filepath: str, version_id, measurement_id: int, version_name: str, tms_table_name: str):
         """
-        Loads data from a CSV file.
+        Loads TMS Data from a CSV file.
 
         :param filepath: Path to the CSV file.
         :param version_id: Unique ID of the version.
@@ -175,40 +175,38 @@ class Version(BaseClass):
         obj.version_name = version_name
         obj.tms_table_name = tms_table_name
         try:
-            obj.tms_df = obj.read_csv_tms(filepath)
+            obj._tms_df = obj.read_csv_tms(filepath)
         except Exception as e:
             logger.error(f"Error while reading the CSV file, error: {e}")
         obj.update_metadata()
         return obj
 
     @timing_decorator
-    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None):
+    def copy(self, reset_id: bool = False, auto_commit: bool = False):
         """
         Create a copy of the data object.
 
         :param reset_id: Whether to reset the ID of the new object.
         :param auto_commit: Whether to auto-commit after copying.
-        :param session: SQLAlchemy session for interacting with the database.
         :return: Copied data object.
         """
-        new_obj = super().copy('id_data', reset_id, auto_commit, session)
+        obj = super().copy(reset_id, auto_commit)
 
         # Create a deep copy of the DataFrame
-        if self.tms_df is not None:
-            new_obj.df = self.tms_df.copy(deep=True)
+        if self._tms_df is not None:
+            obj._tms_df = self._tms_df.copy(deep=True)
 
-        return new_obj
+        return obj
 
     @timing_decorator
-    def commit(self, df_commit=True, session=None):
+    def commit(self, df_commit=True):
         """
         Add the data object to the database and perform the commit.
 
         :param df_commit: If True, Version.df will be committed; if False, Version.df will not be committed (default).
-        :param session: SQLAlchemy session for interacting with the database.
         :return: True if commit is successful; False if failed.
         """
-        session = db_manager.get_session(session)
+        session = db_manager.get_session()
         try:
             session.add(self)
             if self.tms_df is not None and df_commit:
@@ -221,16 +219,12 @@ class Version(BaseClass):
             logger.error(f"Failed to commit '{self.__str__()}' to the database: {e}")
             return False
 
-    def remove(self, session=None, **kwargs):
+    def remove(self, **kwargs):
         """
         Removes the data object from the database.
 
-        Parameters
-        ----------
-        session : sqlalchemy.orm.Session, optional
-            SQL-Alchemy session for interacting with the database.
         """
-        session = db_manager.get_session(session)
+        session = db_manager.get_session()
         existing_obj = session.query(type(self)).get(getattr(self, 'id_data'))
         try:
             if existing_obj is not None:
@@ -250,23 +244,22 @@ class Version(BaseClass):
             logger.error(f"Error while removing the object {self.__class__.__name__}: {e}")
             return False
 
-
     @classmethod
-    def create_new_version(cls, source_obj, new_version: str):
+    def create_new_version(cls, source_obj, new_version_name: str):
         """
         Creates a new version of the data object.
 
         :param source_obj: The source object to be copied.
-        :param new_version: The new version.
+        :param new_version_name: The new version.
         :return: New data object.
         """
         new_obj = cls()
         try:
             new_obj.version_id = None
             new_obj.measurement_id = source_obj.measurement_id
-            new_obj.version_name = new_version
+            new_obj.version_name = new_version_name
             new_obj.tms_table_name = new_obj.get_tms_table_name(new_obj.version_name, new_obj.measurement_id)
-            new_obj.tms_df = source_obj.tms_df.copy(deep=True)  # not copying from Data, but from pd.DataFrame
+            new_obj._tms_df = source_obj.tms_df.copy(deep=True)  # not copying from Data, but from pd.DataFrame
             new_obj.update_metadata()
             return new_obj
         except Exception as e:
@@ -319,7 +312,7 @@ class Version(BaseClass):
                 return False
         return True
 
-    def update_metadata(self, auto_commit: bool = False, session=None):
+    def update_metadata(self, auto_commit: bool = False):
         """
         Updates the metadata of the data object (Data.df).
 
@@ -330,8 +323,6 @@ class Version(BaseClass):
         ----------
         auto_commit : bool
             Flag indicating whether to auto-commit the changes.
-        session : sqlalchemy.orm.Session
-            Database session.
 
         Returns
         -------
@@ -351,14 +342,14 @@ class Version(BaseClass):
             if peak is None:
                 logger.warning(f"No peak found for {self.__str__()}, updating other metadata for {self.__str__()}!")
                 if auto_commit:
-                    self.commit(df_commit=False, session=session)
+                    self.commit(df_commit=False)
                 return True
             self.peak_index = peak['peak_index']
             self.peak_time = peak['peak_time']
             self.peak_value = peak['peak_value']
             logger.info(f"Metadata updated successfully for {self.__str__()}")
             if auto_commit:
-                self.commit(df_commit=False, session=session)
+                self.commit(df_commit=False)
         except (KeyError, ValueError) as e:
             logger.error(f"Failed to update metadata for {self.__str__()}: {e}")
             return False
@@ -395,7 +386,6 @@ class Version(BaseClass):
         return peaks
 
     # Inherited from BaseClass
-
 
     def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False, session=None):
         """
@@ -447,7 +437,7 @@ class Version(BaseClass):
     def limit_time_by_peaks(self, duration: int, values_col: str = 'Absolute-Inclination - drift compensated',
                             time_col: str = 'Time', n_peaks: int = 10,
                             sample_rate: float = 20, min_time_diff: float = 60,
-                            prominence: int = None, auto_commit: bool = False, session=None):
+                            prominence: int = None, auto_commit: bool = False):
         """
         Limits the data based on the peaks in a specified column.
 
@@ -469,8 +459,6 @@ class Version(BaseClass):
             Prominence value for peak detection. If None, prominence is not used. Default is None.
         auto_commit : bool, optional
             Whether to perform an automatic commit after limiting the data. Default is False.
-        session : sqlalchemy.orm.Session, optional
-            The session to use for the query. If None, a new session is created.
 
         Returns
         -------
@@ -497,7 +485,7 @@ class Version(BaseClass):
             f"Successfully limited the data of '{self.__str__()}' between {timeframe_dict['start_time']} and {timeframe_dict['end_time']}.")
         self.update_metadata()
         if auto_commit:
-            self.commit(session=session)
+            self.commit()
 
         return True
 
