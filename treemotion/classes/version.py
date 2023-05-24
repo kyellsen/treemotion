@@ -17,7 +17,7 @@ class Version(BaseClass):
     __tablename__ = 'Version'
     version_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     measurement_id = Column(Integer, ForeignKey('Measurement.measurement_id', onupdate='CASCADE'), nullable=False)
-    name = Column(String)
+    version_name = Column(String)
     tms_table_name = Column(String)
     datetime_start = Column(DateTime)
     datetime_end = Column(DateTime)
@@ -27,26 +27,25 @@ class Version(BaseClass):
     peak_index = Column(Integer)
     peak_time = Column(DateTime)
     peak_value = Column(Float)
-    wind_in_df = Column(Boolean)
 
     measurement = relationship("Measurement", back_populates="version", lazy="joined",
                                order_by="Version.version_id")
 
-    def __init__(self, *args, version_id: int = None, id_measurement: int = None, name: str = None,
+    def __init__(self, *args, version_id: int = None, id_measurement: int = None, version_name: str = None,
                  tms_table_name: str = None, **kwargs):
         """
         Initializes a Data instance.
 
         :param version_id: Unique ID of the data.
         :param id_measurement: ID of the measurement to which the data belongs.
-        :param name: Data version.
+        :param version_name: Data version.
         :param df: DataFrame with the data.
         """
         super().__init__(*args, **kwargs)
         # in SQLite Database
         self.version_id = version_id
         self.measurement_id = id_measurement
-        self.name = name
+        self.version_name = version_name
         self.tms_table_name = tms_table_name  # name of SQLite Table where TMS-Data is stored
         self.tms_wind_table_name = None
         self.datetime_start = None  # metadata
@@ -61,14 +60,13 @@ class Version(BaseClass):
         self.peaks_indexes = None
         self.peaks_times = None
         self.peaks_values = None
-        # additional only in class-object, own table in database "auto_df_{version}_{id_measurement}_measurement
-        self.tms_df = None
-        # additional only in class-object
-        self.wind_df = None
-        self.tms_wind_df = None
+        # additional only in class-object, own table in database "auto_{}_df_{version}_{id_measurement}_measurement
+        self._tms_df = None
+        self._wind_df = None
+        self._tms_wind_df = None
 
     def __str__(self):
-        return f"Data(id={self.version_id}, table_name={self.tms_table_name})"
+        return f"{self.__class__.__name__}(id={self.version_id}, tms_table_name={self.tms_table_name})"
 
     def describe(self):
         """
@@ -79,7 +77,7 @@ class Version(BaseClass):
             print(f"Measurement ID: {self.measurement_id}")
             print(f"Measurement Series ID: {self.measurement.series_id}")
             print(f"Sensor ID: {self.measurement.sensor_id}")
-            print(f"Version: {self.name}")
+            print(f"Version: {self.version_name}")
             print(f"Table name in database: {self.tms_table_name}")
             print(f"Start datetime: {self.datetime_start.strftime('%d.%m.%Y %H:%M:%S')}")
             print(f"End datetime: {self.datetime_end.strftime('%d.%m.%Y %H:%M:%S')}")
@@ -93,55 +91,165 @@ class Version(BaseClass):
         except Exception as e:
             raise e
 
+
+    # tms_df
+    @property
+    @timing_decorator
+    def tms_df(self):
+        if self._tms_df is None:
+            session = db_manager.get_session()
+            try:
+                self._tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
+                logger.info(f"{self.__class__.__name__}.tms_df loaded successfully: {self.__str__()}")
+            except Exception as e:
+                logger.error(f"{self.__class__.__name__}.tms_df could not be loaded: {self.__str__()}, error: {e}")
+                return None
+        return self._tms_df
+
+    @tms_df.setter
+    @timing_decorator
+    def tms_df(self, tms_df):
+        session = db_manager.get_session()
+        try:
+            tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace')
+            logger.info(f"{self.__class__.__name__}.tms_df set successfully: {self.__str__()}")
+        except Exception as e:
+            logger.error(f"{self.__class__.__name__}.tms_df could not be set: {self.__str__()}, error: {e}")
+
+    @tms_df.deleter
+    @timing_decorator
+    def tms_df(self):
+        session = db_manager.get_session()
+        try:
+            drop_table_statement = text(f"DROP TABLE IF EXISTS {self.tms_table_name}")
+            session.bind.execute(drop_table_statement)
+            logger.info(f"{self.__class__.__name__}.tms_df deleted successfully: {self.__str__()}")
+        except Exception as e:
+            logger.error(f"{self.__class__.__name__}.tms_df could not be deleted: {self.__str__()}, error: {e}")
+
+    @staticmethod
+    def get_tms_table_name(version_name: str, id_measurement: int) -> str:
+        """
+        Generates a tms table name.
+
+        :param version_name: Version of the data.
+        :param id_measurement: ID of the measurement to which the data belongs.
+        :return: New table name.
+        """
+        return f"auto_tms_df_{version_name}_{str(id_measurement).zfill(3)}_measurement"
+
     @classmethod
     @timing_decorator
-    def load_from_db(cls, measurement_id: int = None, load_related_df: bool = False, session=None):
-        """
-        Loads data from the database.
+    def load_from_db(cls, version_id=None, version_name=None) -> List['Version']:
+        filter_by = {}
+        if version_id:
+            filter_by['version_id'] = version_id
+        if version_name:
+            filter_by['name'] = version_name
 
-        :param measurement_id: ID of the measurement to which the data belongs.
-        :param load_related_df: Whether to load the associated DataFrame.
-        :param session: SQLAlchemy session for interacting with the database.
-        :return: List of data objects.
-        """
-        objs = super().load_from_db(filter_by={'id_measurement': measurement_id} if measurement_id else None,
-                                    session=session)
-        if not objs:
-            logger.error(f"No data found for id_measurement={measurement_id}")
+        if isinstance(version_id, list):
+            objs = super().load_from_db(ids=version_id)
         else:
-            logger.info(f"{len(objs)} Data objects loaded successfully.")
-        if load_related_df:
-            for obj in objs:
-                obj.load_df()
+            objs = super().load_from_db(filter_by=filter_by or None)
         return objs
 
     @classmethod
     @timing_decorator
-    def load_from_csv(cls, filepath: str, id_data, id_measurement: int, version: str, table_name: str):
+    def load_from_csv(cls, filepath: str, version_id, measurement_id: int, version_name: str, tms_table_name: str):
         """
         Loads data from a CSV file.
 
         :param filepath: Path to the CSV file.
-        :param id_data: Unique ID of the data.
-        :param id_measurement: ID of the measurement to which the data belongs.
-        :param version: Version of the data.
-        :param table_name: Name of the SQLite table where the data is stored.
+        :param version_id: Unique ID of the version.
+        :param measurement_id: ID of the measurement to which the data belongs.
+        :param version_name: Version Name of the data.
+        :param tms_table_name: Name of the SQLite table where the data is stored.
         :return: Data object.
         """
         if filepath is None:
             logger.warning(f"Filepath is None, process aborted.")
             return None
         obj = cls()
-        obj.version_id = id_data
-        obj.measurement_id = id_measurement
-        obj.name = version
-        obj.tms_table_name = table_name
+        obj.version_id = version_id
+        obj.measurement_id = measurement_id
+        obj.version_name = version_name
+        obj.tms_table_name = tms_table_name
         try:
             obj.tms_df = obj.read_csv_tms(filepath)
         except Exception as e:
             logger.error(f"Error while reading the CSV file, error: {e}")
         obj.update_metadata()
         return obj
+
+    @timing_decorator
+    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None):
+        """
+        Create a copy of the data object.
+
+        :param reset_id: Whether to reset the ID of the new object.
+        :param auto_commit: Whether to auto-commit after copying.
+        :param session: SQLAlchemy session for interacting with the database.
+        :return: Copied data object.
+        """
+        new_obj = super().copy('id_data', reset_id, auto_commit, session)
+
+        # Create a deep copy of the DataFrame
+        if self.tms_df is not None:
+            new_obj.df = self.tms_df.copy(deep=True)
+
+        return new_obj
+
+    @timing_decorator
+    def commit(self, df_commit=True, session=None):
+        """
+        Add the data object to the database and perform the commit.
+
+        :param df_commit: If True, Version.df will be committed; if False, Version.df will not be committed (default).
+        :param session: SQLAlchemy session for interacting with the database.
+        :return: True if commit is successful; False if failed.
+        """
+        session = db_manager.get_session(session)
+        try:
+            session.add(self)
+            if self.tms_df is not None and df_commit:
+                self.tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace', index=False)
+            db_manager.commit(session)
+            logger.info(f"Instance '{self.__str__()}' committed to the database.")
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to commit '{self.__str__()}' to the database: {e}")
+            return False
+
+    def remove(self, session=None, **kwargs):
+        """
+        Removes the data object from the database.
+
+        Parameters
+        ----------
+        session : sqlalchemy.orm.Session, optional
+            SQL-Alchemy session for interacting with the database.
+        """
+        session = db_manager.get_session(session)
+        existing_obj = session.query(type(self)).get(getattr(self, 'id_data'))
+        try:
+            if existing_obj is not None:
+                # Delete the table associated with this Data object
+                drop_table_statement = text(f"DROP TABLE IF EXISTS {self.tms_table_name}")
+                session.execute(drop_table_statement)
+                self.tms_df = None
+                session.delete(existing_obj)
+                logger.info(f"Object {self.__class__.__name__} has been removed.")
+                db_manager.commit(session)
+                return True
+            else:
+                logger.info(f"Object {self.__class__.__name__} does not exist.")
+                return False
+        except Exception as e:
+            session.rollback()  # Rollback the changes on error
+            logger.error(f"Error while removing the object {self.__class__.__name__}: {e}")
+            return False
+
 
     @classmethod
     def create_new_version(cls, source_obj, new_version: str):
@@ -156,48 +264,14 @@ class Version(BaseClass):
         try:
             new_obj.version_id = None
             new_obj.measurement_id = source_obj.measurement_id
-            new_obj.name = new_version
-            new_obj.tms_table_name = new_obj.get_table_name(new_obj.name, new_obj.measurement_id)
+            new_obj.version_name = new_version
+            new_obj.tms_table_name = new_obj.get_tms_table_name(new_obj.version_name, new_obj.measurement_id)
             new_obj.tms_df = source_obj.tms_df.copy(deep=True)  # not copying from Data, but from pd.DataFrame
             new_obj.update_metadata()
             return new_obj
         except Exception as e:
             logger.error(f"Error while creating a copy of the data instance: {e}")
             return None
-
-    @timing_decorator
-    def load_df(self, session=None):
-        """
-        Loads the DataFrame for this Version instance from the database.
-
-        :param session: SQLAlchemy session for interacting with the database.
-        :return: The Version object with loaded data or None if an error occurred.
-        """
-        session = db_manager.get_session(session)
-        try:
-            self.tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
-            logger.info(f"Data.df loaded successfully: {self.__str__()}")
-        except Exception as e:
-            logger.error(f"Data.df could not be loaded: {self.__str__()}, error: {e}")
-            return None
-        return self
-
-    def load_df_if_missing(self, session=None):
-        """
-        Loads the data for this Data instance if it has not been loaded yet.
-
-        :param session: SQLAlchemy session for interacting with the database.
-        :return: True if the loading was successful, False otherwise.
-        """
-        if not hasattr(self, 'df') or self.tms_df is None:
-            logger.warning(
-                f"DataFrame (Data.df) is missing for instance {self.__str__()}. Automatically executing Data.load_df().")
-            try:
-                self.load_df(session=session)
-                return True
-            except Exception as e:
-                logger.critical(f"Data.load_df could not be executed for {self.__str__()}, error: {e}")
-                return False
 
     @staticmethod
     @timing_decorator
@@ -221,17 +295,6 @@ class Version(BaseClass):
             logger.error(f"Unusual error while loading {filepath.stem}: {e}")
             raise e
         return df
-
-    @staticmethod
-    def get_table_name(version: str, id_measurement: int) -> str:
-        """
-        Generates a new table name.
-
-        :param version: Version of the data.
-        :param id_measurement: ID of the measurement to which the data belongs.
-        :return: New table name.
-        """
-        return f"auto_df_{version}_{str(id_measurement).zfill(3)}_measurement"
 
     def _validate_df(self, wind_in_df=False):
         """
@@ -332,74 +395,7 @@ class Version(BaseClass):
         return peaks
 
     # Inherited from BaseClass
-    @timing_decorator
-    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None):
-        """
-        Create a copy of the data object.
 
-        :param reset_id: Whether to reset the ID of the new object.
-        :param auto_commit: Whether to auto-commit after copying.
-        :param session: SQLAlchemy session for interacting with the database.
-        :return: Copied data object.
-        """
-        new_obj = super().copy('id_data', reset_id, auto_commit, session)
-
-        # Create a deep copy of the DataFrame
-        if self.tms_df is not None:
-            new_obj.df = self.tms_df.copy(deep=True)
-
-        return new_obj
-
-    @timing_decorator
-    def commit(self, df_commit=True, session=None):
-        """
-        Add the data object to the database and perform the commit.
-
-        :param df_commit: If True, Version.df will be committed; if False, Version.df will not be committed (default).
-        :param session: SQLAlchemy session for interacting with the database.
-        :return: True if commit is successful; False if failed.
-        """
-        session = db_manager.get_session(session)
-        try:
-            session.add(self)
-            if self.tms_df is not None and df_commit:
-                self.tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace', index=False)
-            db_manager.commit(session)
-            logger.info(f"Instance '{self.__str__()}' committed to the database.")
-            return True
-        except Exception as e:
-            session.rollback()
-            logger.error(f"Failed to commit '{self.__str__()}' to the database: {e}")
-            return False
-
-    def remove(self, session=None, **kwargs):
-        """
-        Removes the data object from the database.
-
-        Parameters
-        ----------
-        session : sqlalchemy.orm.Session, optional
-            SQL-Alchemy session for interacting with the database.
-        """
-        session = db_manager.get_session(session)
-        existing_obj = session.query(type(self)).get(getattr(self, 'id_data'))
-        try:
-            if existing_obj is not None:
-                # Delete the table associated with this Data object
-                drop_table_statement = text(f"DROP TABLE IF EXISTS {self.tms_table_name}")
-                session.execute(drop_table_statement)
-                self.tms_df = None
-                session.delete(existing_obj)
-                logger.info(f"Object {self.__class__.__name__} has been removed.")
-                db_manager.commit(session)
-                return True
-            else:
-                logger.info(f"Object {self.__class__.__name__} does not exist.")
-                return False
-        except Exception as e:
-            session.rollback()  # Rollback the changes on error
-            logger.error(f"Error while removing the object {self.__class__.__name__}: {e}")
-            return False
 
     def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False, session=None):
         """

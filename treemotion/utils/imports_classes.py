@@ -10,7 +10,7 @@ from typing import Type, Dict, List, Optional, Union
 
 from sqlalchemy import Column, Boolean, Integer, Float, String, ForeignKey, DateTime
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy.orm import Session, relationship, class_mapper
 
 
 

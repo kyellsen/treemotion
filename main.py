@@ -1,17 +1,21 @@
 # main.py
 import treemotion
-from treemotion import config, logger, db_manager, Project, Series, Measurement, Version, WindMeasurement#, ValidationManager
+from treemotion import config, logger, db_manager, Project, Series, Measurement, Version, \
+    WindMeasurement  # , ValidationManager
 
 logger.setLevel(level="DEBUG")
 
-filename_db_1 = r"TREEMOTION_BOSAU.db"
+filename_db_1 = r"TREEMOTION_BOSAU_REMOVE.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
-
 
 db_manager.connect(db_filename=filename_db_1)
 
-session = db_manager.get_session()
-series_1 = session.query(Series).first()
+measurement_1 = Measurement.load_from_db(measurement_id=1)[0]
+series_1 = Series.load_from_db(series_id=1)[0]
+project_1 = Project.load_from_db(project_id=3)[0]
+test_list = series_1.run_all(class_name="Measurement", method_name="load_from_db")
+project_1.copy(auto_commit=True)
+project_1.remove(auto_commit=True)
 
 # WindMeasurement.load_from_dwd_online(name="Dornick", station_id=6163, auto_commit=True, overwrite=False)
 # session = db_manager.get_session()
@@ -25,16 +29,14 @@ series_1 = session.query(Series).first()
 # df_val = validation_manager.validate_data(df)
 
 
-
 # WindMessreihe.load_from_dwd_online(name="Dörnick_2022", stations_id=6163, auto_commit=True, overwrite=False)
 # session = db_manager.get_session()
 # windmessreihe = session.query(WindMessreihe).first()
 
 
-
-#data_list = Data.load_from_db(id_messung=1, load_related_df=True)
-#data = data_list[0]
-#wind_df = data.get_wind_df(id_wind_messreihe=1, time_extension_secs=60*60*60)
+# data_list = Data.load_from_db(id_messung=1, load_related_df=True)
+# data = data_list[0]
+# wind_df = data.get_wind_df(id_wind_messreihe=1, time_extension_secs=60*60*60)
 # projekt.add_filenames(csv_path=csv_path)
 # projekt.load_data_from_csv(version="raw", overwrite=False, auto_commit=False)
 # data_list = Data.load_from_db()

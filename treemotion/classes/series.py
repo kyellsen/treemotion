@@ -26,7 +26,7 @@ class Series(BaseClass):
     project = relationship("Project", back_populates="series", lazy="joined", order_by="Project.project_id")
     measurement = relationship(Measurement, back_populates="series", lazy="joined",
                                cascade='all, delete, delete-orphan', order_by=Measurement.measurement_id)
-    wind_measurement = relationship(WindMeasurement, lazy="joined")
+    wind_measurement = relationship(WindMeasurement) # lazy = joined
 
     def __init__(self, *args, series_id=None, description=None, datetime_start=None, datetime_end=None, location=None,
                  annotation=None, filepath_tms=None, wind_measurement_id=None, **kwargs):
@@ -47,9 +47,11 @@ class Series(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, project_id=None, session=None):
-        objs = super().load_from_db(filter_by={'project_id': project_id} if project_id else None, session=session)
-        logger.info(f"{len(objs)} series were successfully loaded.")
+    def load_from_db(cls, series_id=None) -> List['Series']:
+        if isinstance(series_id, list):
+            objs = super().load_from_db(ids=series_id)
+        else:
+            objs = super().load_from_db(filter_by={'series_id': series_id} if series_id else None)
         return objs
 
     @timing_decorator
@@ -65,39 +67,6 @@ class Series(BaseClass):
         logger.info(
             f"Process of loading CSV files for {len(results)} measurements from {self.__str__()} successfully completed.")
         return results
-
-    @timing_decorator
-    def copy(self, reset_id=False, auto_commit=False, session=None) -> 'Series':
-        """
-        Create a copy of the series.
-
-        Args:
-            reset_id (bool, optional): Whether to reset the ID of the new instance.
-            auto_commit (bool, optional): Whether to automatically commit the new instance to the database.
-            session (Session, optional): The database session to use.
-
-        Returns:
-            Series: A new instance that is a copy of the current series.
-        """
-        new_obj = super().copy("series_id", reset_id, auto_commit, session)
-        return new_obj
-
-    @timing_decorator
-    def remove(self, auto_commit=False, session=None) -> bool:
-        """
-        Remove the series from the database.
-
-        Args:
-            auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-            session (Session, optional): The database session to use.
-
-        Returns:
-            bool: True if the series was successfully removed, False otherwise.
-        """
-        session = db_manager.get_session(session)
-        # Call the base class method to remove this series object from the database
-        result = super().remove('series_id', auto_commit, session)
-        return result
 
     @timing_decorator
     def add_filenames(self, csv_path: str):

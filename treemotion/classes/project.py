@@ -52,20 +52,11 @@ class Project(BaseClass):
 
     @classmethod
     @timing_decorator
-    def load_from_db(cls, project_id=None, session=None) -> List['Project']:
-        """
-        Load projects from the database.
-
-        Args:
-            project_id (int, optional): The ID of the project to load.
-            session (Session, optional): The database session to use.
-
-        Returns:
-            List[Project]: A list of loaded projects.
-        """
-        session = db_manager.get_session(session)
-        objs = super().load_from_db(filter_by={'project_id': project_id} if project_id else None, session=session)
-        logger.info(f"{len(objs)} projects were successfully loaded.")
+    def load_from_db(cls, project_id=None) -> List['Project']:
+        if isinstance(project_id, list):
+            objs = super().load_from_db(ids=project_id)
+        else:
+            objs = super().load_from_db(filter_by={'project_id': project_id} if project_id else None)
         return objs
 
     @timing_decorator
@@ -94,37 +85,29 @@ class Project(BaseClass):
         return results
 
     @timing_decorator
-    def copy(self, reset_id: bool = False, auto_commit: bool = False, session=None) -> 'Project':
+    def load_data_from_csv_2(self, version_name: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
+                             auto_commit: bool = False) -> Optional[List]:
         """
-        Create a copy of the project.
+        Load data from CSV files for all series associated with the project.
 
         Args:
-            reset_id (bool, optional): Whether to reset the ID of the new instance.
-            auto_commit (bool, optional): Whether to automatically commit the new instance to the database.
-            session (Session, optional): The database session to use.
-
-        Returns:
-            Project: A new instance that is a copy of the current project.
-        """
-        new_obj = super().copy("project_id", reset_id, auto_commit, session)
-        return new_obj
-
-    @timing_decorator
-    def remove(self, auto_commit: bool = False, session=None) -> bool:
-        """
-        Remove the project from the database.
-
-        Args:
+            version_name (str, optional): The version of the TMS Data to load.
+            overwrite (bool, optional): Whether to overwrite existing data.
             auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-            session (Session, optional): The database session to use.
 
         Returns:
-            bool: True if the project was successfully removed, False otherwise.
+            Optional[List]: A list of results from loading the data.
         """
-        session = db_manager.get_session(session)
-        # Call the base class method to remove this Project object from the database
-        result = super().remove('project_id', auto_commit, session)
-        return result
+        logger.info(f"Starting process to load all CSV files for {self.__str__()}")
+        try:
+            results = self.run_all('Measurement', 'load_data_from_csv', version_name, overwrite, auto_commit)
+        except Exception as e:
+            logger.error(f"Error loading all CSV files for {self.__str__()}, Error: {e}")
+            return None
+        logger.info(
+            f"Process of loading CSV files for {len(results)} series from {self.__str__()} successfully completed.")
+        return results
+
 
     @timing_decorator
     def add_filenames(self, csv_path: str):

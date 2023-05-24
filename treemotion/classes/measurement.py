@@ -63,7 +63,7 @@ class Measurement(BaseClass):
         # in SQLite Database
         self.measurement_id = measurement_id
         self.series_id = series_id
-        self.tree_id = tree_id
+        self.tree_id = self.tree_treatment.tree_id
         self.tree_treatment_id = tree_treatment_id
         self.sensor_id = sensor_id
         self.measurement_status_id = measurement_status_id
@@ -77,31 +77,22 @@ class Measurement(BaseClass):
     def __str__(self):
         return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filename}"
 
-    # Inherited from BaseClass
     @classmethod
     @timing_decorator
-    def load_from_db(cls, id_series=None, session=None):
-        """
-        Load measurement objects from the database based on the series ID.
-
-        :param id_series: The ID of the series to filter by.
-        :param session: The SQL-Alchemy session used to interact with the database.
-        :return: A list of loaded measurement objects.
-        """
-        objs = super().load_from_db(filter_by={'series_id': id_series} if id_series else None, session=session)
-        if not objs:
-            logger.error(f"No data found for series_id={id_series}")
+    def load_from_db(cls, measurement_id=None) -> List['Measurement']:
+        if isinstance(measurement_id, list):
+            objs = super().load_from_db(ids=measurement_id)
         else:
-            logger.info(f"{len(objs)} Measurement objects successfully loaded.")
+            objs = super().load_from_db(filter_by={'measurement_id': measurement_id} if measurement_id else None)
         return objs
 
     @timing_decorator
-    def load_data_from_csv(self, version: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
+    def load_data_from_csv(self, version_name: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
                            auto_commit: bool = False, session=None):
         """
         Load data from a CSV file and update existing data if necessary.
 
-        :param version: Version of the data.
+        :param version_name: Version of the data.
         :param overwrite: Determines whether to overwrite existing data.
         :param auto_commit: Determines whether to save the data to the database immediately.
         :param session: SQL-Alchemy session used to interact with the database.
@@ -112,13 +103,13 @@ class Measurement(BaseClass):
             return None
 
         logger.info(f"Start loading csv data for '{self.__str__()}'")
-        table_name = Version.get_table_name(version, self.measurement_id)
+        table_name = Version.get_tms_table_name(version_name, self.measurement_id)
         present_data_obj = self.find_data_by_table_name(table_name)
 
         if present_data_obj is None or overwrite:
             if present_data_obj is not None and overwrite:
                 logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj.__str__()}")
-            obj = self.create_or_update_data_obj_from_csv(version, table_name, present_data_obj)
+            obj = self.create_or_update_data_obj_from_csv(version_name, table_name, present_data_obj)
         else:
             logger.warning(
                 f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj.__str__()}")
@@ -163,9 +154,9 @@ class Measurement(BaseClass):
         :param present_data_obj: An existing data object to update.
         :return: The created or updated data object.
         """
-        obj = present_data_obj or Version.load_from_csv(filepath=self.filepath, id_data=None,
-                                                        id_measurement=self.measurement_id, version=version,
-                                                        table_name=table_name)
+        obj = present_data_obj or Version.load_from_csv(filepath=self.filepath, version_id=None,
+                                                        measurement_id=self.measurement_id, version_name=version,
+                                                        tms_table_name=table_name)
         obj.tms_df = obj.read_csv_tms(self.filepath)
         obj.update_metadata(auto_commit=True)
         if present_data_obj:
@@ -174,23 +165,7 @@ class Measurement(BaseClass):
         logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
 
-    @timing_decorator
-    def copy(self, reset_id=False, auto_commit=False, session=None):
-        new_obj = super().copy("measurement_id", reset_id, auto_commit, session)
-        return new_obj
 
-    @timing_decorator
-    def remove(self, auto_commit=False, session=None):
-        """
-        Remove this measurement object from the database.
-
-        :param auto_commit: A flag indicating whether to commit the changes automatically.
-        :param session: The SQL-Alchemy session used to interact with the database.
-        """
-        session = db_manager.get_session(session)
-        # Call the base class method to remove this Measurement object from the database
-        result = super().remove('measurement_id', auto_commit, session)
-        return result
 
     def get_data_by_version(self, version):
         """
