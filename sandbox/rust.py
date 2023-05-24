@@ -2,15 +2,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import emd
-from treemotion.classes.messung import Messung
+from treemotion.classes.measurement import Measurement
 
 test_dir = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\py_tms_tools\test"
 csv_file = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2023_Kronensicherung_Plesse\020_Daten\TMS\CSV_Messung_001_Plesse_export_2023-03-22_24h\2023-03-22 000000__DatasA000-0000-0007.csv"
 db_file = r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\py_tms_tools\test\test.db"
 
-messung_1 = Messung.read_from_csv(source_path=csv_file, messung_id=1, feedback=True)
+messung_1 = Measurement.read_from_csv(source_path=csv_file, messung_id=1, feedback=True)
 
-df = messung_1.data
+df = messung_1.version
 
 df = df.set_index(pd.DatetimeIndex(df['Time']))
 
@@ -18,7 +18,7 @@ print(df['Absolute-Inclination'].idxmax())
 start_time = pd.Timestamp('2023-03-22 15:25:00')
 end_time = pd.Timestamp('2023-03-22 15:30:00')
 messung_1.limit_time(start_time, end_time)
-dfk = messung_1.data
+dfk = messung_1.version
 
 plt.plot(dfk['East-West-Inclination - drift compensated'])
 plt.show()

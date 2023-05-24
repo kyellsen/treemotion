@@ -17,7 +17,7 @@ class Configuration:
 
         # Default Directory´s
         self.working_directory = None
-        self.set_working_directory(r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_1")
+        self.set_working_directory(r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory_en")
 
         # noinspection PyUnresolvedReferences
         self.log_directory = self.working_directory / "logs"
@@ -80,23 +80,23 @@ class Configuration:
         self.validation_manager_max_inclination = 5
         incl = self.validation_manager_max_inclination  # Shortform
 
-        df_expectations = ge.dataset.PandasDataset({
-            'Time': {'expect_column_values_to_be_of_type': 'datetime64'},
-            'East-West-Inclination': {'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
-            'North-South-Inclination': {'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
-            'Absolute-Inclination': {'expect_column_values_to_be_between': {'min_value': 0, 'max_value': incl}},
-            'Inclination direction of the tree': {
-                'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 360}},
-            'Temperature': {'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 30}},
-            'East-West-Inclination - drift compensated': {
-                'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
-            'North-South-Inclination - drift compensated': {
-                'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
-            'Absolute-Inclination - drift compensated': {
-                'expect_column_values_to_be_between': {'min_value': 0, 'max_value': incl}},
-            'Inclination direction of the tree - drift compensated': {
-                'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 360}},
-        })
+        # df_expectations = ge.dataset.PandasDataset({
+        #     'Time': {'expect_column_values_to_be_of_type': 'datetime64'},
+        #     'East-West-Inclination': {'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
+        #     'North-South-Inclination': {'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
+        #     'Absolute-Inclination': {'expect_column_values_to_be_between': {'min_value': 0, 'max_value': incl}},
+        #     'Inclination direction of the tree': {
+        #         'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 360}},
+        #     'Temperature': {'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 30}},
+        #     'East-West-Inclination - drift compensated': {
+        #         'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
+        #     'North-South-Inclination - drift compensated': {
+        #         'expect_column_values_to_be_between': {'min_value': -incl, 'max_value': incl}},
+        #     'Absolute-Inclination - drift compensated': {
+        #         'expect_column_values_to_be_between': {'min_value': 0, 'max_value': incl}},
+        #     'Inclination direction of the tree - drift compensated': {
+        #         'expect_column_values_to_be_between': {'min_value': 0, 'max_value': 360}},
+        # })
 
     def set_working_directory(self, directory: str) -> bool:
         """

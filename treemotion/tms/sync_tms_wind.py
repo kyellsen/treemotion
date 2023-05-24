@@ -17,21 +17,19 @@ CORRELATION_METHODS = {
 
 def sync_by_datetime(df_1: pd.DataFrame, df_2: pd.DataFrame):
     try:
-        validate_df(df_tms, columns=[])
-        validate_df()
+        validate_df(df_1, columns=[])
+        validate_df(df_2)
     except Exception as e:
         logger.error(f"")
         return None
 
-
-
-    return result_df
+    return df_1, df_2
 
 
 def sync_data_by_correlation(df_tms: pd.DataFrame, df_wind: pd.DataFrame, max_shift: int,
-              interpolation_method: str = 'linear',
-              correlation_method: str = 'pearson',
-              max_window: Optional[int] = None) -> pd.DataFrame:
+                             interpolation_method: str = 'linear',
+                             correlation_method: str = 'pearson',
+                             max_window: Optional[int] = None) -> pd.DataFrame:
     """
     Synchronize two dataframes based on a datetime column, such that the correlation
     between a column in each dataframe is maximized.
@@ -113,6 +111,3 @@ def find_optimal_shift(df1: pd.DataFrame, df2: pd.DataFrame, column1: str, colum
 
     logger.info(f"Best shift is {best_shift} with {correlation_method} correlation {best_corr}.")
     return best_shift
-
-
-

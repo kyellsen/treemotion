@@ -40,7 +40,7 @@ def get_tms_filenames_from_db(data_path: str, db_path: str) -> pd.DataFrame:
     file_df = file_df.merge(messreihe_filepath_tms_df, on='filepath_tms', how='left')
 
     # Merge the TMS file information with the "Messreihe" and "Messung" tables based on "id_messreihe" and "gid".
-    df = dbi.read_df(db_path, "messung.py").merge(
+    df = dbi.read_df(db_path, "measurement.py").merge(
         file_df, on=['id_messreihe', 'gid'], how='left')
 
     return df
@@ -106,8 +106,8 @@ if __name__ == '__main__':
     write_tms_filenames_to_db(data_path=tms_path, db_path=db_path)
     #import_tms_to_db(tms_path, db_path)
     print("ENDE MAIN")
-    #df = dbi.read_sql(db_path=db_path, sql_query="SELECT * FROM messung.py")
-    df = dbi.read_df(db_path=db_path, df_name="messung.py")
+    #df = dbi.read_sql(db_path=db_path, sql_query="SELECT * FROM measurement.py")
+    df = dbi.read_df(db_path=db_path, df_name="measurement.py")
     print("HIER")
 
 

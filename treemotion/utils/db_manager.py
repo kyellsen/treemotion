@@ -1,7 +1,7 @@
 # treemotion/utils/db_manager.py
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import sessionmaker
 from pathlib import Path
 from shutil import copy
 
@@ -13,13 +13,13 @@ logger = get_logger(__name__)
 
 class DatabaseManager:
     """
-    Eine Klasse zur Verwaltung von Datenbankverbindungen und -sitzungen.
+    A class for managing database connections and sessions.
     """
 
     def __init__(self):
         """
-        Konstruktor der DatabaseManager-Klasse.
-        Initialisiert das engine- und session-Attribut auf None.
+        Constructor of the DatabaseManager class.
+        Initializes the engine and session_factory attributes to None.
         """
         self.engine = None
         self.session_factory = None
@@ -27,10 +27,11 @@ class DatabaseManager:
 
     def connect(self, db_filename: str, directory: str = None):
         """
-        Verbindet zur Datenbank und erstellt eine neue session_factory.
+        Connects to the database and creates a new session_factory.
+
         Args:
-            db_filename (str): Pfad zur Datenbank.
-            directory (str: Optional, normalerweise im working_directory
+            db_filename (str): Path to the database.
+            directory (str): Optional, usually in the working_directory.
         """
         if directory is None:
             from treemotion import config
@@ -39,122 +40,123 @@ class DatabaseManager:
             directory = Path(directory)
 
         directory.mkdir(parents=True, exist_ok=True)
-        db_path = directory / db_filename  # DB-Pfad aus Working directory und Filename erstellen
+        db_path = directory / db_filename  # Create DB path from working directory and filename
 
         DATABASE_URI = f'sqlite:///{db_path.__str__()}'
 
-        # Überprüfung, ob die Datenbank bereits existiert
+        # Check if the database already exists
         if db_path.is_file():
-            logger.info(f"Die existierende Datenbank unter {db_path.__str__()} wird genutzt.")
+            logger.info(f"Using existing database at {db_path.__str__()}.")
         else:
-            logger.info(f"Die Datenbank unter {db_path.__str__()} existiert nicht und wird erstellt.")
+            logger.info(f"Database at {db_path.__str__()} does not exist and will be created.")
 
         try:
             self.engine = create_engine(DATABASE_URI)
-            Base.metadata.create_all(self.engine)  # Erstellt alle Tabellen, definiert in Ihrem Base ORM-Objekt
+            Base.metadata.create_all(self.engine)  # Create all tables defined in your Base ORM object
             self.session_factory = sessionmaker(bind=self.engine)
             self.current_session = self.session_factory()
-            logger.info(f"Verbindung zur Datenbank unter {db_path.__str__()} erfolgreich hergestellt.")
+            logger.info(f"Successfully connected to the database at {db_path.__str__()}.")
         except Exception as e:
-            logger.error(f"Fehler beim Verbinden zur Datenbank: {e}")
+            logger.error(f"Error while connecting to the database: {e}")
             raise e
 
     def disconnect(self):
         """
-        Trennt die Verbindung zur Datenbank.
+        Disconnects from the database.
         """
         if self.engine is not None:
             if self.current_session is not None:
                 if len(self.current_session.dirty) > 0 or len(self.current_session.new) > 0:
-                    logger.warning(f"Es gibt noch nicht committete Änderungen.")
+                    logger.warning("There are uncommitted changes.")
                     self.ask_commit(self.current_session)
                 self.current_session.close()
                 self.current_session = None
             self.session_factory = None
             self.engine.dispose()
             self.engine = None
-            logger.info("Datenbankverbindung erfolgreich getrennt.")
+            logger.info("Successfully disconnected from the database.")
         else:
-            logger.warning("Es gibt keine aktive Verbindung zur Datenbank, die getrennt werden könnte.")
+            logger.warning("There is no active database connection to disconnect.")
 
     def get_session(self, session=None):
         """
-        Gibt die angegebene Session oder, wenn keine angegeben wurde, die aktuelle Session zurück.
+        Returns the specified session or, if not specified, the current session.
+
         Args:
-            session (Optional[Session]): Eine optionale Session.
+            session (Optional[Session]): An optional session.
+
         Returns:
-            Session: Die angegebene oder die aktuelle Session.
+            Session: The specified or current session.
         """
         if self.session_factory is None:
-            logger.error("Datenbank ist nicht verbunden. Bitte rufen Sie zuerst connect() auf.")
-            raise Exception("Datenbank ist nicht verbunden. Bitte rufen Sie zuerst connect() auf.")
+            logger.error("Database is not connected. Please call connect() first.")
+            raise Exception("Database is not connected. Please call connect() first.")
 
         if session is None:
-            # logger.debug("Es wurde keine Session übergeben. Die aktuelle Session wird verwendet.")
             return self.current_session
         else:
-            # logger.debug("Es wurde eine Session übergeben. Diese Session wird verwendet.")
             return session
 
     def commit(self, session=None):
         """
-        Committet alle Änderungen in der angegebenen Session zur Datenbank.
+        Commits all changes in the specified session to the database.
+
         Args:
-            session (Session): Die Session, in der die Änderungen vorgenommen wurden.
+            session (Session): The session in which the changes were made.
         """
         session = self.get_session(session)
         try:
             session.commit()
-            logger.debug("Änderungen erfolgreich zur Datenbank committet.")
+            logger.debug("Successfully committed changes to the database.")
         except Exception as e:
-            logger.error("Fehler beim Commit zur Datenbank: ", e)
+            logger.error("Error while committing to the database: ", e)
             raise e
 
-    # Nur für Anwender individuelle Sessions
     def open_session(self):
         """
-        Erstellt und gibt eine neue Session zurück.
+        Creates and returns a new session.
+
         Returns:
-            Session: Eine neue Session.
+            Session: A new session.
         """
         if self.session_factory is None:
-            logger.error("Datenbank ist nicht verbunden. Bitte rufen Sie zuerst connect() auf.")
-            raise Exception("Datenbank ist nicht verbunden. Bitte rufen Sie zuerst connect() auf.")
+            logger.error("Database is not connected. Please call connect() first.")
+            raise Exception("Database is not connected. Please call connect() first.")
         self.current_session = self.session_factory()
-        logger.debug("Neue Session erfolgreich erstellt.")
+        logger.debug("Successfully created a new session.")
         return self.current_session
 
-    # Nur für Anwender individuelle Sessions
     def close_session(self, session):
         """
-        Schließt die angegebene Session.
+        Closes the specified session.
+
         Args:
-            session (Session): Die zu schließende Session.
+            session (Session): The session to close.
         """
         try:
             if len(session.dirty) > 0 or len(session.new) > 0:
-                logger.warning(f"Es gibt noch nicht committete Änderungen.")
+                logger.warning("There are uncommitted changes.")
                 self.ask_commit(session)
             session.close()
             if session == self.current_session:
                 self.current_session = None
-            logger.debug("Session erfolgreich geschlossen.")
+            logger.debug("Successfully closed the session.")
         except Exception as e:
-            logger.error("Fehler beim Schließen der Session: ", e)
+            logger.error("Error while closing the session: ", e)
             raise e
 
     @staticmethod
     def create_template_db(name: str, path: str = None):
         """
-        Erstellt eine neue Datenbank indem die Vorlagendatenbank kopiert wird.
+        Creates a new database by copying the template database.
+
         Args:
-            path (str): Der Pfad, in dem die neue Datenbank erstellt werden soll.
-            name (str): Der Name der neuen Datenbank.
+            name (str): The name of the new database.
+            path (str): The path where the new database should be created.
 
         Returns:
-            str: Der Pfad zur neuen Datenbank oder None, wenn die Datenbank nicht erstellt werden konnte. Bei Fehler = None
+            str: The path to the new database or None if the database could not be created.
         """
-
         if path is None:
             from treemotion import config
             path = config.working_directory
@@ -164,39 +166,41 @@ class DatabaseManager:
         database_path = path / database_filename
 
         if database_path.exists():
-            logger.error(f"Eine Datenbank namens '{database_filename}' existiert bereits in {path}.")
+            logger.error(f"A database named '{database_filename}' already exists in {path}.")
             return str(database_path)
 
         template_database_filename = config.template_db_name
         template_database_path = Path(__file__).parent.parent / "resources" / template_database_filename
 
         if not template_database_path.is_file():
-            logger.error(f"Die Datei {template_database_filename} wurde nicht gefunden.")
+            logger.error(f"The file {template_database_filename} was not found.")
             return
 
         try:
             copy(template_database_path, database_path)
-            logger.info(f"Datenbank '{database_filename}' wurde erfolgreich in {path} erstellt.")
+            logger.info(f"Database '{database_filename}' created successfully in {path}.")
             return str(database_path)
         except Exception as e:
-            logger.error(f"Fehler beim Erstellen der Datenbank {database_filename}: ", e)
+            logger.error(f"Error while creating the database {database_filename}: ", e)
             return None
 
-    def ask_commit(self, session):
+    @staticmethod
+    def ask_commit(session):
         """
-        Fragt den Benutzer, ob er die Änderungen committen möchte.
+        Asks the user if they want to commit the changes.
+
         Args:
-            session (Session): Die Session, in der die Änderungen vorgenommen wurden.
+            session (Session): The session in which the changes were made.
         """
         # START GUI MODIFICATION
-        commit = input("Möchten Sie committen? (True/False): ")
+        commit = input("Do you want to commit? (True/False): ")
         # END GUI MODIFICATION
         if commit.lower() == 'true':
             try:
                 session.commit()
-                logger.info("Änderungen erfolgreich zur Datenbank committet.")
+                logger.info("Changes committed successfully to the database.")
             except Exception as e:
-                logger.error("Fehler beim Commit zur Datenbank: ", e)
+                logger.error("Error while committing to the database: ", e)
                 raise e
         else:
-            logger.warning("Änderungen wurden nicht zur Datenbank committet und verworfen.")
+            logger.warning("Changes were not committed to the database and discarded.")

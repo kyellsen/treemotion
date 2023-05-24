@@ -1,6 +1,6 @@
 # main.py
 import treemotion
-from treemotion import config, logger, db_manager, Projekt, Messreihe, Messung, Data, WindMessreihe, ValidationManager
+from treemotion import config, logger, db_manager, Project, Series, Measurement, Version, WindMeasurement#, ValidationManager
 
 logger.setLevel(level="DEBUG")
 
@@ -9,13 +9,17 @@ csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Dat
 
 
 db_manager.connect(db_filename=filename_db_1)
-validation_manager = ValidationManager()
-data_list = Data.load_from_db(load_related_df=False)
-data = data_list[0].load_df()
-df = data.df
-data.describe()
 
-df_val = validation_manager.validate_data(df)
+WindMeasurement.load_from_dwd_online(name="Dörnick_2022", station_id=6163, auto_commit=True, overwrite=False)
+session = db_manager.get_session()
+windmessreihe = session.query(WindMeasurement).first()
+# validation_manager = ValidationManager()
+# data_list = Version.load_from_db(load_related_df=False)
+# data = data_list[0].load_df()
+# df = data.df
+# data.describe()
+#
+# df_val = validation_manager.validate_data(df)
 
 
 

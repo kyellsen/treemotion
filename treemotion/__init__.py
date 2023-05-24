@@ -23,11 +23,11 @@ logger.debug(f"Datenbank Manager erstellt!")
 plot_manager = DatabaseManager()
 logger.debug(f"Plot Manager erstellt!")
 
-from .classes.projekt import Projekt
-from .classes.messreihe import Messreihe
-from .classes.messung import Messung
-from .classes.data import Data
-from .classes.wind_messreihe import WindMessreihe
+from .classes.project import Project
+from .classes.series import Series
+from .classes.measurement import Measurement
+from .classes.version import Version
+from .classes.wind_measurement import WindMeasurement
 
 from .tms.validation_manager import ValidationManager
 

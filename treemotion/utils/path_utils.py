@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from typing import List, Union
+from typing import List, Union, Optional
 from utils.log import get_logger
 
 logger = get_logger(__name__)
@@ -66,7 +66,7 @@ def validate_and_get_filepath(filepath):
     return filepath
 
 
-def validate_and_get_file_list(search_path: Path) -> None:
+def validate_and_get_file_list(search_path: Path):
     """
     Sucht nach CSV-Dateien im angegebenen Pfad und gibt diese als Liste zurück.
 
@@ -83,7 +83,7 @@ def validate_and_get_file_list(search_path: Path) -> None:
     return files
 
 
-def extract_id_sensor_list(files: List[Path]) -> None:
+def extract_id_sensor_list(files=None):
     """
     Extrahiert die Sensor-ID aus den Dateinamen und gibt diese als Liste zurück.
 

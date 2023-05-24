@@ -1,13 +1,16 @@
-# treemotion/classes/wind_messung.py
+# treemotion/classes/wind_data.py
 from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
 
-from utils.base import Base
+from classes.base_class import BaseClass
 
 
-class WindMessung(Base):
-    __tablename__ = 'WindMessung'
-    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    id_wind_messreihe = Column(Integer, ForeignKey('WindMessreihe.id', onupdate='CASCADE'))
+class WindData(BaseClass):
+    """
+    This class represents wind data in the system.
+    """
+    __tablename__ = 'WindData'
+    wind_data_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
+    wind_measurement_id = Column(Integer, ForeignKey('WindMeasurement.wind_measurement_id', onupdate='CASCADE'))
     datetime = Column(DateTime)
     quality_level_wind_avg = Column(Float)
     wind_speed_10min_avg = Column(Float)
@@ -17,4 +20,3 @@ class WindMessung(Base):
     wind_speed_min_10min = Column(Float)
     wind_speed_max_10min_moving_avg = Column(Float)
     wind_direction_max_wind_speed = Column(Float)
-

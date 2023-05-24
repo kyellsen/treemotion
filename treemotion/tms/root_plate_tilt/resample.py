@@ -1,4 +1,8 @@
-def resample_df(df: pd.DataFrame, column: str = 'datetime', sample_rate: float, method: str = 'linear') -> pd.DataFrame:
+import pandas as pd
+
+
+def resample_df(df: pd.DataFrame, column: str = 'datetime', sample_rate: float = None,
+                method: str = 'linear') -> pd.DataFrame:
     """
     Resample a pandas DataFrame based on a specified sample rate and interpolation method.
 

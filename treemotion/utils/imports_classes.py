@@ -6,11 +6,11 @@ from pandas import DataFrame
 
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Type, Dict, List, Optional, Union
 
 from sqlalchemy import Column, Boolean, Integer, Float, String, ForeignKey, DateTime
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Session, relationship
 
 
 
