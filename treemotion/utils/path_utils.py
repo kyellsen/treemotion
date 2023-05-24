@@ -83,7 +83,7 @@ def validate_and_get_file_list(search_path: Path):
     return files
 
 
-def extract_id_sensor_list(files=None):
+def extract_sensor_id(files=None):
     """
     Extrahiert die Sensor-ID aus den Dateinamen und gibt diese als Liste zurück.
 
@@ -91,13 +91,13 @@ def extract_id_sensor_list(files=None):
     :return: Liste mit Sensor-IDs oder bei Fehler None
     """
     try:
-        id_sensor_list = [int(filename.stem[-3:]) for filename in files]
+        sensor_id_list = [int(filename.stem[-3:]) for filename in files]
     except ValueError as e:
         logger.error(f"Extraktion der Sensor-ID aus Dateinamen fehlgeschlagen. Fehler: {e}")
         return None
 
-    logger.info(f"Extrahierte Sensor-IDs: {id_sensor_list}")
-    return id_sensor_list
+    logger.info(f"Extrahierte Sensor-IDs: {sensor_id_list}")
+    return sensor_id_list
 
 
 def validate_files_exist(folder_path: Path, filename: str) -> bool:

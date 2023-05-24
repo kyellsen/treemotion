@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, relationship, class_mapper
 
 from treemotion import config
 from utils.runtime import timing_decorator
+from utils.auto_commit import auto_commit, auto_commit_cls
 from utils.log import get_logger
 from treemotion import db_manager
 

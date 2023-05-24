@@ -85,7 +85,8 @@ class Project(BaseClass):
         return results
 
     @timing_decorator
-    def load_data_from_csv_2(self, version_name: str = config.default_load_data_from_csv_version_name, overwrite: bool = False,
+    def load_data_from_csv_2(self, version_name: str = config.default_load_data_from_csv_version_name,
+                             overwrite: bool = False,
                              auto_commit: bool = False) -> Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
@@ -107,7 +108,6 @@ class Project(BaseClass):
         logger.info(
             f"Process of loading CSV files for {len(results)} series from {self.__str__()} successfully completed.")
         return results
-
 
     @timing_decorator
     def add_filenames(self, csv_path: str):

@@ -1,10 +1,10 @@
 # treemotionen/classes/base_class.py
+from typing import Any
+
 from utils.imports_classes import *
 from utils.base import Base
 
 logger = get_logger(__name__)
-
-from typing import Any
 
 
 class BaseClass(Base):
@@ -26,7 +26,7 @@ class BaseClass(Base):
             setattr(self, attr, value)
 
     def run_all(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any, **kwargs: Any) -> \
-    List[Any]:
+            List[Any]:
         """
         Execute a method on all instances of a specified class and return the results.
 
@@ -229,6 +229,3 @@ class BaseClass(Base):
             session.rollback()  # Rollback the changes on error
             logger.error(f"Error removing the object {self.__class__.__name__}: {e}")
             return False
-
-
-

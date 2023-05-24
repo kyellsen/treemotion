@@ -1,6 +1,6 @@
 # treemotion/classes/series.py
 from utils.imports_classes import *
-from utils.path_utils import validate_and_get_path, validate_and_get_file_list, extract_id_sensor_list
+from utils.path_utils import validate_and_get_path, validate_and_get_file_list, extract_sensor_id
 from tms.time_limits import optimal_time_frame
 
 from .measurement import Measurement
@@ -103,13 +103,13 @@ class Series(BaseClass):
         if files is None:
             return None
 
-        id_sensor_list = extract_id_sensor_list(files)
-        if id_sensor_list is None:
+        sensor_id_list = extract_sensor_id(files)
+        if sensor_id_list is None:
             return None
 
         for measurement in self.measurement:
-            if measurement.id_sensor in id_sensor_list:
-                corresponding_file = next((file for file in files if int(file.stem[-3:]) == measurement.id_sensor),
+            if measurement.sensor_id in sensor_id_list:
+                corresponding_file = next((file for file in files if int(file.stem[-3:]) == measurement.sensor_id),
                                           None)
                 if corresponding_file and corresponding_file.is_file():
                     measurement.filename = corresponding_file.name
