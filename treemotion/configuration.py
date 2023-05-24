@@ -3,6 +3,7 @@
 from pathlib import Path
 import great_expectations as ge
 
+
 class Configuration:
     """
     Eine Klasse zur Verwaltung der Konfigurationseinstellungen für das Treemotion-Paket.
@@ -34,7 +35,7 @@ class Configuration:
         self.log_level = "debug"  # debug, info, warning, critical, error
 
         # Database
-        self.template_db_name = "database_template_1_0_0_0.db"  # Look in the "treemotion" directory for template.db
+        self.template_db_name = "TREEMOTION_TEMPLATE.db"  # Look in the "treemotion" directory for template.db
 
         # Projekt
 
@@ -65,10 +66,6 @@ class Configuration:
         self.wind_df_columns_selected = ['datetime', 'wind_speed_10min_avg', 'wind_direction_10min_avg',
                                          'wind_speed_max_10min', 'wind_direction_max_wind_speed']
         self.wind_df_time_column_name = 'datetime'
-
-        # Plotting #
-
-        self.plot_directory = "plots"
 
         # PlotManager
 

@@ -20,7 +20,7 @@ db_manager = DatabaseManager()
 logger.debug(f"Datenbank Manager erstellt!")
 
 # Erstellen Sie eine Instanz des PlotManagers, die im Rest Ihres Pakets verwendet wird.
-plot_manager = DatabaseManager()
+plot_manager = PlotManager()
 logger.debug(f"Plot Manager erstellt!")
 
 from .classes.project import Project
