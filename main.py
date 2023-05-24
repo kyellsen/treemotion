@@ -18,6 +18,7 @@ data.describe()
 df_val = validation_manager.validate_data(df)
 
 
+
 # WindMessreihe.load_from_dwd_online(name="Dörnick_2022", stations_id=6163, auto_commit=True, overwrite=False)
 # session = db_manager.get_session()
 # windmessreihe = session.query(WindMessreihe).first()
