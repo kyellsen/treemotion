@@ -91,8 +91,8 @@ class Measurement(BaseClass):
         return objs
 
     @dec_runtime
-    def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name, overwrite: bool = False,
-                      auto_commit: bool = False) -> Optional[Version]:
+    def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name,
+                      overwrite: bool = False, auto_commit: bool = True) -> Optional[Version]:
         """
         Load data from a CSV file and update existing data if necessary.
 
@@ -102,28 +102,52 @@ class Measurement(BaseClass):
         :return: The updated or newly created Version instance, or None if an error occurs.
         """
         if self.filepath is None:
-            logger.warning(f"Process for '{self.__str__()}' aborted, no filename for tms_utils.csv (filename = None).")
+            logger.warning(f"Process for '{self}' aborted, no filename for tms_utils.csv (filename = None).")
             return None
 
-        logger.info(f"Start loading csv data for '{self.__str__()}'")
+        logger.info(f"Start loading csv data for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
         present_data_obj = self.find_data_by_table_name(tms_table_name)
 
         if present_data_obj is None or overwrite:
             if present_data_obj is not None and overwrite:
-                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj.__str__()}")
-            obj = self.create_or_update_data_obj_from_csv(version_name, present_data_obj)
+                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj}")
+            obj = self.create_update_version_from_csv(version_name, present_data_obj, auto_commit)
         else:
-            logger.warning(
-                f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj.__str__()}")
+            logger.warning(f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj}")
             return None
 
-        # if auto_commit:
-        #     obj.commit()
-        #     logger.info(
-        #         f"Loading data from csv and committing to database {self.__str__()} successful (auto_commit=True)!")
-        # else:
-        #     logger.info(f"Loading data from csv for {self.__str__()} successful (auto_commit=False)!")
+        if auto_commit:
+            db_manager.auto_commit(self.__class__.__name__, "load_from_csv")
+        return obj
+
+    # Hilfsmethode für load_from_csv
+    def create_update_version_from_csv(self, version_name: str, present_data_obj: Optional[Version] = None,
+                                       auto_commit: bool = True) -> Optional[Version]:
+
+        """
+        Create or update a data object from a CSV file.
+
+
+        :param version_name: The version of the data.
+        :param present_data_obj: An existing Version instance to update.
+        :param auto_commit:
+        :return: The created or updated Version instance.
+        """
+        if present_data_obj:
+            version_id = present_data_obj.version_id
+            obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name, auto_commit)
+            self.version.remove(present_data_obj)
+
+        else:
+            obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id=None, version_name=version_name,
+                                        auto_commit=auto_commit)
+        if obj is None:
+            logger.error(f"Failed to create Version instance from csv file: {self.filepath}.")
+            return None
+
+        self.version.append(obj)
+        logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
 
     # Hilfsmethode für load_from_csv
@@ -134,62 +158,36 @@ class Measurement(BaseClass):
         :param tms_table_name: The name of the table being searched.
         :return: The found data object, or None if no match is found.
         """
-        matching_data = [version for version in self.version if version.tms_table_name == tms_table_name]
+        matching_versions = [version for version in self.version if version.tms_table_name == tms_table_name]
 
-        if not matching_data:
+        if not matching_versions:
             logger.debug(f"No Version instance found with tms table_name '{tms_table_name}'.")
             return None
 
-        if len(matching_data) > 1:
+        if len(matching_versions) > 1:
             logger.critical(
                 f"Multiple Version instances found with table_name {tms_table_name}. Returning only the first instance.")
 
         logger.debug(f"Version instance found with table_name {tms_table_name}.")
-        return matching_data[0]
-
-    # Hilfsmethode für load_from_csv
-    def create_or_update_data_obj_from_csv(self, version_name: str, present_data_obj: Optional[Version] = None) \
-            -> Optional[Version]:
-        """
-        Create or update a data object from a CSV file.
-
-        :param version_name: The version of the data.
-        :param table_name: The name of the table for the data object.
-        :param present_data_obj: An existing Version instance to update.
-        :return: The created or updated Version instance.
-        """
-        obj = present_data_obj or Version.load_from_csv(filepath=self.filepath, version_id=None,
-                                                        measurement_id=self.measurement_id, version_name=version_name)
-        if obj is None:
-            logger.error(f"Failed to create Version instance from csv file: {self.filepath}.")
-            return None
-
-        obj.tms_df = obj.read_csv_tms(self.filepath)
-        # obj.update_metadata(auto_commit=False)
-
-        if present_data_obj:
-            self.version.remove(present_data_obj)
-
-        self.version.append(obj)
-        logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
-
-        return obj
-
-    def get_data_by_version(self, version):
-        """
-        This method finds an instance in self.data that has the given version.
-        It logs a critical error and returns None if more than one instance is found.
-        It logs an error and returns None if no instance is found.
-        """
-        matching_versions = [data for data in self.version if data.version == version]
-        if len(matching_versions) > 1:
-            logger.critical(
-                f"Multiple Version instances with version '{version}' for '{self.__str__()}' not available. Returning first one.")
-        if len(matching_versions) == 0:
-            logger.warning(f"No Version instances with version '{version}' found for '{self.__str__()}'.")
-            return None
-        logger.debug(f"Version instance {matching_versions[0].__str__()} returned.")
         return matching_versions[0]
+
+
+
+    # def get_data_by_version(self, version):
+    #     """
+    #     This method finds an instance in self.data that has the given version.
+    #     It logs a critical error and returns None if more than one instance is found.
+    #     It logs an error and returns None if no instance is found.
+    #     """
+    #     matching_versions = [data for data in self.version if data.version == version]
+    #     if len(matching_versions) > 1:
+    #         logger.critical(
+    #             f"Multiple Version instances with version '{version}' for '{self.__str__()}' not available. Returning first one.")
+    #     if len(matching_versions) == 0:
+    #         logger.warning(f"No Version instances with version '{version}' found for '{self.__str__()}'.")
+    #         return None
+    #     logger.debug(f"Version instance {matching_versions[0].__str__()} returned.")
+    #     return matching_versions[0]
 
     # def load_data_by_version(self, version):
     #     obj = self.get_data_by_version(version)

@@ -203,10 +203,11 @@ class BaseClass(Base):
 
         return new_obj
 
-    @dec_auto_commit
-    def remove(self) -> bool:
+    def remove(self, auto_commit: bool = False) -> bool:
         """
         Remove the instance from the database.
+
+        :param auto_commit:
 
         Returns:
             bool: True if the instance was successfully removed, False otherwise.
@@ -221,7 +222,10 @@ class BaseClass(Base):
             else:
                 logger.info(f"Object {self.__class__.__name__} does not exist.")
                 return False
-            return True
+
         except Exception as e:
             logger.error(f"Error removing the object {self.__class__.__name__}: {e}")
             return False
+        if auto_commit:
+            db_manager.auto_commit(self.__class__.__name__, "remove")
+        return True

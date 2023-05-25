@@ -56,7 +56,7 @@ class Series(BaseClass):
 
     @dec_runtime
     def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
-                      auto_commit=False):
+                      auto_commit=True):
         logger.info(f"Starting process to load all CSV files for {self.__str__()}")
         try:
             results = self.for_all('measurement', 'load_from_csv', version, overwrite, auto_commit)
@@ -68,44 +68,43 @@ class Series(BaseClass):
         return results
 
     @dec_runtime
-    @dec_auto_commit
-    def add_filenames(self, csv_path: str):
+    def add_filenames(self, csv_path: str, auto_commit: bool = False):
         """
         Update the 'filename' and 'filepath' attributes for each measurement in this series
         by searching for CSV files in the specified path and extracting their names and paths.
 
-        Args:
-            csv_path (str): The path to search for CSV files.
+        :param csv_path: The path to search for CSV files.
+        :param auto_commit:
 
         Returns:
             None
         """
         csv_path = validate_and_get_path(csv_path)
         if csv_path is None:
-            return None
+            return False
 
         if self.filepath_tms is None:
             logger.warning(f"No filepath_tms in series {self.series_id}")
-            return None
+            return False
 
         filepath_tms = validate_and_get_path(self.filepath_tms)
         if filepath_tms is None:
-            return None
+            return False
 
         search_path = csv_path.joinpath(filepath_tms)
         if not search_path.exists():
             logger.error(f"Search path does not exist: {search_path}")
-            return None
+            return False
 
         logger.info(f"Searching for TMS files in path: {search_path}")
 
         files = validate_and_get_file_list(search_path)
         if files is None:
-            return None
+            return False
 
         sensor_id_list = extract_sensor_id(files)
         if sensor_id_list is None:
-            return None
+            return False
 
         for measurement in self.measurement:
             if measurement.sensor_id in sensor_id_list:
@@ -116,9 +115,12 @@ class Series(BaseClass):
                     measurement.filepath = str(corresponding_file)
                 else:
                     logger.error(f"The file {corresponding_file} does not exist or is not a CSV file.")
-                    return None
+                    return False
 
         logger.info("The 'filename' and 'filepath' attributes have been successfully updated.")
+        if auto_commit:
+            db_manager.auto_commit(self.__class__.__name__, "add_filenames")
+        return True
 
     # @dec_runtime
     # def get_data_by_version(self, version: str):

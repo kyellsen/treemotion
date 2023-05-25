@@ -9,8 +9,11 @@ filename_db_1 = r"TREEMOTION_BOSAU.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
 db_manager.connect(db_filename=filename_db_1)
-project_1 = Project.load_from_db()[0]
-project_1.add_filenames(csv_path, auto_commit=True)
+series_1 = Series.load_from_db(series_id=1)[0]
+series_1 = series_1.load_from_csv(overwrite=True)
+version_list = Version.load_from_db(version_id=list(range(5)), get_tms_df=True)
+# measurement_1.load_from_csv(overwrite=True)
+
 
 # series_1 = Measurement.load_from_db(measurement_id=list(range(5)))[0]
 # series_1.load_from_csv()
@@ -46,4 +49,4 @@ project_1.add_filenames(csv_path, auto_commit=True)
 
 # messreihe_1_short_3600 = messreihe_1.get_data_by_version(version="short_3600")
 # ergebnis = messreihe_1.limit_time_by_peaks(version="short_3600", duration=3600, dec_auto_commit=True)
-db_manager.disconnect()
+# db_manager.disconnect()

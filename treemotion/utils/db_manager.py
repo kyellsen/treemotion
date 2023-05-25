@@ -1,10 +1,10 @@
 # treemotion/utils/db_manager.py
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from pathlib import Path
 from shutil import copy
-
+from typing import Optional
 from utils.log import get_logger
 from utils.base import Base
 
@@ -53,7 +53,7 @@ class DatabaseManager:
         try:
             self.engine = create_engine(DATABASE_URI, connect_args={'timeout': 30})
             Base.metadata.create_all(self.engine)  # Create all tables defined in your Base ORM object
-            self.session_factory = sessionmaker(bind=self.engine)
+            self.session_factory = sessionmaker(bind=self.engine, autocommit=False)
             self.current_session = self.session_factory()
             logger.info(f"Successfully connected to the database at {db_path.__str__()}.")
         except Exception as e:
@@ -97,20 +97,45 @@ class DatabaseManager:
         else:
             return session
 
-    def commit(self, session=None):
+    def commit(self, session: Optional[Session] = None) -> bool:
         """
         Commits all changes in the specified session to the database.
 
         Args:
-            session (Session): The session in which the changes were made.
+            session (Session, optional): The session in which the changes were made.
+                                        If None, a new session is created. Defaults to None.
+
+        Returns:
+            bool: True if commit was successful, False otherwise.
         """
         session = self.get_session(session)
         try:
             session.commit()
-            logger.debug("Successfully committed changes to the database.")
+            #logger.debug("Successfully committed changes to the database.")
+            return True
         except Exception as e:
-            logger.error("Error while committing to the database: ", e)
-            raise e
+            session.rollback()
+            logger.error(f"Error while committing to the database: {e}")
+            return False
+
+    def auto_commit(self, class_name: Optional[str] = None, method_name: Optional[str] = None) -> bool:
+        """
+        Automatically commits changes and logs the result.
+
+        Args:
+            class_name (str, optional): Name of the class in which the method was called. Defaults to None.
+            method_name (str, optional): Name of the method in which changes were made. Defaults to None.
+
+        Returns:
+            bool: True if commit was successful, False otherwise.
+        """
+        result = self.commit(self.get_session())
+        if result:
+            pass
+            #logger.debug(f"Auto commit successful for method '{method_name}' in class '{class_name}'.")
+        else:
+            logger.error(f"Auto commit failed for method '{method_name}' in class '{class_name}'.")
+        return result
 
     def open_session(self):
         """
@@ -200,7 +225,10 @@ class DatabaseManager:
                 session.commit()
                 logger.info("Changes committed successfully to the database.")
             except Exception as e:
+                session.rollback()
                 logger.error("Error while committing to the database: ", e)
                 raise e
         else:
             logger.warning("Changes were not committed to the database and discarded.")
+
+

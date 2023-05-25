@@ -61,7 +61,7 @@ class Project(BaseClass):
 
     @dec_runtime
     def load_data_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,
-                           auto_commit: bool = False) -> Optional[List]:
+                           auto_commit: bool = True) -> Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
 
@@ -84,8 +84,7 @@ class Project(BaseClass):
         return results
 
     @dec_runtime
-    @dec_auto_commit
-    def add_filenames(self, csv_path: str):
+    def add_filenames(self, csv_path: str, auto_commit: bool = False):
         """
         Add filenames to all associated series.
 
@@ -93,7 +92,10 @@ class Project(BaseClass):
             csv_path (str): The path to the CSV files.
             auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
         """
-        self.for_all('series', 'add_filenames', csv_path=csv_path)
+        result = self.for_all('series', 'add_filenames', csv_path=csv_path)
+        if auto_commit:
+            db_manager.auto_commit(self.__class__.__name__, "add_filenames")
+        return result
 
     # def get_data_by_version(self, version: str) -> Optional[List]:
     #     """
