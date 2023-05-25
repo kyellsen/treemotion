@@ -60,8 +60,8 @@ class Project(BaseClass):
         return objs
 
     @dec_runtime
-    def load_data_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,
-                           auto_commit: bool = True) -> Optional[List]:
+    def load_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,
+                      auto_commit: bool = True) -> Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
 

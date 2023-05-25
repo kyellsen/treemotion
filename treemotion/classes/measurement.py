@@ -124,24 +124,18 @@ class Measurement(BaseClass):
     # Hilfsmethode für load_from_csv
     def create_update_version_from_csv(self, version_name: str, present_data_obj: Optional[Version] = None,
                                        auto_commit: bool = True) -> Optional[Version]:
-
         """
         Create or update a data object from a CSV file.
 
-
         :param version_name: The version of the data.
         :param present_data_obj: An existing Version instance to update.
-        :param auto_commit:
-        :return: The created or updated Version instance.
+        :param auto_commit: Determines whether to save the data to the database immediately.
+        :return: The created or updated Version instance, or None if an error occurs.
         """
-        if present_data_obj:
-            version_id = present_data_obj.version_id
-            obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name, auto_commit)
-            self.version.remove(present_data_obj)
+        version_id = present_data_obj.version_id if present_data_obj else None
 
-        else:
-            obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id=None, version_name=version_name,
-                                        auto_commit=auto_commit)
+        obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name, auto_commit)
+
         if obj is None:
             logger.error(f"Failed to create Version instance from csv file: {self.filepath}.")
             return None
@@ -151,7 +145,7 @@ class Measurement(BaseClass):
         return obj
 
     # Hilfsmethode für load_from_csv
-    def find_data_by_table_name(self, tms_table_name: str):
+    def find_data_by_table_name(self, tms_table_name: str) -> Optional[Version]:
         """
         Find a version object based on its tms table name.
 
@@ -165,7 +159,7 @@ class Measurement(BaseClass):
             return None
 
         if len(matching_versions) > 1:
-            logger.critical(
+            logger.warning(
                 f"Multiple Version instances found with table_name {tms_table_name}. Returning only the first instance.")
 
         logger.debug(f"Version instance found with table_name {tms_table_name}.")
