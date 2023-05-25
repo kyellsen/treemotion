@@ -407,9 +407,9 @@ class WindMeasurement(BaseClass):
 
             if auto_commit:
                 session.commit()
-                logger.info("Loading data from csv and committing to database successful (auto_commit=True)!")
+                logger.info("Loading data from csv and committing to database successful (dec_auto_commit=True)!")
             else:
-                logger.info("Loading data from csv successful (auto_commit=False)!")
+                logger.info("Loading data from csv successful (dec_auto_commit=False)!")
 
             return wind_measurement
         except Exception as e:

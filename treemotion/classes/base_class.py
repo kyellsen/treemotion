@@ -101,7 +101,7 @@ class BaseClass(Base):
         return results
 
     @classmethod
-    @timing_decorator
+    @dec_runtime
     def load_from_db(cls, filter_by: Optional[Dict] = None, ids: Optional[List[int]] = None) -> List:
         """
         Load objects of the class from the database.
@@ -124,6 +124,8 @@ class BaseClass(Base):
             query = query.filter(primary_key.in_(ids))
 
         objs = query.all()
+        if not objs:
+            logger.warning(f"No {cls.__name__} found.")
 
         logger.info(f"{len(objs)} {cls.__name__} objects were successfully loaded.")
         return objs
@@ -201,14 +203,10 @@ class BaseClass(Base):
 
         return new_obj
 
-    @auto_commit
+    @dec_auto_commit
     def remove(self) -> bool:
         """
         Remove the instance from the database.
-
-        Args:
-            auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-            session (Session, optional): The database session to use.
 
         Returns:
             bool: True if the instance was successfully removed, False otherwise.

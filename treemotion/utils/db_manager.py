@@ -51,7 +51,7 @@ class DatabaseManager:
             logger.info(f"Database at {db_path.__str__()} does not exist and will be created.")
 
         try:
-            self.engine = create_engine(DATABASE_URI)
+            self.engine = create_engine(DATABASE_URI, connect_args={'timeout': 30})
             Base.metadata.create_all(self.engine)  # Create all tables defined in your Base ORM object
             self.session_factory = sessionmaker(bind=self.engine)
             self.current_session = self.session_factory()

@@ -46,14 +46,14 @@ class Configuration:
         # Messung
 
         # Data
-        self.df_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
+        self.tms_df_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
                            'Absolute-Inclination', 'Inclination direction of the tree',
                            'Temperature', 'East-West-Inclination - drift compensated',
                            'North-South-Inclination - drift compensated',
                            'Absolute-Inclination - drift compensated',
                            'Inclination direction of the tree - drift compensated']
-        self.df_time_column_name = 'Time'
-        self.default_load_data_from_csv_version_name = "raw"
+        self.tms_df_time_column_name = 'Time'
+        self.default_load_from_csv_version_name = "raw"
         self.default_copy_data_by_version_name = "copy"
 
         # WindMessreihe

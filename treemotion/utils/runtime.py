@@ -6,7 +6,7 @@ from utils.log import get_logger
 ENABLE_TIMING = True
 
 
-def timing_decorator(func):
+def dec_runtime(func):
     if not ENABLE_TIMING:
         return func
 
