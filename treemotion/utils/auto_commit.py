@@ -1,26 +1,24 @@
 from functools import wraps
 from typing import Callable, Any
-from sqlalchemy.orm import Session
 from treemotion import db_manager
 from .log import get_logger
 
 logger = get_logger(__name__)
 
 
-
 def dec_auto_commit(method: Callable[..., Any]) -> Callable[..., Any]:
     """
-    A decorator that adds automatic commit functionality to a method.
+    A decorator that wraps a method with optional auto_commit functionality.
 
     Args:
-        method (Callable[..., Any]): The method to decorate.
+        method (Callable[..., Any]): The function to decorate.
 
     Returns:
-        Callable[..., Any]: The decorated method with auto-commit functionality.
-
+        Callable[..., Any]: The decorated function.
     """
+
     @wraps(method)
-    def wrapper(*args, **kwargs) -> Any:
+    def wrapper(self, *args, **kwargs) -> Any:
         """
         Wrapper function that adds auto-commit functionality.
 
@@ -29,31 +27,29 @@ def dec_auto_commit(method: Callable[..., Any]) -> Callable[..., Any]:
             **kwargs: Arbitrary keyword arguments.
 
         Keyword Args:
-            auto_commit (bool, optional): If True, automatically commits the database session. Defaults to False.
-            session (Session, optional): The database session to commit. If not provided, it's retrieved from the manager.
+            auto_commit (Optional[bool], optional): If True, automatically commits the database session. Defaults to False.
 
         Returns:
             Any: The result of the decorated method.
-
         """
-        auto_commit = kwargs.get('auto_commit', False)
-        session = kwargs.get('session') or db_manager.get_session()
-
-        try:
-            result = method(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"An error occurred during method execution: {e}")
-            raise
+        auto_commit = kwargs.pop('auto_commit', False)
+        result = method(self, *args, **kwargs)
 
         if auto_commit:
+            session = None
             try:
-                session.commit()
-                logger.info(f"{method.__name__} committed successfully.")
+                if isinstance(result, tuple):
+                    result, session = result
+                else:
+                    session = db_manager.get_session()
+
+                if auto_commit:
+                    db_manager.commit(session)
+                    logger.debug(f"Auto commit successful for method {method.__name__}")
+                return result
+
             except Exception as e:
-                logger.error(f"Auto commit failed: {e}")
-                session.rollback()
+                db_manager.rollback(session)
+                logger.error(f"Auto commit failed for method {method.__name__}: {e}")
                 raise
-
-        return result
-
     return wrapper

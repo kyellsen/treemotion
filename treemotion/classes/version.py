@@ -110,14 +110,14 @@ class Version(BaseClass):
         return self._tms_df
 
     @dec_auto_commit
-    def set_tms_df(self, tms_df: pd.DataFrame, update_metadata: bool = False, auto_commit: bool = False) -> bool:
+    def set_tms_df(self, tms_df: pd.DataFrame, update_metadata: bool = False) -> bool:
         """
         Sets the TMS data to the given DataFrame and updates the database.
 
         Args:
             tms_df (pd.DataFrame): The DataFrame to set as the TMS data.
             update_metadata (bool, optional): If True, metadata is updated. Defaults to False.
-            auto_commit (bool, optional): If True, automatically commits the database session. Defaults to False.
+            auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
 
         Returns:
             bool: True if the operation was successful, False otherwise.
@@ -148,12 +148,12 @@ class Version(BaseClass):
         return True
 
     @dec_auto_commit
-    def del_tms_df(self, auto_commit: bool = False) -> bool:
+    def del_tms_df(self) -> bool:
         """
         Deletes the TMS data from the database.
 
         Args:
-            auto_commit (bool, optional): If True, automatically commits the database session. Defaults to False.
+            auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
 
         Returns:
             bool: True if the operation was successful, False otherwise.
@@ -168,7 +168,6 @@ class Version(BaseClass):
         except Exception as e:
             self._handle_db_exception('deleted', e)
             return False
-
         return True
 
     def _handle_db_exception(self, operation: str, error: Exception) -> None:

@@ -9,9 +9,11 @@ filename_db_1 = r"TREEMOTION_BOSAU.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
 db_manager.connect(db_filename=filename_db_1)
+project_1 = Project.load_from_db()[0]
+project_1.add_filenames(csv_path, auto_commit=True)
 
-series_1 = Measurement.load_from_db(measurement_id=list(range(5)))[0]
-series_1.load_from_csv()
+# series_1 = Measurement.load_from_db(measurement_id=list(range(5)))[0]
+# series_1.load_from_csv()
 
 # WindMeasurement.load_from_dwd_online(name="Dornick", station_id=6163, dec_auto_commit=True, overwrite=False)
 # session = db_manager.get_session()

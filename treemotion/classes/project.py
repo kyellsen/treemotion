@@ -91,6 +91,7 @@ class Project(BaseClass):
 
         Args:
             csv_path (str): The path to the CSV files.
+            auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
         """
         self.for_all('series', 'add_filenames', csv_path=csv_path)
 
