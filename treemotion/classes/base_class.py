@@ -46,7 +46,8 @@ class BaseClass(Base):
             if callable(method):
                 try:
                     result = method(*args, **kwargs)
-                    results.append(result)
+                    if result is not None:
+                        results.append(result)
                 except Exception as e:
                     logger.error(
                         f"Error occurred while executing the method {method_name} on {self.__class__.__name__}: {e}")
@@ -102,23 +103,28 @@ class BaseClass(Base):
 
     @classmethod
     @dec_runtime
-    def load_from_db(cls, ids: Optional[List[int]] = None, filter_by: Optional[Dict] = None,
-                     get_tms_df: bool = False) -> List:
+    def load_from_db(cls, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
+                     get_tms_df: bool = False) -> Union[List, None]:
         """
         Load instances of the class from the database, filtered by the provided criteria.
 
         Args:
-            ids (Optional[List[int]]): A list of object ids to load.
+            ids (Optional[Union[int, List[int]]]): An id or list of object ids to load.
             filter_by (Optional[Dict]): A dictionary of filtering criteria.
             get_tms_df (bool): If set to True, calls get_tms_df() on Version instances related to the loaded objects.
 
         Returns:
-            List: A list of loaded objects. If no objects are found, returns an empty list.
+            List or instance of the class: A list of loaded objects or a single object if a single id is provided.
+            If no objects are found, returns an empty list or None.
         """
+        logger.info(f"Start loading instance(s) of {cls.__name__} from the database.")
         session = db_manager.get_session()
         query = session.query(cls)
 
         if ids is not None:
+            # if single id is provided, convert it to list
+            if isinstance(ids, int):
+                ids = [ids]
             # Assuming each class has a single primary key.
             primary_key = list(class_mapper(cls).primary_key)[0]
             query = query.filter(primary_key.in_(ids))
@@ -128,18 +134,21 @@ class BaseClass(Base):
         objs = query.all()
         if not objs:
             logger.warning(f"No instances of {cls.__name__} found with provided criteria.")
-            return []
+            return None if isinstance(ids, int) else []
+
+        num_objs = len(objs)
+        logger.info(f"{num_objs} instance(s) of {cls.__name__} successfully loaded from the database.")
 
         if get_tms_df:
+            logger.info(f"Starting Version.get_tms_df for {num_objs} instance(s) of {cls.__name__}.")
             for obj in objs:
                 if cls.__name__ == 'Version':
                     obj.get_tms_df()
                 else:
                     obj.run_all(class_name='Version', method_name='get_tms_df')
+            logger.info(f"Version.get_tms_df for {num_objs} instance(s) of {cls.__name__} successful.")
 
-        num_objs = len(objs)
-        logger.info(f"{num_objs} instance(s) of {cls.__name__} successfully loaded from the database.")
-        return objs
+        return objs[0] if isinstance(ids, int) else objs
 
     def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':
         """
