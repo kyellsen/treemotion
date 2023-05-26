@@ -29,7 +29,7 @@ from .classes.measurement import Measurement
 from .classes.version import Version
 from .classes.wind_measurement import WindMeasurement
 
-from .tms.validation_manager import ValidationManager
+#from .tms.validation_manager import ValidationManager
 
 
 logger.info(f"TreeMotion Package importiert!")

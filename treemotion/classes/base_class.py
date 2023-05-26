@@ -102,32 +102,43 @@ class BaseClass(Base):
 
     @classmethod
     @dec_runtime
-    def load_from_db(cls, filter_by: Optional[Dict] = None, ids: Optional[List[int]] = None) -> List:
+    def load_from_db(cls, ids: Optional[List[int]] = None, filter_by: Optional[Dict] = None,
+                     get_tms_df: bool = False) -> List:
         """
-        Load objects of the class from the database.
+        Load instances of the class from the database, filtered by the provided criteria.
 
         Args:
-            filter_by (dict, optional): A dictionary of filtering criteria.
-            ids (list of ints, optional): A list of ids.
+            ids (Optional[List[int]]): A list of object ids to load.
+            filter_by (Optional[Dict]): A dictionary of filtering criteria.
+            get_tms_df (bool): If set to True, calls get_tms_df() on Version instances related to the loaded objects.
 
         Returns:
-            List: A list of loaded objects.
+            List: A list of loaded objects. If no objects are found, returns an empty list.
         """
         session = db_manager.get_session()
         query = session.query(cls)
 
-        if filter_by is not None:
-            query = query.filter_by(**filter_by)
         if ids is not None:
             # Assuming each class has a single primary key.
             primary_key = list(class_mapper(cls).primary_key)[0]
             query = query.filter(primary_key.in_(ids))
+        if filter_by is not None:
+            query = query.filter_by(**filter_by)
 
         objs = query.all()
         if not objs:
-            logger.warning(f"No {cls.__name__} found.")
+            logger.warning(f"No instances of {cls.__name__} found with provided criteria.")
+            return []
 
-        logger.info(f"{len(objs)} {cls.__name__} objects were successfully loaded.")
+        if get_tms_df:
+            for obj in objs:
+                if cls.__name__ == 'Version':
+                    obj.get_tms_df()
+                else:
+                    obj.run_all(class_name='Version', method_name='get_tms_df')
+
+        num_objs = len(objs)
+        logger.info(f"{num_objs} instance(s) of {cls.__name__} successfully loaded from the database.")
         return objs
 
     def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':

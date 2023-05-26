@@ -81,14 +81,14 @@ class Measurement(BaseClass):
         """
         return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filename})"
 
-    @classmethod
-    @dec_runtime
-    def load_from_db(cls, measurement_id: Optional[Union[int, List[int]]] = None) -> List['Measurement']:
-        if isinstance(measurement_id, list):
-            objs = super().load_from_db(ids=measurement_id)
-        else:
-            objs = super().load_from_db(filter_by={'measurement_id': measurement_id} if measurement_id else None)
-        return objs
+    # @classmethod
+    # @dec_runtime
+    # def load_from_db(cls, measurement_id: Optional[Union[int, List[int]]] = None) -> List['Measurement']:
+    #     if isinstance(measurement_id, list):
+    #         objs = super().load_from_db(ids=measurement_id)
+    #     else:
+    #         objs = super().load_from_db(filter_by={'measurement_id': measurement_id} if measurement_id else None)
+    #     return objs
 
     @dec_runtime
     def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name,

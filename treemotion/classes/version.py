@@ -98,7 +98,7 @@ class Version(BaseClass):
 
         :return: The loaded TMS data.
         """
-        logger.debug(f"tms_df.getter aktiviert!")
+        logger.debug(f"{self.__class__.__name__}.get_tms_df running!")
         if not hasattr(self, '_tms_df') or self._tms_df is None:
             session = db_manager.get_session()
             try:
@@ -123,7 +123,7 @@ class Version(BaseClass):
             bool: True if the operation was successful, False otherwise.
 
         """
-        logger.debug("set_tms_df activated!")
+        logger.debug(f"{self.__class__.__name__}.set_tms_df running!")
         try:
             validate_df(tms_df, columns=config.tms_df_columns)
         except Exception as e:
@@ -165,6 +165,7 @@ class Version(BaseClass):
             bool: True if the operation was successful, False otherwise.
 
         """
+        logger.debug(f"{self.__class__.__name__}.del_tms_df running!")
         session = db_manager.get_session()
 
         try:
@@ -198,33 +199,33 @@ class Version(BaseClass):
         """
         return f"auto_tms_df_{version_name}_{str(id_measurement).zfill(3)}_measurement"
 
-    @classmethod
-    @dec_runtime
-    def load_from_db(cls, version_id: Optional[Union[int, List[int]]] = None, version_name=None,
-                     get_tms_df: bool = True) -> List['Version']:
-        """
-        Loads Version objects from the database based on the provided filters.
-
-        :param version_id: The id of the version to load.
-        :param version_name: The name of the version to load.
-        :param get_tms_df
-        :return: A list of Version objects matching the provided filters.
-        """
-        filter_by = {}
-        if version_id:
-            filter_by['version_id'] = version_id
-        if version_name:
-            filter_by['name'] = version_name
-
-        if isinstance(version_id, list):
-            objs = super().load_from_db(ids=version_id)
-        else:
-            objs = super().load_from_db(filter_by=filter_by or None)
-
-        if get_tms_df:
-            objs = [obj.get_tms_df() for obj in objs]
-
-        return objs
+    # @classmethod
+    # @dec_runtime
+    # def load_from_db(cls, version_id: Optional[Union[int, List[int]]] = None, version_name=None,
+    #                  get_tms_df: bool = True) -> List['Version']:
+    #     """
+    #     Loads Version objects from the database based on the provided filters.
+    #
+    #     :param version_id: The id of the version to load.
+    #     :param version_name: The name of the version to load.
+    #     :param get_tms_df
+    #     :return: A list of Version objects matching the provided filters.
+    #     """
+    #     filter_by = {}
+    #     if version_id:
+    #         filter_by['version_id'] = version_id
+    #     if version_name:
+    #         filter_by['name'] = version_name
+    #
+    #     if isinstance(version_id, list):
+    #         objs = super().load_from_db(ids=version_id)
+    #     else:
+    #         objs = super().load_from_db(filter_by=filter_by or None)
+    #
+    #     if get_tms_df:
+    #         objs = [obj.get_tms_df() for obj in objs]
+    #
+    #     return objs
 
     @classmethod
     def load_from_csv(cls, filepath: str, measurement_id: int, version_id: int = None,

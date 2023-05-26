@@ -50,14 +50,12 @@ class Project(BaseClass):
         """
         return f"Project(id={self.project_id}, name={self.name}"
 
-    @classmethod
-    @dec_runtime
-    def load_from_db(cls, project_id: Optional[Union[int, List[int]]] = None) -> List['Project']:
-        if isinstance(project_id, list):
-            objs = super().load_from_db(ids=project_id)
-        else:
-            objs = super().load_from_db(filter_by={'project_id': project_id} if project_id else None)
-        return objs
+    # @classmethod
+    # @dec_runtime
+    # def load_from_db(cls, project_id: Optional[Union[int, List[int]]] = None,
+    #                  get_tms_df: bool = False) -> List['Project']:
+    #     filter_by = {'project_id': project_id} if project_id else None
+    #     return super().load_from_db(filter_by=filter_by, get_tms_df=get_tms_df)
 
     @dec_runtime
     def load_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,

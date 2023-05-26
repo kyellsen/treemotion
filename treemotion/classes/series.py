@@ -45,14 +45,14 @@ class Series(BaseClass):
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id}"
 
-    @classmethod
-    @dec_runtime
-    def load_from_db(cls, series_id: Optional[Union[int, List[int]]] = None) -> List['Series']:
-        if isinstance(series_id, list):
-            objs = super().load_from_db(ids=series_id)
-        else:
-            objs = super().load_from_db(filter_by={'series_id': series_id} if series_id else None)
-        return objs
+    # @classmethod
+    # @dec_runtime
+    # def load_from_db(cls, series_id: Optional[Union[int, List[int]]] = None) -> List['Series']:
+    #     if isinstance(series_id, list):
+    #         objs = super().load_from_db(ids=series_id)
+    #     else:
+    #         objs = super().load_from_db(filter_by={'series_id': series_id} if series_id else None)
+    #     return objs
 
     @dec_runtime
     def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
