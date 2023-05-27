@@ -19,25 +19,26 @@ class Series(BaseClass):
     location = Column(String)
     annotation = Column(String)
     filepath_tms = Column(String)
+
     project = relationship("Project", back_populates="series", lazy="joined", order_by="Project.project_id")
     measurement = relationship('Measurement', back_populates="series", lazy="joined",
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
     wind_measurement = relationship('WindMeasurement', lazy="joined")
 
-    def __init__(self, *args, series_id=None, project_id=None, description=None, datetime_start=None, datetime_end=None, location=None,
-                 annotation=None, filepath_tms=None, wind_measurement_id=None, **kwargs):
+    def __init__(self, *args, series_id=None, project_id=None, wind_measurement_id=None, description=None,
+                 datetime_start=None, datetime_end=None, location=None, annotation=None, filepath_tms=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         # in SQLite Database
         self.series_id = series_id
         self.project_id = project_id
+        self.wind_measurement_id = wind_measurement_id
         self.description = description
         self.datetime_start = datetime_start
         self.datetime_end = datetime_end
         self.location = location
         self.annotation = annotation
         self.filepath_tms = filepath_tms
-        self.wind_measurement_id = wind_measurement_id
 
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id})"
@@ -45,7 +46,7 @@ class Series(BaseClass):
     @dec_runtime
     def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
                       auto_commit=True):
-        logger.info(f"Starting process to load all CSV files for {self.__str__()}")
+        logger.info(f"Starting process to load_from_db all CSV files for {self.__str__()}")
         try:
             results = self.method_for_all_in_list('load_from_csv', version, overwrite, auto_commit)
         except Exception as e:
@@ -110,87 +111,6 @@ class Series(BaseClass):
             db_manager.commit()
         return True
 
-
-    #
-    # @dec_runtime
-    # def load_data_by_version(self, version: str, session=None):
-    #     """
-    #     Load the data frames for the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #         session (Session, optional): The database session to use.
-    #
-    #     Returns:
-    #         List: A list of data frames loaded for the measurements.
-    #     """
-    #     logger.info(f"Starting process to load data frames in {self.__str__()} with version: {version}")
-    #     try:
-    #         results = self.method_for_all_in_list('measurements', 'load_data_by_version', version, session)
-    #     except Exception as e:
-    #         logger.error(f"Error loading data frames for {self.__str__()}, Error: {e}")
-    #         return None
-    #     logger.info(
-    #         f"Process of loading data frames for {len(results)} measurements from {self.__str__()} successfully completed.")
-    #     return results
-    #
-    # @dec_runtime
-    # def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
-    #                          version_source=config.default_load_from_csv_version_name, auto_commit=False,
-    #                          session=None):
-    #     """
-    #     Copy the data objects for the specified version.
-    #
-    #     Args:
-    #         version_new (str, optional): The new version to assign to the copied data objects.
-    #         version_source (str, optional): The version of the source data to copy.
-    #         auto_commit (bool, optional): Whether to automatically commit the copied data objects to the database.
-    #         session (Session, optional): The database session to use.
-    #
-    #     Returns:
-    #         List: A list of copied data objects.
-    #     """
-    #     logger.info(f"Starting process to copy all data objects in {self.__str__()} with version: {version_source}")
-    #     try:
-    #         results = self.method_for_all_in_list('measurements', 'copy_data_by_version', version_new, version_source, auto_commit,
-    #                                session)
-    #     except Exception as e:
-    #         logger.error(f"Error copying all data objects for {self.__str__()}, Error: {e}")
-    #         return None
-    #     logger.info(
-    #         f"Process of copying all data objects for {len(results)} measurements from {self.__str__()} successfully completed.")
-    #     return results
-    #
-    # @dec_runtime
-    # def commit_data_by_version(self, version, session=None):
-    #     logger.info(f"Starte Prozess zum Commiten aller Data-Objekte in {self.__str__()} mit Version: {session}")
-    #     try:
-    #         results = self.method_for_all_in_list('messungen', 'commit_data_by_version', version, session)
-    #     except Exception as e:
-    #         logger.error(f"Fehler beim Commiten aller Data-Objekte für {self.__str__()}, Error: {e}")
-    #         return False
-    #     # Zählt die Anzahl der erfolgreichen Ergebnisse (die nicht False sind)
-    #     successful = sum(1 for result in results if result is not False)
-    #     logger.info(
-    #         f"Prozess zum Commiten von Data-Objekten für {successful}/{len(results)} für Messungen aus {self.__str__()} erfolgreich.")
-    #     return results
-    #
-    # @dec_runtime
-    # def limit_time_data_by_version(self, version, start_time: str, end_time: str, auto_commit: bool = False,
-    #                                session=None):
-    #     logger.info(
-    #         f"Starte Prozess zur Zeiteinschränkung aller Data-Objekte in {self.__str__()} mit Version: {version}")
-    #     try:
-    #         results = self.method_for_all_in_list('messungen', 'limit_time_data_by_version', version, start_time, end_time,
-    #                                auto_commit, session)
-    #     except Exception as e:
-    #         logger.error(f"Fehler bei Zeiteinschränkung aller Data-Objekte für {self.__str__()}, Error: {e}")
-    #         return None
-    #     # Zählt die Anzahl der erfolgreichen Ergebnisse (die nicht False sind)
-    #     successful = sum(1 for result in results if result is not False)
-    #     logger.info(
-    #         f"Prozess zur Zeiteinschränkung von Data-Objekten für {successful}/{len(results)} für Messungen aus {self.__str__()} erfolgreich.")
-    #     return results
     #
     # def limit_time_by_version_and_peaks(self, version, duration: int, show_peaks: bool = False,
     #                                     values_col: str = 'Absolute-Inclination - drift compensated',

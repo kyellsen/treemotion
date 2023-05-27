@@ -55,14 +55,14 @@ class Project(BaseClass):
         Load data from CSV files for all series associated with the project.
 
         Args:
-            version (str, optional): The version of the data to load.
+            version (str, optional): The version of the data to load_from_db.
             overwrite (bool, optional): Whether to overwrite existing data.
             auto_commit (bool, optional): Whether to automatically commit the changes to the database.
 
         Returns:
             Optional[List]: A list of results from loading the data.
         """
-        logger.info(f"Starting process to load all CSV files for {self.__str__()}")
+        logger.info(f"Starting process to load_from_db all CSV files for {self.__str__()}")
         try:
             results = self.method_for_all_in_list('load_from_csv', version, overwrite, auto_commit)
         except Exception as e:
@@ -85,117 +85,3 @@ class Project(BaseClass):
         if auto_commit:
             db_manager.commit()
         return result
-
-    # def get_data_by_version(self, version: str) -> Optional[List]:
-    #     """
-    #     Get data instances for all associated series with the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #
-    #     Returns:
-    #         Optional[List]: A list of data instances.
-    #     """
-    #     try:
-    #         results = self.method_for_all_in_list('series', 'get_data_by_version', version)
-    #     except Exception as e:
-    #         logger.error(f"Error searching for data instances with version '{version}' from {self.__str__()}, Error: {e}")
-    #         return None
-    #     return results
-    #
-    # @dec_runtime
-    # def load_data_by_version(self, version: str) -> Optional[List]:
-    #     """
-    #     Load data frames for all associated series with the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #
-    #     Returns:
-    #         Optional[List]: A list of loaded data frames.
-    #     """
-    #     logger.info(f"Starting process to load data frames in {self.__str__()} with version: {version}")
-    #     try:
-    #         results = self.method_for_all_in_list('series', 'load_data_by_version', version)
-    #     except Exception as e:
-    #         logger.error(f"Error loading data frames for {self.__str__()}, Error: {e}")
-    #         return None
-    #     logger.info(f"Process of loading data frames for {len(results)} series from {self.__str__()} successfully completed.")
-    #     return results
-    #
-    # @dec_runtime
-    # def copy_data_by_version(self, version_new: str = config.default_copy_data_by_version_name,
-    #                          version_source: str = config.default_load_from_csv_version_name,
-    #                          auto_commit: bool = False, session=None) -> Optional[List]:
-    #     """
-    #     Copy data objects for all associated series from the source version to the new version.
-    #
-    #     Args:
-    #         version_new (str, optional): The new version to copy the data to.
-    #         version_source (str, optional): The source version to copy the data from.
-    #         auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-    #         session (Session, optional): The database session to use.
-    #
-    #     Returns:
-    #         Optional[List]: A list of results from copying the data.
-    #     """
-    #     logger.info(f"Starting process to copy all data objects in {self.__str__()} with version: {version_source}")
-    #     try:
-    #         results = self.method_for_all_in_list('series', 'copy_data_by_version', version_new, version_source, auto_commit,
-    #                                session)
-    #     except Exception as e:
-    #         logger.error(f"Error copying all data objects for {self.__str__()}, Error: {e}")
-    #         return None
-    #     logger.info(f"Process of copying all data objects for {len(results)} series from {self.__str__()} successfully completed.")
-    #     return results
-    #
-    # @dec_runtime
-    # def commit_data_by_version(self, version: str, session=None) -> Union[List[bool], bool]:
-    #     """
-    #     Commit data objects for all associated series with the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #         session (Session, optional): The database session to use.
-    #
-    #     Returns:
-    #         Union[List[bool], bool]: A list of results indicating whether each data object was successfully committed.
-    #     """
-    #     logger.info(f"Starting process to commit all data objects in {self.__str__()} with version: {session}")
-    #     try:
-    #         results = self.method_for_all_in_list('series', 'commit_data_by_version', version, session)
-    #     except Exception as e:
-    #         logger.error(f"Error committing all data objects for {self.__str__()}, Error: {e}")
-    #         return False
-    #     # Count the number of successful results (those that are not False)
-    #     successful = sum(1 for result in results if result is not False)
-    #     logger.info(f"Process of committing data objects for {successful}/{len(results)} series from {self.__str__()} successful.")
-    #     return results
-    #
-    # @dec_runtime
-    # def limit_time_data_by_version(self, version: str, start_time: str, end_time: str, auto_commit: bool = False,
-    #                                session=None) -> Optional[List]:
-    #     """
-    #     Limit the time range of data objects for all associated series with the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #         start_time (str): The start time of the time range.
-    #         end_time (str): The end time of the time range.
-    #         auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-    #         session (Session, optional): The database session to use.
-    #
-    #     Returns:
-    #         Optional[List]: A list of results from limiting the time range of the data objects.
-    #     """
-    #     logger.info(f"Starting process to limit time range of data objects in {self.__str__()} with version: {version}")
-    #     try:
-    #         results = self.method_for_all_in_list('series', 'limit_time_data_by_version', version, start_time, end_time,
-    #                                auto_commit, session)
-    #     except Exception as e:
-    #         logger.error(f"Error limiting time range of data objects for {self.__str__()}, Error: {e}")
-    #         return None
-    #     # Count the number of successful results (those that are not False)
-    #     successful = sum(1 for result in results if result is not False)
-    #     logger.info(f"Process of limiting time range of data objects for {successful}/{len(results)} series from {self.__str__()} successful.")
-    #     return results

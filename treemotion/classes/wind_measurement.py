@@ -161,7 +161,7 @@ class WindMeasurement(BaseClass):
         Loads wind measurement data from online DWD (Deutscher Wetterdienst) resources.
 
         :param name: Name of the WindMeasurement.
-        :param station_id: Identifier for the station to load data from.
+        :param station_id: Identifier for the station to load_from_db data from.
         :param folder_path: The folder path to store downloaded files.
         :param link_wind: Link to online resource for average wind data.
         :param link_wind_extreme: Link to online resource for extreme wind data.

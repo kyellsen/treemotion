@@ -61,7 +61,6 @@ class Measurement(BaseClass):
         # in SQLite Database
         self.measurement_id = measurement_id
         self.series_id = series_id
-        self.tree_id = self.tree_treatment.tree_id
         self.tree_treatment_id = tree_treatment_id
         self.sensor_id = sensor_id
         self.measurement_status_id = measurement_status_id
@@ -97,7 +96,7 @@ class Measurement(BaseClass):
 
         logger.info(f"Start loading TMS-CSV data for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        present_version = self.get_version_by(filter_dict={'tms_table_name': tms_table_name})
+        present_version = self.get_version_by_filter(filter_dict={'tms_table_name': tms_table_name})
 
         if present_version is None or overwrite:
             if present_version is not None and overwrite:
@@ -137,8 +136,7 @@ class Measurement(BaseClass):
         logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
         return obj
 
-    # Hilfsmethode für load_from_csv
-    def get_version_by(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
+    def get_version_by_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
         """
         Find a version object based on the provided filters.
 
@@ -168,13 +166,7 @@ class Measurement(BaseClass):
             logger.error(f"An error occurred while querying the Version: {str(e)}")
             return None
 
-    # def load_data_by_version(self, version):
-    #     obj = self.get_data_by_version(version)
-    #     if obj is None:
-    #         return None
-    #     result = obj.load_df()
-    #     return result
-    #
+
     # @dec_runtime
     # def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
     #                          version_source=config.default_load_from_csv_version_name, auto_commit=False):
@@ -226,25 +218,3 @@ class Measurement(BaseClass):
     #     logger.info(f"Successful creation of '{version_new.__str__()}' (auto_commit = '{auto_commit}').")
     #
     #     return new_obj
-    #
-    # def commit_data_by_version(self, version, session=None):
-    #     obj = self.get_data_by_version(version)
-    #     if obj is None:
-    #         logger.warning(f"Commit for {self.__str__()} aborted.")
-    #         return False
-    #     # Load the data for this Version instance if it hasn't been loaded yet.
-    #     obj.load_df_if_missing(session=session)
-    #     result = obj.commit()
-    #     return result
-    #
-    # def limit_time_data_by_version(self, version, start_time: str, end_time: str, auto_commit: bool = False,
-    #                                session=None):
-    #     obj = self.get_data_by_version(version)
-    #     if obj is None:
-    #         logger.warning(f"Process for time limiting {self.__str__()} aborted.")
-    #         return None
-    #     # Load the data for this Version instance if it hasn't been loaded yet.
-    #     obj.load_df_if_missing(session=session)
-    #
-    #     result = obj.limit_by_time(start_time, end_time, auto_commit, session)
-    #     return result
