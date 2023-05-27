@@ -89,7 +89,7 @@ class Version(BaseClass):
         except Exception as e:
             raise e
 
-    @property
+
     @dec_runtime
     def get_tms_df(self) -> Optional[pd.DataFrame]:
         """
