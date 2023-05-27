@@ -11,7 +11,7 @@ class SeriesVersion(Series):
         self.series_version_id = series_version_id
         self.version_name = version_name
 
-        self.series = Series.load_from_db(ids=self.series_id)
+        self.series = Series.load(ids=self.series_id)
 
         self.version_objs = self.series.get_by_version(version_name=self.version_name)
 

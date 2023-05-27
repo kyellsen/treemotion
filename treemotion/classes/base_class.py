@@ -12,14 +12,14 @@ class BaseClass(Base):
     """
     __abstract__ = True  # mark class as abstract
 
-    def __init__(self, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
-                 get_tms_df: bool = False, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.load_from_db(ids, filter_by, get_tms_df)
+
 
     @dec_runtime
-    def load_from_db(self, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
-                     get_tms_df: bool = False):
+    @classmethod
+    def load(cls, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
+             get_tms_df: bool = False):
         """
         Load instances of the class from the database, filtered by the provided criteria.
 

@@ -158,7 +158,7 @@ class Version(BaseClass):
 
     # @classmethod
     # @dec_runtime
-    # def load_from_db(cls, version_id: Optional[Union[int, List[int]]] = None, version_name=None,
+    # def load(cls, version_id: Optional[Union[int, List[int]]] = None, version_name=None,
     #                  get_tms_df: bool = True) -> List['Version']:
     #     """
     #     Loads Version objects from the database based on the provided filters.
@@ -175,9 +175,9 @@ class Version(BaseClass):
     #         filter_by['name'] = version_name
     #
     #     if isinstance(version_id, list):
-    #         objs = super().load_from_db(ids=version_id)
+    #         objs = super().load(ids=version_id)
     #     else:
-    #         objs = super().load_from_db(filter_by=filter_by or None)
+    #         objs = super().load(filter_by=filter_by or None)
     #
     #     if get_tms_df:
     #         objs = [obj.get_tms_df() for obj in objs]
