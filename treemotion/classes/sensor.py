@@ -1,32 +1,18 @@
-from utilities.imports_classes import *
+from common_imports.classes_heavy import *
 
-logger = get_logger(__name__)
+from .sensor_type import SensorType
+from .sensor_status import SensorStatus
 
 
 class Sensor(BaseClass):
+    """
+    This class represents a sensor in the system.
+    """
     __tablename__ = 'Sensor'
-    id_sensor = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    id_sensor_typ = Column(Integer, ForeignKey('SensorTyp.id_sensor_typ', onupdate='CASCADE'))
-    id_sensor_status = Column(Integer, ForeignKey('SensorStatus.id_sensor_status', onupdate='CASCADE'))
-    anmerkung = Column(String)
+    sensor_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
+    sensor_type_id = Column(Integer, ForeignKey('SensorType.sensor_type_id', onupdate='CASCADE'))
+    sensor_status_id = Column(Integer, ForeignKey('SensorStatus.sensor_status_id', onupdate='CASCADE'))
+    description = Column(String)
 
-    sensor_typ = relationship('SensorTyp', lazy="joined")
-    sensor_status = relationship('SensorStatus', lazy="joined")
-
-
-class SensorStatus(BaseClass):
-    __tablename__ = 'SensorStatus'
-    id_sensor_status = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    sensor_status = Column(String)
-
-
-class SensorTyp(BaseClass):
-    __tablename__ = 'SensorTyp'
-    id_sensor_typ = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    sensor_typ = Column(String)
-
-
-class SensorOrt(BaseClass):
-    __tablename__ = 'SensorOrt'
-    id_sensor_ort = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
-    sensor_ort = Column(String)
+    sensor_type = relationship(SensorType, backref="sensor", lazy="joined")
+    sensor_status = relationship(SensorStatus, backref="sensor", lazy="joined")
