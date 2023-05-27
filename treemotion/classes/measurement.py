@@ -97,7 +97,7 @@ class Measurement(BaseClass):
 
         logger.info(f"Start loading TMS-CSV data for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        present_version = self.get_by_table_name(tms_table_name)
+        present_version = self.get_version_by(filter_dict={'tms_table_name': tms_table_name})
 
         if present_version is None or overwrite:
             if present_version is not None and overwrite:
@@ -138,41 +138,35 @@ class Measurement(BaseClass):
         return obj
 
     # Hilfsmethode für load_from_csv
-    def get_by_table_name(self, tms_table_name: str) -> Optional[Version]:
+    def get_version_by(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
         """
-        Find a version object based on its tms table name.
+        Find a version object based on the provided filters.
 
-        :param tms_table_name: The name of the table being searched.
-        :return: The found version instance, or None if no match is found.
+        :param filter_dict: A dictionary of attributes and their desired values.
+                            For example: {'tms_table_name': tms_table_name}
+        :return: The found Version instance, or None if no match is found.
         """
-        matching_versions = [version for version in self.version if version.tms_table_name == tms_table_name]
 
-        if not matching_versions:
-            logger.debug(f"No Version instance found with tms table_name '{tms_table_name}'.")
+        if not isinstance(filter_dict, dict):
+            logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
             return None
+        session = db_manager.get_session()
+        try:
+            matching_version = (session.query(Version)
+                                .filter(Version.measurement == self)
+                                .filter_by(**filter_dict)
+                                .first())
 
-        if len(matching_versions) > 1:
-            logger.warning(
-                f"Multiple Version instances found with table_name {tms_table_name}. Returning only the first instance.")
+            if matching_version is None:
+                logger.warning(f"No Version instance found with the given filters: {filter_dict}.")
+                return None
 
-        logger.debug(f"Version instance found with table_name {tms_table_name}.")
-        return matching_versions[0]
+            logger.info(f"Version instance found with the given filters: {filter_dict}.")
+            return matching_version
 
-    def get_by_version_name(self, version_name):
-        """
-        This method finds an instance in self.version that has the given version_name.
-        It logs a critical error and returns None if more than one instance is found.
-        It logs an error and returns None if no instance is found.
-        """
-        matching_versions = [version for version in self.version if version.version == version_name]
-        if len(matching_versions) > 1:
-            logger.critical(
-                f"Multiple Version instances with version '{version_name}' for '{self.__str__()}' not available. Returning first one.")
-        if len(matching_versions) == 0:
-            logger.warning(f"No Version instances with version '{version_name}' found for '{self.__str__()}'.")
+        except Exception as e:
+            logger.error(f"An error occurred while querying the Version: {str(e)}")
             return None
-        logger.debug(f"Version instance {matching_versions[0].__str__()} returned.")
-        return matching_versions[0]
 
     # def load_data_by_version(self, version):
     #     obj = self.get_data_by_version(version)

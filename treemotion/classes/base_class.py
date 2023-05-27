@@ -12,117 +12,14 @@ class BaseClass(Base):
     """
     __abstract__ = True  # mark class as abstract
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Initialize the BaseClass instance.
-
-        Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-        """
+    def __init__(self, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
+                 get_tms_df: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.load_from_db(ids, filter_by, get_tms_df)
 
-    def get_children(self) -> Optional[List[Any]]:
-        """
-        Get the child instances of the current class.
-
-        Returns:
-            List[Any]: A list of child instances if the attribute name is found, otherwise None.
-        """
-        mapping = {
-            "Project": "series",
-            "Series": "measurement",
-            "Measurement": "version",
-        }
-
-        attr_name = mapping.get(self.__class__.__name__)
-        return getattr(self, attr_name, None) if attr_name else None
-
-    def method_for_all_in_list(self, method_name: Optional[str] = None, *args: Any, **kwargs: Any) -> List[Any]:
-        """
-        Call a method on all objects in a list and return the results.
-
-        Args:
-            method_name (str, optional): The name of the method to be called.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            List[Any]: A list containing the return values of the method calls.
-        """
-        children = self.get_children()
-        if not children:
-            logger.error("No child instances found.")
-            return []
-
-        method_name = method_name or '__str__'
-        results: List[Any] = []
-
-        for obj in children:
-            method = getattr(obj, method_name, None)
-            if callable(method):
-                try:
-                    result = method(*args, **kwargs)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(
-                        f"Error occurred while executing the method {method_name} on {obj.__class__.__name__}: {e}"
-                    )
-            else:
-                logger.error(f"The method {method_name} does not exist in the class {obj.__class__.__name__}.")
-                return []
-
-        return results
-
-    def method_for_all_of_class(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
-                                **kwargs: Any) -> List[Any]:
-        """
-        Execute a method on all instances of a specified class and return the results.
-
-        Args:
-            class_name (str, optional): The name of the class on which the method should be called. Defaults to the class of self.
-            method_name (str, optional): The name of the method to be called. Defaults to '__str__' method of the class.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            List[Any]: A list containing the return values of the method calls.
-        """
-        class_name = class_name or self.__class__.__name__
-        method_name = method_name or '__str__'
-        results: List[Any] = []
-
-        if self.__class__.__name__ == class_name:
-            method = getattr(self, method_name, None)
-            if callable(method):
-                try:
-                    result = method(*args, **kwargs)
-                    if result is not None:
-                        results.append(result)
-                except Exception as e:
-                    logger.error(
-                        f"Error occurred while executing the method {method_name} on {self.__class__.__name__}: {e}"
-                    )
-            else:
-                logger.error(f"The method {method_name} does not exist in the class {self.__class__.__name__}.")
-        else:
-            children = self.get_children()
-            if children is not None:
-                for child in children:
-                    try:
-                        result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
-                        if result is not None:
-                            results.extend(result)
-                    except Exception as e:
-                        logger.error(
-                            f"Error occurred while executing the method {method_name} on {child.__class__.__name__}: {e}"
-                        )
-        return results
-
-    @classmethod
     @dec_runtime
-    def load_from_db(cls, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
-                     get_tms_df: bool = False) -> Union[None, Any, List[Any]]:
+    def load_from_db(self, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
+                     get_tms_df: bool = False):
         """
         Load instances of the class from the database, filtered by the provided criteria.
 
@@ -147,7 +44,7 @@ class BaseClass(Base):
         logger.info(f"'{num_objs}' instance(s) of '{cls.__name__}' successfully loaded from the database.")
 
         if get_tms_df:
-            cls._apply_tms_df(objs)
+            cls._apply_get_tms_df(objs)
 
         return objs[0] if isinstance(ids, int) else objs
 
@@ -179,7 +76,7 @@ class BaseClass(Base):
         return query
 
     @classmethod
-    def _apply_tms_df(cls, objs: List[Any]) -> int:
+    def _apply_get_tms_df(cls, objs: List[Any]) -> int:
         """
         Applies get_tms_df method on the loaded objects, sets the result to obj._tms_df
         and counts the number of successful operations.
@@ -206,9 +103,141 @@ class BaseClass(Base):
                     if result is not None:
                         obj._tms_df = result
                         count_get_tms_df_success += 1
-        logger.info(f"Version.get_tms_df successfully applied on '{count_get_tms_df_success}/{count_version_objs}' instance(s) in '{cls.__name__}'.")
+        logger.info(
+            f"Version.get_tms_df successfully applied on '{count_get_tms_df_success}/{count_version_objs}' instance(s) in '{cls.__name__}'.")
 
         return count_get_tms_df_success
+
+    def get_children(self) -> Optional[List[Any]]:
+        """
+        Get the child instances of the current class.
+
+        Returns:
+            List[Any]: A list of child instances if the attribute name is found, otherwise None.
+        """
+        mapping = {
+            "Project": "series",
+            "Series": "measurement",
+            "Measurement": "version",
+        }
+
+        attr_name = mapping.get(self.__class__.__name__)
+        return getattr(self, attr_name, None) if attr_name else None
+
+    def method_for_all_in_list(self, method_name: Optional[str], *args: Any, **kwargs: Any) -> List[Any]:
+        """
+        Call a method on all objects in a list and return the results.
+
+        Args:
+            method_name (str): The name of the method to be called.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            List[Any]: A list containing the return values of the method calls.
+        """
+
+        children = self.get_children()
+        if not children:
+            logger.error("No child instances found.")
+            return []
+        logger.info(f"Applying '{method_name}' to '{len(children)}' of class '{children[0].__class__.__name__}'!")
+        results: List[Any] = []
+
+        for obj in children:
+            method = getattr(obj, method_name, None)
+            if callable(method):
+                try:
+                    result = method(*args, **kwargs)
+                    results.append(result)
+                except Exception as e:
+                    logger.error(
+                        f"Error occurred while executing the method '{method_name}' on '{obj.__class__.__name__}': {e}"
+                    )
+            else:
+                logger.error(f"The method '{method_name}' does not exist in the class '{obj.__class__.__name__}'.")
+                return []
+
+        return results
+
+    def method_for_all_of_class(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
+                                **kwargs: Any) -> List[Any]:
+        """
+        Execute a method on all instances of a specified class and return the results.
+
+        Args:
+            class_name (str, optional): The name of the class on which the method should be called. Defaults to the class of self.
+            method_name (str, optional): The name of the method to be called. Defaults to '__str__' method of the class.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            List[Any]: A list containing the return values of the method calls.
+        """
+        class_name = class_name or self.__class__.__name__
+        method_name = method_name or '__str__'
+        results: List[Any] = []
+
+        if self.__class__.__name__ == class_name:
+            method = getattr(self, method_name, None)
+            if callable(method):
+                try:
+                    result = method(*args, **kwargs)
+                    results.append(result)
+                except Exception as e:
+                    logger.error(
+                        f"Error occurred while executing the method '{method_name}' on '{self.__class__.__name__}': {e}"
+                    )
+            else:
+                logger.error(f"The method '{method_name}' does not exist in the class '{self.__class__.__name__}'.")
+        else:
+            children = self.get_children()
+            if children is not None:
+                for child in children:
+                    try:
+                        result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
+                        results.extend(result)
+                    except Exception as e:
+                        logger.error(
+                            f"Error occurred while executing the method '{method_name}' on '{child.__class__.__name__}': {e}"
+                        )
+        return results
+
+    @dec_runtime
+    def get_version_by(self, filter_dict: Dict[str, Any]) -> Optional[List[Any]]:
+        """
+        Executes 'get_version_by' method in all 'Measurement' class children with given filter.
+
+        :param filter_dict: Dictionary with filter keys and values
+        :return: List with version_objs of method execution on all 'Measurement' class children,
+                 or None if an error occurred.
+        """
+        logger.info(f"Start 'get_version_by' with filter '{filter_dict}' for instance of '{self}'")
+        try:
+            version_objs = self.method_for_all_of_class(class_name="Measurement", method_name='get_version_by',
+                                                        filter_dict=filter_dict)
+            logger.info(f"Finished 'get_version_by' for instance of '{self}'")
+            return version_objs
+        except Exception as e:
+            logger.error(f"Error in '{self.__class__.__name__}'.get_version_by from '{self}', Error: {e}")
+            return None
+
+    @dec_runtime
+    def get_by_version(self, version_name: str = config.default_load_from_csv_version_name) -> \
+            Optional[List[Any]]:
+        """
+        Executes 'get_version_by' method with 'version_name' filter in all 'Measurement' class children.
+
+        :param version_name: Version name to use as filter
+        :return: List with version_objs of method execution on all 'Measurement' class children,
+                 or None if an error occurred.
+        """
+        logger.info(f"Start 'get_by_version' for '{self}'")
+        version_objs = self.get_version_by({"version_name": version_name})
+
+        logger.info(f"Finished 'get_by_version' for '{self}'")
+
+        return version_objs
 
     def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':
         """

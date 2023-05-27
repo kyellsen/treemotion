@@ -26,8 +26,7 @@ class Version(BaseClass):
     peak_time = Column(DateTime)
     peak_value = Column(Float)
 
-    measurement = relationship("Measurement", back_populates="version", lazy="joined",
-                               order_by="Version.version_id")
+    measurement = relationship("Measurement", back_populates="version", lazy="joined")
 
     def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None,
                  tms_table_name: str = None, **kwargs):

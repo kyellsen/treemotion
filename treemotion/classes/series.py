@@ -24,12 +24,13 @@ class Series(BaseClass):
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
     wind_measurement = relationship('WindMeasurement', lazy="joined")
 
-    def __init__(self, *args, series_id=None, description=None, datetime_start=None, datetime_end=None, location=None,
+    def __init__(self, *args, series_id=None, project_id=None, description=None, datetime_start=None, datetime_end=None, location=None,
                  annotation=None, filepath_tms=None, wind_measurement_id=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         # in SQLite Database
         self.series_id = series_id
+        self.project_id = project_id
         self.description = description
         self.datetime_start = datetime_start
         self.datetime_end = datetime_end
@@ -39,7 +40,7 @@ class Series(BaseClass):
         self.wind_measurement_id = wind_measurement_id
 
     def __str__(self):
-        return f"Series(series_id={self.series_id}, series_id={self.series_id}"
+        return f"Series(series_id={self.series_id}, series_id={self.series_id})"
 
     @dec_runtime
     def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
@@ -109,24 +110,7 @@ class Series(BaseClass):
             db_manager.commit()
         return True
 
-    # @dec_runtime
-    # def get_data_by_version(self, version: str):
-    #     """
-    #     Get the data instances for the specified version.
-    #
-    #     Args:
-    #         version (str): The version of the data.
-    #
-    #     Returns:
-    #         List: A list of data instances matching the specified version.
-    #     """
-    #     try:
-    #         results = self.method_for_all_in_list('measurements', 'get_data_by_version', version)
-    #     except Exception as e:
-    #         logger.error(
-    #             f"Error searching for data instances with version '{version}' from {self.__str__()}, Error: {e}")
-    #         return None
-    #     return results
+
     #
     # @dec_runtime
     # def load_data_by_version(self, version: str, session=None):
