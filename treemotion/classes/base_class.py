@@ -12,7 +12,7 @@ class BaseClass(Base):
     """
     __abstract__ = True  # mark class as abstract
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Initialize the BaseClass instance.
 
@@ -20,42 +20,42 @@ class BaseClass(Base):
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
         """
+        super().__init__(*args, **kwargs)
 
-        for attr, value in kwargs.items():
-            setattr(self, attr, value)
+    def get_children(self) -> Optional[List[Any]]:
+        """
+        Get the child instances of the current class.
 
-    def get_children(self):
-        # dictionary mapping the parent class to the name of the child attribute
+        Returns:
+            List[Any]: A list of child instances if the attribute name is found, otherwise None.
+        """
         mapping = {
             "Project": "series",
             "Series": "measurement",
             "Measurement": "version",
         }
 
-        # get the attribute name for the current class
         attr_name = mapping.get(self.__class__.__name__)
-
-        # return the child instances if the attribute name is found, otherwise return None
         return getattr(self, attr_name, None) if attr_name else None
 
-    def method_for_all_in_list(self, list_name: Optional[str] = None, method_name: Optional[str] = None, *args,
-                               **kwargs):
+    def method_for_all_in_list(self, list_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
+                               **kwargs: Any) -> List[Any]:
         """
         Call a method on all objects in a list and return the results.
 
         Args:
-            list_name (str): The name of the list attribute. If not specified, it will be determined automatically.
-            method_name (str): The name of the method to be called.
+            list_name (str, optional): The name of the list attribute. If not specified, it will be determined automatically.
+            method_name (str, optional): The name of the method to be called.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
 
         Returns:
-            List: A list containing the return values of the method calls.
+            List[Any]: A list containing the return values of the method calls.
         """
         list_name = list_name or self.get_children()
         if not list_name:
             logger.error("No list attribute found.")
-            return None
+            return []
 
         method_name = method_name or '__str__'
         results: List[Any] = []
@@ -63,23 +63,29 @@ class BaseClass(Base):
         for obj in getattr(self, list_name):
             method = getattr(obj, method_name, None)
             if callable(method):
-                result = method(*args, **kwargs)
-                results.append(result)
+                try:
+                    result = method(*args, **kwargs)
+                    results.append(result)
+                except Exception as e:
+                    logger.error(
+                        f"Error occurred while executing the method {method_name} on {obj.__class__.__name__}: {e}"
+                    )
             else:
                 logger.error(f"The method {method_name} does not exist in the class {obj.__class__.__name__}.")
-                return None
+                return []
 
         return results
 
     def method_for_all_of_class(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
-                                **kwargs: Any) -> \
-            List[Any]:
+                                **kwargs: Any) -> List[Any]:
         """
         Execute a method on all instances of a specified class and return the results.
 
         Args:
             class_name (str, optional): The name of the class on which the method should be called. Defaults to the class of self.
             method_name (str, optional): The name of the method to be called. Defaults to '__str__' method of the class.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
 
         Returns:
             List[Any]: A list containing the return values of the method calls.
@@ -97,20 +103,22 @@ class BaseClass(Base):
                         results.append(result)
                 except Exception as e:
                     logger.error(
-                        f"Error occurred while executing the method {method_name} on {self.__class__.__name__}: {e}")
+                        f"Error occurred while executing the method {method_name} on {self.__class__.__name__}: {e}"
+                    )
             else:
                 logger.error(f"The method {method_name} does not exist in the class {self.__class__.__name__}.")
         else:
             children = self.get_children()
-            for child in children:
-                try:
-                    result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
-                    if result is not None:
-                        results.extend(result)
-                except Exception as e:
-                    logger.error(
-                        f"Error occurred while executing the method {method_name} on {child.__class__.__name__}: {e}")
-
+            if children is not None:
+                for child in children:
+                    try:
+                        result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
+                        if result is not None:
+                            results.extend(result)
+                    except Exception as e:
+                        logger.error(
+                            f"Error occurred while executing the method {method_name} on {child.__class__.__name__}: {e}"
+                        )
         return results
 
     @classmethod
