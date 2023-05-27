@@ -97,7 +97,7 @@ class Measurement(BaseClass):
 
         logger.info(f"Start loading TMS-CSV data for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        present_version = self.find_version_by_table_name(tms_table_name)
+        present_version = self.get_by_table_name(tms_table_name)
 
         if present_version is None or overwrite:
             if present_version is not None and overwrite:
@@ -138,7 +138,7 @@ class Measurement(BaseClass):
         return obj
 
     # Hilfsmethode für load_from_csv
-    def find_version_by_table_name(self, tms_table_name: str) -> Optional[Version]:
+    def get_by_table_name(self, tms_table_name: str) -> Optional[Version]:
         """
         Find a version object based on its tms table name.
 
@@ -158,23 +158,21 @@ class Measurement(BaseClass):
         logger.debug(f"Version instance found with table_name {tms_table_name}.")
         return matching_versions[0]
 
-
-
-    # def get_data_by_version(self, version):
-    #     """
-    #     This method finds an instance in self.data that has the given version.
-    #     It logs a critical error and returns None if more than one instance is found.
-    #     It logs an error and returns None if no instance is found.
-    #     """
-    #     matching_versions = [data for data in self.version if data.version == version]
-    #     if len(matching_versions) > 1:
-    #         logger.critical(
-    #             f"Multiple Version instances with version '{version}' for '{self.__str__()}' not available. Returning first one.")
-    #     if len(matching_versions) == 0:
-    #         logger.warning(f"No Version instances with version '{version}' found for '{self.__str__()}'.")
-    #         return None
-    #     logger.debug(f"Version instance {matching_versions[0].__str__()} returned.")
-    #     return matching_versions[0]
+    def get_by_version_name(self, version_name):
+        """
+        This method finds an instance in self.version that has the given version_name.
+        It logs a critical error and returns None if more than one instance is found.
+        It logs an error and returns None if no instance is found.
+        """
+        matching_versions = [version for version in self.version if version.version == version_name]
+        if len(matching_versions) > 1:
+            logger.critical(
+                f"Multiple Version instances with version '{version_name}' for '{self.__str__()}' not available. Returning first one.")
+        if len(matching_versions) == 0:
+            logger.warning(f"No Version instances with version '{version_name}' found for '{self.__str__()}'.")
+            return None
+        logger.debug(f"Version instance {matching_versions[0].__str__()} returned.")
+        return matching_versions[0]
 
     # def load_data_by_version(self, version):
     #     obj = self.get_data_by_version(version)

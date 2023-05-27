@@ -38,13 +38,11 @@ class BaseClass(Base):
         attr_name = mapping.get(self.__class__.__name__)
         return getattr(self, attr_name, None) if attr_name else None
 
-    def method_for_all_in_list(self, list_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
-                               **kwargs: Any) -> List[Any]:
+    def method_for_all_in_list(self, method_name: Optional[str] = None, *args: Any, **kwargs: Any) -> List[Any]:
         """
         Call a method on all objects in a list and return the results.
 
         Args:
-            list_name (str, optional): The name of the list attribute. If not specified, it will be determined automatically.
             method_name (str, optional): The name of the method to be called.
             *args: Variable length argument list.
             **kwargs: Arbitrary keyword arguments.
@@ -52,15 +50,15 @@ class BaseClass(Base):
         Returns:
             List[Any]: A list containing the return values of the method calls.
         """
-        list_name = list_name or self.get_children()
-        if not list_name:
-            logger.error("No list attribute found.")
+        children = self.get_children()
+        if not children:
+            logger.error("No child instances found.")
             return []
 
         method_name = method_name or '__str__'
         results: List[Any] = []
 
-        for obj in getattr(self, list_name):
+        for obj in children:
             method = getattr(obj, method_name, None)
             if callable(method):
                 try:
@@ -149,10 +147,7 @@ class BaseClass(Base):
         logger.info(f"'{num_objs}' instance(s) of '{cls.__name__}' successfully loaded from the database.")
 
         if get_tms_df:
-            logger.info(f"Start Version.get_tms_df for '{num_objs}' instance(s) of '{cls.__name__}'.")
-            num_objs_get_tms_df = cls._apply_tms_df(objs)
-            logger.info(
-                f"Version.get_tms_df successfully applied on '{num_objs_get_tms_df}'/'{num_objs}' instance(s) of '{cls.__name__}'.")
+            cls._apply_tms_df(objs)
 
         return objs[0] if isinstance(ids, int) else objs
 
@@ -195,19 +190,25 @@ class BaseClass(Base):
         Returns:
             int: The number of successful get_tms_df operations.
         """
-        count_get_tms_df = 0
+        count_version_objs = 0
+        count_get_tms_df_success = 0
+        logger.info(f"Start Version.get_tms_df.")
         for obj in objs:
             if cls.__name__ == 'Version':
                 tms_df = obj.get_tms_df()
+                count_version_objs += 1
                 if tms_df is not None:  # check if the return value is not None
                     obj.set_tms_df(tms_df, update_metadata=True)
-                    count_get_tms_df += 1
+                    count_get_tms_df_success += 1
             else:
                 for result in obj.method_for_all_of_class(class_name='Version', method_name='get_tms_df'):
+                    count_version_objs += 1
                     if result is not None:
                         obj._tms_df = result
-                        count_get_tms_df += 1
-        return count_get_tms_df
+                        count_get_tms_df_success += 1
+        logger.info(f"Version.get_tms_df successfully applied on '{count_get_tms_df_success}/{count_version_objs}' instance(s) in '{cls.__name__}'.")
+
+        return count_get_tms_df_success
 
     def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':
         """

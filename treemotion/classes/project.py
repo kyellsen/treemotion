@@ -64,7 +64,7 @@ class Project(BaseClass):
         """
         logger.info(f"Starting process to load all CSV files for {self.__str__()}")
         try:
-            results = self.method_for_all_in_list('series', 'load_from_csv', version, overwrite, auto_commit)
+            results = self.method_for_all_in_list('load_from_csv', version, overwrite, auto_commit)
         except Exception as e:
             logger.error(f"Error loading all CSV files for {self.__str__()}, Error: {e}")
             return None
@@ -73,7 +73,7 @@ class Project(BaseClass):
         return results
 
     @dec_runtime
-    def add_filenames(self, csv_path: str, auto_commit: bool = False):
+    def add_filenames(self, csv_path: str, auto_commit: bool = True):
         """
         Add filenames to all associated series.
 
@@ -81,7 +81,7 @@ class Project(BaseClass):
             csv_path (str): The path to the CSV files.
             auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
         """
-        result = self.method_for_all_in_list('series', 'add_filenames', csv_path=csv_path)
+        result = self.method_for_all_in_list('add_filenames', csv_path=csv_path)
         if auto_commit:
             db_manager.commit()
         return result
