@@ -1,7 +1,4 @@
-from utils.imports_classes import *
-
-logger = get_logger(__name__)
-
+from common_imports.classes_light import *
 
 class TreeTreatmentVariant(BaseClass):
     __tablename__ = 'TreeTreatmentVariant'

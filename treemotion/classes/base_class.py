@@ -1,7 +1,6 @@
 # treemotionen/classes/base_class.py
 from typing import Any
-
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 from utils.base import Base
 
 logger = get_logger(__name__)
@@ -25,7 +24,55 @@ class BaseClass(Base):
         for attr, value in kwargs.items():
             setattr(self, attr, value)
 
-    def run_all(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any, **kwargs: Any) -> \
+    def get_children(self):
+        # dictionary mapping the parent class to the name of the child attribute
+        mapping = {
+            "Project": "series",
+            "Series": "measurement",
+            "Measurement": "version",
+        }
+
+        # get the attribute name for the current class
+        attr_name = mapping.get(self.__class__.__name__)
+
+        # return the child instances if the attribute name is found, otherwise return None
+        return getattr(self, attr_name, None) if attr_name else None
+
+    def method_for_all_in_list(self, list_name: Optional[str] = None, method_name: Optional[str] = None, *args,
+                               **kwargs):
+        """
+        Call a method on all objects in a list and return the results.
+
+        Args:
+            list_name (str): The name of the list attribute. If not specified, it will be determined automatically.
+            method_name (str): The name of the method to be called.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            List: A list containing the return values of the method calls.
+        """
+        list_name = list_name or self.get_children()
+        if not list_name:
+            logger.error("No list attribute found.")
+            return None
+
+        method_name = method_name or '__str__'
+        results: List[Any] = []
+
+        for obj in getattr(self, list_name):
+            method = getattr(obj, method_name, None)
+            if callable(method):
+                result = method(*args, **kwargs)
+                results.append(result)
+            else:
+                logger.error(f"The method {method_name} does not exist in the class {obj.__class__.__name__}.")
+                return None
+
+        return results
+
+    def method_for_all_of_class(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
+                                **kwargs: Any) -> \
             List[Any]:
         """
         Execute a method on all instances of a specified class and return the results.
@@ -57,7 +104,7 @@ class BaseClass(Base):
             children = self.get_children()
             for child in children:
                 try:
-                    result = child.run_all(class_name, method_name, *args, **kwargs)
+                    result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
                     if result is not None:
                         results.extend(result)
                 except Exception as e:
@@ -66,45 +113,10 @@ class BaseClass(Base):
 
         return results
 
-    def get_children(self):
-        # dictionary mapping the parent class to the name of the child attribute
-        mapping = {
-            "Project": "series",
-            "Series": "measurement",
-            "Measurement": "version",
-        }
-
-        # return the child instances
-        return getattr(self, mapping.get(self.__class__.__name__), [])
-
-    def for_all(self, list_name: str, method_name: str, *args, **kwargs):
-        """
-        Call a method on all objects in a list and return the results.
-
-        Args:
-            list_name (str): The name of the list attribute.
-            method_name (str): The name of the method to be called.
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
-
-        Returns:
-            List: A list containing the return values of the method calls.
-        """
-        results = []
-        for obj in getattr(self, list_name):
-            method = getattr(obj, method_name, None)
-            if callable(method):
-                result = method(*args, **kwargs)
-                results.append(result)  # Append the method return value to the list
-            else:
-                logger.error(f"The method {method_name} does not exist in the class {obj.__class__.__name__}.")
-                return None
-        return results
-
     @classmethod
     @dec_runtime
     def load_from_db(cls, ids: Optional[Union[int, List[int]]] = None, filter_by: Optional[Dict] = None,
-                     get_tms_df: bool = False) -> Union[List, None]:
+                     get_tms_df: bool = False) -> Union[None, Any, List[Any]]:
         """
         Load instances of the class from the database, filtered by the provided criteria.
 
@@ -114,41 +126,80 @@ class BaseClass(Base):
             get_tms_df (bool): If set to True, calls get_tms_df() on Version instances related to the loaded objects.
 
         Returns:
-            List or instance of the class: A list of loaded objects or a single object if a single id is provided.
-            If no objects are found, returns an empty list or None.
+            None, cls, List[cls]: If no objects are found, returns None if a single id is provided, else an empty list.
+                If objects are found, returns a single object if a single id is provided, else a list of objects.
         """
-        logger.info(f"Start loading instance(s) of {cls.__name__} from the database.")
+        logger.info(f"Start loading instance(s) of '{cls.__name__}' from the database.")
         session = db_manager.get_session()
-        query = session.query(cls)
-
-        if ids is not None:
-            # if single id is provided, convert it to list
-            if isinstance(ids, int):
-                ids = [ids]
-            # Assuming each class has a single primary key.
-            primary_key = list(class_mapper(cls).primary_key)[0]
-            query = query.filter(primary_key.in_(ids))
-        if filter_by is not None:
-            query = query.filter_by(**filter_by)
-
+        query = cls._build_query(session, ids, filter_by)
         objs = query.all()
         if not objs:
-            logger.warning(f"No instances of {cls.__name__} found with provided criteria.")
+            logger.warning(f"No instances of '{cls.__name__}' found with provided criteria.")
             return None if isinstance(ids, int) else []
 
         num_objs = len(objs)
-        logger.info(f"{num_objs} instance(s) of {cls.__name__} successfully loaded from the database.")
+        logger.info(f"'{num_objs}' instance(s) of '{cls.__name__}' successfully loaded from the database.")
 
         if get_tms_df:
-            logger.info(f"Starting Version.get_tms_df for {num_objs} instance(s) of {cls.__name__}.")
-            for obj in objs:
-                if cls.__name__ == 'Version':
-                    obj.get_tms_df()
-                else:
-                    obj.run_all(class_name='Version', method_name='get_tms_df')
-            logger.info(f"Version.get_tms_df for {num_objs} instance(s) of {cls.__name__} successful.")
+            logger.info(f"Start Version.get_tms_df for '{num_objs}' instance(s) of '{cls.__name__}'.")
+            num_objs_get_tms_df = cls._apply_tms_df(objs)
+            logger.info(
+                f"Version.get_tms_df successfully applied on '{num_objs_get_tms_df}'/'{num_objs}' instance(s) of '{cls.__name__}'.")
 
         return objs[0] if isinstance(ids, int) else objs
+
+    @classmethod
+    def _build_query(cls, session: Session, ids: Optional[Union[int, List[int]]] = None,
+                     filter_by: Optional[Dict] = None):
+        """
+        Constructs a SQLAlchemy Query object based on provided criteria.
+
+        Args:
+            session (Session): SQLAlchemy Session object.
+            ids (Optional[Union[int, List[int]]]): An id or list of object ids to load.
+            filter_by (Optional[Dict]): A dictionary of filtering criteria.
+
+        Returns:
+            Query: The constructed SQLAlchemy Query object.
+        """
+        query = session.query(cls)
+
+        if ids is not None:
+            if isinstance(ids, int):
+                ids = [ids]
+            primary_key = list(class_mapper(cls).primary_key)[0]
+            query = query.filter(primary_key.in_(ids))
+
+        if filter_by is not None:
+            query = query.filter_by(**filter_by)
+
+        return query
+
+    @classmethod
+    def _apply_tms_df(cls, objs: List[Any]) -> int:
+        """
+        Applies get_tms_df method on the loaded objects, sets the result to obj._tms_df
+        and counts the number of successful operations.
+
+        Args:
+            objs (List[cls]): The list of objects to apply get_tms_df.
+
+        Returns:
+            int: The number of successful get_tms_df operations.
+        """
+        count_get_tms_df = 0
+        for obj in objs:
+            if cls.__name__ == 'Version':
+                tms_df = obj.get_tms_df()
+                if tms_df is not None:  # check if the return value is not None
+                    obj.set_tms_df(tms_df, update_metadata=True)
+                    count_get_tms_df += 1
+            else:
+                for result in obj.method_for_all_of_class(class_name='Version', method_name='get_tms_df'):
+                    if result is not None:
+                        obj._tms_df = result
+                        count_get_tms_df += 1
+        return count_get_tms_df
 
     def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':
         """
@@ -186,7 +237,6 @@ class BaseClass(Base):
                 db_manager.commit(session)
                 logger.info(f"New instance of {self.__class__.__name__} added to session and committed.")
             except Exception as e:
-                session.rollback()
                 logger.error(f"Error committing new instance of {self.__class__.__name__}: {e}")
 
         return new_obj
@@ -223,29 +273,19 @@ class BaseClass(Base):
 
         return new_obj
 
-    def remove(self, auto_commit: bool = False) -> bool:
+    @dec_runtime
+    def delete_from_db(self, auto_commit=False) -> bool:
         """
-        Remove the instance from the database.
-
+        Delete the instance from the database.
         :param auto_commit:
 
         Returns:
-            bool: True if the instance was successfully removed, False otherwise.
+            bool: True if the instance was successfully deleted, False otherwise.
         """
         session = db_manager.get_session()
-        primary_key_attr = self.__mapper__.primary_key[0].name
-        existing_obj = session.get(type(self), getattr(self, primary_key_attr))
-        try:
-            if existing_obj is not None:
-                session.delete(existing_obj)
-                logger.info(f"Object {self.__class__.__name__} was removed.")
-            else:
-                logger.info(f"Object {self.__class__.__name__} does not exist.")
-                return False
+        session.delete(self)
 
-        except Exception as e:
-            logger.error(f"Error removing the object {self.__class__.__name__}: {e}")
-            return False
         if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "remove")
+            db_manager.commit(session)
+        logger.info(f"Object {self.__str__()} was deleted.")
         return True

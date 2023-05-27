@@ -2,7 +2,7 @@
 
 from sqlalchemy import func
 
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 from wind.wind_dwd_download import download_dwd_files
 from utils.path_utils import validate_files_exist
 
@@ -33,7 +33,7 @@ class WindMeasurement(BaseClass):
     length = Column(Integer)  # metadata
 
     wind_data = relationship(WindData, backref='wind_measurement', lazy="joined",
-                             cascade="all, delete, delete-orphan", order_by=WindData.wind_data_id)
+                             cascade="all, delete", order_by=WindData.wind_data_id)
 
     def __init__(self, wind_measurement_id: int = None, name: str = None, source: str = None):
         """
@@ -398,7 +398,7 @@ class WindMeasurement(BaseClass):
             if existing_obj is not None:
                 if overwrite:
                     logger.warning("Existing object will be overwritten (overwrite = True): ")
-                    session.delete(existing_obj)
+                    session.delete_from_db(existing_obj)
                 else:
                     logger.warning("Object already exists, not overwritten (overwrite = False), obj: ")
                     return existing_obj

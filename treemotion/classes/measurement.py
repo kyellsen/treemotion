@@ -1,13 +1,12 @@
 # treemotion/classes/measurement.py
 
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 
 from .version import Version
-from .tree import Tree
-from .tree_treatment import TreeTreatment
 from .sensor import Sensor
-from .sensor_location import SensorLocation
+from .tree_treatment import TreeTreatment
 from .measurement_status import MeasurementStatus
+from .sensor_location import SensorLocation
 
 logger = get_logger(__name__)
 
@@ -36,8 +35,8 @@ class Measurement(BaseClass):
     sensor_location = relationship(SensorLocation, backref="measurement", lazy="joined")
     series = relationship('Series', back_populates='measurement')
 
-    version = relationship(Version, back_populates="measurement", lazy="joined", cascade="all, delete, delete-orphan",
-                           order_by=Version.version_id)
+    version = relationship('Version', back_populates="measurement", lazy="joined", cascade='all, delete-orphan',
+                           order_by='Version.version_id')
 
     def __init__(self, *args, measurement_id: int = None, series_id: int = None,
                  tree_treatment_id: int = None, sensor_id: int = None, measurement_status_id: int = None,
@@ -81,15 +80,6 @@ class Measurement(BaseClass):
         """
         return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filename})"
 
-    # @classmethod
-    # @dec_runtime
-    # def load_from_db(cls, measurement_id: Optional[Union[int, List[int]]] = None) -> List['Measurement']:
-    #     if isinstance(measurement_id, list):
-    #         objs = super().load_from_db(ids=measurement_id)
-    #     else:
-    #         objs = super().load_from_db(filter_by={'measurement_id': measurement_id} if measurement_id else None)
-    #     return objs
-
     @dec_runtime
     def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name,
                       overwrite: bool = False, auto_commit: bool = True) -> Optional[Version]:
@@ -105,34 +95,37 @@ class Measurement(BaseClass):
             logger.warning(f"Process for '{self}' aborted, no filename for tms_utils.csv (filename = None).")
             return None
 
-        logger.info(f"Start loading csv data for '{self}'")
+        logger.info(f"Start loading TMS-CSV data for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        present_data_obj = self.find_data_by_table_name(tms_table_name)
+        present_version = self.find_version_by_table_name(tms_table_name)
 
-        if present_data_obj is None or overwrite:
-            if present_data_obj is not None and overwrite:
-                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_data_obj}")
-            obj = self.create_update_version_from_csv(version_name, present_data_obj, auto_commit)
+        if present_version is None or overwrite:
+            if present_version is not None and overwrite:
+                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_version}")
+            obj = self.create_update_version_from_csv(version_name, present_version, auto_commit)
         else:
-            logger.warning(f"Object already exists, not overwritten (overwrite = False), obj: {present_data_obj}")
+            logger.warning(f"Object already exists, not overwritten (overwrite = False), obj: {present_version}")
             return None
 
         if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "load_from_csv")
+            db_manager.commit()
+        logger.debug(f"Loading TMS-CSV data for '{self}' successful")
         return obj
 
     # Hilfsmethode für load_from_csv
-    def create_update_version_from_csv(self, version_name: str, present_data_obj: Optional[Version] = None,
+    def create_update_version_from_csv(self, version_name: str, present_version: Optional[Version] = None,
                                        auto_commit: bool = True) -> Optional[Version]:
         """
         Create or update a data object from a CSV file.
 
         :param version_name: The version of the data.
-        :param present_data_obj: An existing Version instance to update.
+        :param present_version: An existing Version instance to update.
         :param auto_commit: Determines whether to save the data to the database immediately.
         :return: The created or updated Version instance, or None if an error occurs.
         """
-        version_id = present_data_obj.version_id if present_data_obj else None
+        version_id = present_version.version_id if present_version else None
+        if present_version:
+            present_version.delete_from_db()
 
         obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name, auto_commit)
 
@@ -145,12 +138,12 @@ class Measurement(BaseClass):
         return obj
 
     # Hilfsmethode für load_from_csv
-    def find_data_by_table_name(self, tms_table_name: str) -> Optional[Version]:
+    def find_version_by_table_name(self, tms_table_name: str) -> Optional[Version]:
         """
         Find a version object based on its tms table name.
 
         :param tms_table_name: The name of the table being searched.
-        :return: The found data object, or None if no match is found.
+        :return: The found version instance, or None if no match is found.
         """
         matching_versions = [version for version in self.version if version.tms_table_name == tms_table_name]
 

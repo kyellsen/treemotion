@@ -1,5 +1,5 @@
 # treemotion/classes/wind_data.py
-from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime
+from common_imports.classes_light import *
 
 from classes.base_class import BaseClass
 

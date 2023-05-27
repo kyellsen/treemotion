@@ -1,8 +1,6 @@
 # treemotion/classes/version.py
 from sqlalchemy import text
-from datetime import timedelta
-
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 from utils.path_utils import validate_and_get_filepath
 from utils.dataframe_utils import validate_df
 from tms.time_limits import validate_time_format, limit_df_by_time, optimal_time_frame
@@ -31,7 +29,8 @@ class Version(BaseClass):
     measurement = relationship("Measurement", back_populates="version", lazy="joined",
                                order_by="Version.version_id")
 
-    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None, tms_table_name: str = None, **kwargs):
+    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None,
+                 tms_table_name: str = None, **kwargs):
         """
         Initializes a Data instance.
 
@@ -98,26 +97,24 @@ class Version(BaseClass):
 
         :return: The loaded TMS data.
         """
-        logger.debug(f"{self.__class__.__name__}.get_tms_df running!")
+        logger.debug(f"{self.__class__.__name__}.get_tms_df running for {self.__str__()}!")
         if not hasattr(self, '_tms_df') or self._tms_df is None:
             session = db_manager.get_session()
             try:
                 self._tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
                 logger.info(f"{self.__class__.__name__}.tms_df loaded successfully: {self.__str__()}")
             except Exception as e:
-                self._handle_db_exception('loaded', e)
+                logger.error(f"{self.__class__.__name__}.df could not be loaded: {self.__str__()}, error: {e}")
                 return None
         return self._tms_df
 
-    @dec_runtime
-    def set_tms_df(self, tms_df: pd.DataFrame, update_metadata: bool = True, auto_commit: bool = False) -> bool:
+    def set_tms_df(self, tms_df: pd.DataFrame, update_metadata: bool = True) -> bool:
         """
         Sets the TMS data to the given DataFrame and updates the database.
 
         Args:
             tms_df (pd.DataFrame): The DataFrame to set as the TMS data.
             update_metadata (bool, optional): If True, metadata is updated. Defaults to True.
-            auto_commit:
 
         Returns:
             bool: True if the operation was successful, False otherwise.
@@ -131,62 +128,23 @@ class Version(BaseClass):
             return False
 
         if update_metadata:
-            if not self.update_metadata(tms_df=tms_df):
+            if not self.update_metadata(tms_df):
                 return False
 
         self._tms_df = tms_df
 
-        if auto_commit:
-            self.commit_df(self._tms_df, self.tms_table_name)
-            logger.info(f"{self.__class__.__name__}.tms_df set/edit successfully (auto_commit={auto_commit}): {self.__str__()}")
-        else:
-            logger.info(f"{self.__class__.__name__}.tms_df set/edit successfully (auto_commit=={auto_commit}): {self.__str__()}")
+        logger.debug(f"{self.__class__.__name__}.tms_df set/edit successfully: {self.__str__()}")
         return True
 
     @dec_runtime
-    def commit_df(self, df, table_name):
-        session = db_manager.get_session()
+    def commit_tms_df(self):
         try:
-            df.to_sql(table_name, session.bind, if_exists='replace', index=False)
-            logger.debug(f"'{self.__str__()}' committed as table '{table_name}' to Database!")
+            db_manager.commit_df(df=self._tms_df, table_name=self.tms_table_name)
+            logger.info(f"{self.__class__.__name__}.commit_tms_df committed successfully: {self.__str__()}")
+            return True
         except Exception as e:
-            self._handle_db_exception(f"commit '{table_name}'", e)
+            logger.error(f"{self.__class__.__name__}.commit_tms_df failed: {self.__str__()}, error: {str(e)}")
             return False
-
-
-    def del_tms_df(self, auto_commit: bool = False) -> bool:
-        """
-        Deletes the TMS data from the database.
-
-        Args:
-            auto_commit (bool, optional): If True, automatically commits the database session. Defaults to False.
-
-        Returns:
-            bool: True if the operation was successful, False otherwise.
-
-        """
-        logger.debug(f"{self.__class__.__name__}.del_tms_df running!")
-        session = db_manager.get_session()
-
-        try:
-            session.bind.add(statement=text(f"DROP TABLE IF EXISTS {self.tms_table_name}"))
-            logger.info(f"{self.__class__.__name__}.tms_df deleted successfully: {self.__str__()}")
-        except Exception as e:
-            self._handle_db_exception('deleted', e)
-            return False
-
-        if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "del_tms_df")
-        return True
-
-    def _handle_db_exception(self, operation: str, error: Exception) -> None:
-        """
-        A helper function to handle exceptions related to database operations.
-
-        :param operation: The operation which caused the exception.
-        :param error: The occurred exception.
-        """
-        logger.error(f"{self.__class__.__name__}.df could not be {operation}: {self.__str__()}, error: {error}")
 
     @staticmethod
     def get_tms_table_name(version_name: str, id_measurement: int) -> str:
@@ -245,14 +203,15 @@ class Version(BaseClass):
             logger.warning(f"Filepath Measurement ID '{measurement_id}' is None, process aborted.")
             return None
         tms_table_name = cls.get_tms_table_name(version_name, measurement_id)
-        obj = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name, tms_table_name=tms_table_name)
+        obj = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name,
+                  tms_table_name=tms_table_name)
+
         tms_df = cls.read_csv_tms(filepath)
+        obj.set_tms_df(tms_df, update_metadata=True)
 
         if auto_commit:
-            obj.set_tms_df(tms_df, update_metadata=True, auto_commit=auto_commit)
-            db_manager.auto_commit(cls.__class__.__name__, "load_from_csv")
-        else:
-            obj.set_tms_df(tms_df, update_metadata=True, auto_commit=False)
+            obj.commit_tms_df()
+            db_manager.commit()
         return obj
 
     @staticmethod
@@ -296,29 +255,25 @@ class Version(BaseClass):
 
         return obj
 
-    def remove(self, auto_commit=False) -> bool:
+    # used by version_event_listener.py
+    @dec_runtime
+    def delete_tms_table(self) -> bool:
         """
-        Removes the data object from the database.
+        Deletes the TMS data table from the database.
 
-        :param auto_commit:
-
+        Returns:
+            bool: True if the operation was successful, False otherwise.
         """
-        session = db_manager.get_session()
-        existing_obj = session.query(type(self)).get(getattr(self, 'version_id'))
+        session: Session = db_manager.get_session()
+
         try:
-            if existing_obj is not None:
-                self.del_tms_df()
-                session.delete(existing_obj)
-                logger.info(f"Object {self.__class__.__name__} has been removed.")
-            else:
-                logger.info(f"Object {self.__class__.__name__} does not exist.")
-                return False
+            statement = text(f"DROP TABLE IF EXISTS {self.tms_table_name}")
+            session.execute(statement)
+            logger.info(f"For {self.__str__()} delete_tms_table '{self.tms_table_name}' successful.")
+            return True
         except Exception as e:
-            logger.error(f"Error while removing the object {self.__class__.__name__}: {e}")
+            logger.error(f"For {self.__str__()} delete_tms_table '{self.tms_table_name}' error: {e}")
             return False
-        if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "remove")
-        return True
 
     # @classmethod
     # def create_new_version(cls, source_obj, new_version_name: str):
@@ -380,7 +335,7 @@ class Version(BaseClass):
             # self.peak_index = peak['peak_index']
             # self.peak_time = peak['peak_time']
             # self.peak_value = peak['peak_value']
-            logger.info(f"Metadata updated successfully for {self.__str__()}")
+            logger.debug(f"Metadata updated successfully for {self.__str__()}")
         except (KeyError, ValueError) as e:
             logger.error(f"Failed to update metadata for {self.__str__()}: {e}")
             return False
@@ -456,7 +411,8 @@ class Version(BaseClass):
         logger.debug(f"Successfully limited the data of '{self.__str__()}' between {start_time} and {end_time}.")
 
         if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "limit_by_time")
+            self.commit_tms_df()
+            db_manager.commit()
 
         return True
 
@@ -508,9 +464,8 @@ class Version(BaseClass):
 
         logger.info(
             f"Successfully limited the data of '{self.__str__()}' between {timeframe_dict['start_time']} and {timeframe_dict['end_time']}.")
-
         if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "limit_time_by_peaks")
+            db_manager.commit()
 
         return True
 
@@ -542,7 +497,7 @@ class Version(BaseClass):
             logger.error(f"Error while selecting the random sample: {e}")
             return self
         if auto_commit:
-            db_manager.auto_commit(self.__class__.__name__, "random_sample")
+            db_manager.commit()
         return self
 
     def get_wind_df(self, wind_measurement_id, time_extension_secs=0):
@@ -585,108 +540,111 @@ class Version(BaseClass):
                 f'Error while retrieving wind data for wind measurement with ID {wind_measurement_id}: {str(e)}')
             raise e
 
-    # def sync_wind_df(self, wind_measurement_id, max_time_shift_secs=0, session=None):
-    #
-    #     tms_df = self.tms_df
-    #     wind_df = self.get_wind_df(wind_measurement_id, time_extension_secs=max_time_shift_secs, session=session)
-    #
-    #     if not self._validate_tms_df(wind_in_df=False):
-    #         logger.error(f"")
-    #         return None
-    #     if not validate_df(wind_df, columns=config.wind_df_columns_selected):
-    #         logger.error(f"")
-    #         return None
-    #
-    #     # tms_time_col =
 
-    #
-    # @dec_runtime
-    # def temp_drift_comp(self, method="emd_hht", overwrite=True, sample_rate=20, window_size=1000,
-    #                     freq_range=(0.05, 2, 128), feedback=False):  # 128 is used because ...
-    #     """
-    #     Compensate the temperature drift in the measurements using the specified method.
-    #
-    #     :param method: The method to use for temperature drift compensation.
-    #     :param overwrite: Whether to overwrite the original data or create new columns.
-    #     :param sample_rate: The sample rate of the data (in Hz).
-    #     :param window_size: The window size for the moving average method.
-    #     :param freq_range: The frequency range for the EMD-HHT method.
-    #     :param feedback: Show result and runtime
-    #     """
-    #     temp = self.df['Temperature']
-    #
-    #     methods = {
-    #         "lin_reg": lambda df: tempdrift.temp_drift_comp_lin_reg(df, temp),
-    #         "lin_reg_2": lambda df: tempdrift.temp_drift_comp_lin_reg_2(df, temp),
-    #         "mov_avg": lambda df: tempdrift.temp_drift_comp_mov_avg(df, window_size),
-    #         "emd_hht": lambda df: tempdrift.temp_drift_comp_emd(df, sample_rate, freq_range),
-    #     }
-    #
-    #     if method in methods:
-    #         x = methods[method](self.df['East-West-Inclination'])
-    #         y = methods[method](self.df['North-South-Inclination'])
-    #     else:
-    #         raise ValueError(f"Invalid method for temp_drift_comp: {method}")
-    #
-    #     suffix = "" if overwrite else " - new"
-    #
-    #     self.df[f'East-West-Inclination - drift compensated{suffix}'] = x
-    #     self.df[f'North-South-Inclination - drift compensated{suffix}'] = y
-    #     self.df[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
-    #     self.df[
-    #         f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
-    #         x, y)
-    #     if feedback is True:
-    #         print(
-    #             f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
-    #
-    # def plot_df(self, y_cols):
-    #     """
-    #     Plots the specified columns of df against time.
-    #
-    #     Args:
-    #         y_cols (list of str): The names of the columns to plot on the y-axis.
-    #
-    #     Returns:
-    #         None.
-    #
-    #     Raises:
-    #         KeyError: If any of the specified column names are not in the df.
-    #     """
-    #     fig, ax = plt.subplots()
-    #     x = self.df["Time"]
-    #     for col in y_cols:
-    #         try:
-    #             y = self.df[col]
-    #         except KeyError:
-    #             raise KeyError(f"Column '{col}' not found in df.")
-    #         ax.plot(x, y, label=col)
-    #     ax.set_xlabel("Time")
-    #     ax.legend()
-    #     plt.show()
-    #
-    # def plot_df_sub(self, y_cols):
-    #     """
-    #     Plot multiple time series subplots.
-    #
-    #     Parameters:
-    #     y_cols (list of str): The columns to plot.
-    #
-    #     Returns:
-    #     None
-    #
-    #     Raises:
-    #         KeyError: If any of the specified column names are not in the df.
-    #     """
-    #     num_plots = len(y_cols)
-    #     fig, axs = plt.subplots(num_plots, 1, figsize=(8, num_plots * 4))
-    #     x = self.df["Time"]
-    #     for i, col in enumerate(y_cols):
-    #         try:
-    #             y = self.df[col]
-    #         except KeyError:
-    #             raise KeyError(f"Column '{col}' not found in df.")
-    #         axs[i].plot(x, y, label=col)
-    #         axs[i].set_xlabel("Time")
-    #         axs[i].legend()
-    #     plt.show()
+
+
+# def sync_wind_df(self, wind_measurement_id, max_time_shift_secs=0, session=None):
+#
+#     tms_df = self.tms_df
+#     wind_df = self.get_wind_df(wind_measurement_id, time_extension_secs=max_time_shift_secs, session=session)
+#
+#     if not self._validate_tms_df(wind_in_df=False):
+#         logger.error(f"")
+#         return None
+#     if not validate_df(wind_df, columns=config.wind_df_columns_selected):
+#         logger.error(f"")
+#         return None
+#
+#     # tms_time_col =
+
+#
+# @dec_runtime
+# def temp_drift_comp(self, method="emd_hht", overwrite=True, sample_rate=20, window_size=1000,
+#                     freq_range=(0.05, 2, 128), feedback=False):  # 128 is used because ...
+#     """
+#     Compensate the temperature drift in the measurements using the specified method.
+#
+#     :param method: The method to use for temperature drift compensation.
+#     :param overwrite: Whether to overwrite the original data or create new columns.
+#     :param sample_rate: The sample rate of the data (in Hz).
+#     :param window_size: The window size for the moving average method.
+#     :param freq_range: The frequency range for the EMD-HHT method.
+#     :param feedback: Show result and runtime
+#     """
+#     temp = self.df['Temperature']
+#
+#     methods = {
+#         "lin_reg": lambda df: tempdrift.temp_drift_comp_lin_reg(df, temp),
+#         "lin_reg_2": lambda df: tempdrift.temp_drift_comp_lin_reg_2(df, temp),
+#         "mov_avg": lambda df: tempdrift.temp_drift_comp_mov_avg(df, window_size),
+#         "emd_hht": lambda df: tempdrift.temp_drift_comp_emd(df, sample_rate, freq_range),
+#     }
+#
+#     if method in methods:
+#         x = methods[method](self.df['East-West-Inclination'])
+#         y = methods[method](self.df['North-South-Inclination'])
+#     else:
+#         raise ValueError(f"Invalid method for temp_drift_comp: {method}")
+#
+#     suffix = "" if overwrite else " - new"
+#
+#     self.df[f'East-West-Inclination - drift compensated{suffix}'] = x
+#     self.df[f'North-South-Inclination - drift compensated{suffix}'] = y
+#     self.df[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
+#     self.df[
+#         f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
+#         x, y)
+#     if feedback is True:
+#         print(
+#             f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
+#
+# def plot_df(self, y_cols):
+#     """
+#     Plots the specified columns of df against time.
+#
+#     Args:
+#         y_cols (list of str): The names of the columns to plot on the y-axis.
+#
+#     Returns:
+#         None.
+#
+#     Raises:
+#         KeyError: If any of the specified column names are not in the df.
+#     """
+#     fig, ax = plt.subplots()
+#     x = self.df["Time"]
+#     for col in y_cols:
+#         try:
+#             y = self.df[col]
+#         except KeyError:
+#             raise KeyError(f"Column '{col}' not found in df.")
+#         ax.plot(x, y, label=col)
+#     ax.set_xlabel("Time")
+#     ax.legend()
+#     plt.show()
+#
+# def plot_df_sub(self, y_cols):
+#     """
+#     Plot multiple time series subplots.
+#
+#     Parameters:
+#     y_cols (list of str): The columns to plot.
+#
+#     Returns:
+#     None
+#
+#     Raises:
+#         KeyError: If any of the specified column names are not in the df.
+#     """
+#     num_plots = len(y_cols)
+#     fig, axs = plt.subplots(num_plots, 1, figsize=(8, num_plots * 4))
+#     x = self.df["Time"]
+#     for i, col in enumerate(y_cols):
+#         try:
+#             y = self.df[col]
+#         except KeyError:
+#             raise KeyError(f"Column '{col}' not found in df.")
+#         axs[i].plot(x, y, label=col)
+#         axs[i].set_xlabel("Time")
+#         axs[i].legend()
+#     plt.show()

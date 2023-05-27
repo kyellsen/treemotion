@@ -1,10 +1,8 @@
-from utils.imports_classes import *
+from common_imports.classes_light import *
 
 from .tree import Tree
 from .tree_treatment_variant import TreeTreatmentVariant
 from .tree_cable import TreeCable
-
-logger = get_logger(__name__)
 
 
 class TreeTreatment(BaseClass):

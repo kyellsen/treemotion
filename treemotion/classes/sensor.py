@@ -1,9 +1,7 @@
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 
 from .sensor_type import SensorType
 from .sensor_status import SensorStatus
-
-logger = get_logger(__name__)
 
 
 class Sensor(BaseClass):

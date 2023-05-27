@@ -5,12 +5,29 @@ from treemotion import config, logger, db_manager, Project, Series, Measurement,
 
 logger.setLevel(level="DEBUG")
 
-filename_db_1 = r"TREEMOTION_BOSAU.db"
+filename_db_1 = r"TREEMOTION_BOSAU_backup - kopie.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
 db_manager.connect(db_filename=filename_db_1)
-project_1 = Project.load_from_db()[0]
-series_list = Series.load_from_db(ids=[1])
+project = Project.load_from_db(ids=1)
+series_1 = Series.load_from_db(ids=1)
+measurement_1 = Measurement.load_from_db(ids=1)
+measurement_2 = Measurement.load_from_db(ids=2)
+# measurement_2 = Measurement.load_from_db(ids=2)
+# measurement_20 = Measurement.load_from_db(ids=20)
+# measurement_21 = Measurement.load_from_db(ids=21)
+measurement_1.load_from_csv(overwrite=False)
+measurement_2.load_from_csv(overwrite=False)
+# measurement_2.load_from_csv(overwrite=True)
+# measurement_20.load_from_csv(overwrite=False)
+# measurement_21.load_from_csv(overwrite=True)
+# series_2 = Series.load_from_db(ids=2)
+# series_2.delete_from_db(auto_commit=True)
+measurement_2.delete_from_db(auto_commit=True)
+
+# project_1 = Project.load_from_db()[0]
+# series_list = Series.load_from_db(ids=[1, 2, 3], get_tms_df=True)
+# measurement_list = Measurement.load_from_db(ids=[1, 2, 3], get_tms_df=True)
 # version_list = Version.load_from_db(get_tms_df=True)
 #project_1 = project_1.load_from_csv(overwrite=False)
 # version_list = Version.load_from_db(version_id=list(range(5)), get_tms_df=True)
@@ -51,4 +68,4 @@ series_list = Series.load_from_db(ids=[1])
 
 # messreihe_1_short_3600 = messreihe_1.get_data_by_version(version="short_3600")
 # ergebnis = messreihe_1.limit_time_by_peaks(version="short_3600", duration=3600, dec_auto_commit=True)
-db_manager.disconnect()
+# db_manager.disconnect()

@@ -49,7 +49,7 @@ def download_dwd_files(stations_id, directory, link_wind, link_wind_extreme, lin
 
 def download_wind_files(url, folder_path, stations_id):
     """
-    Download a zip file from a given url, extract it in a given folder, and then delete the zip file.
+    Download a zip file from a given url, extract it in a given folder, and then delete_from_db the zip file.
 
     :param url: the url of the zip file
     :param folder_path: the folder where the zip file will be extracted

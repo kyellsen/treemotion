@@ -1,4 +1,4 @@
-from utils.imports_classes import *
+from common_imports.classes_heavy import *
 
 
 class MeasurementStatus(BaseClass):
