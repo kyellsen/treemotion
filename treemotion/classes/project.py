@@ -49,30 +49,6 @@ class Project(BaseClass):
         return f"Project(id={self.project_id}, name={self.name})"
 
     @dec_runtime
-    def load_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,
-                      auto_commit: bool = True) -> Optional[List]:
-        """
-        Load data from CSV files for all series associated with the project.
-
-        Args:
-            version (str, optional): The version of the data to load_from_db.
-            overwrite (bool, optional): Whether to overwrite existing data.
-            auto_commit (bool, optional): Whether to automatically commit the changes to the database.
-
-        Returns:
-            Optional[List]: A list of results from loading the data.
-        """
-        logger.info(f"Starting process to load_from_db all CSV files for {self.__str__()}")
-        try:
-            results = self.method_for_all_in_list('load_from_csv', version, overwrite, auto_commit)
-        except Exception as e:
-            logger.error(f"Error loading all CSV files for {self.__str__()}, Error: {e}")
-            return None
-        logger.info(
-            f"Process of loading CSV files for {len(results)} series from {self.__str__()} successfully completed.")
-        return results
-
-    @dec_runtime
     def add_filenames(self, csv_path: str, auto_commit: bool = True):
         """
         Add filenames to all associated series.

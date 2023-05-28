@@ -81,37 +81,44 @@ class Measurement(BaseClass):
 
     @dec_runtime
     def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name,
-                      overwrite: bool = False, auto_commit: bool = True) -> Optional[Version]:
+                      overwrite: bool = False) -> Optional[Version]:
         """
         Load data from a CSV file and update existing data if necessary.
 
         :param version_name: Version of the data.
         :param overwrite: Determines whether to overwrite existing data.
-        :param auto_commit: Determines whether to save the data to the database immediately.
         :return: The updated or newly created Version instance, or None if an error occurs.
         """
         if self.filepath is None:
-            logger.warning(f"Process for '{self}' aborted, no filename for tms_utils.csv (filename = None).")
+            logger.warning(f"Process for '{self}' canceled, no filename for tms_utils.csv (filename = {self.filename}).")
             return None
 
-        logger.info(f"Start loading TMS-CSV data for '{self}'")
-        tms_table_name = Version.get_tms_table_name(version_name=version_name, measurement_id=self.measurement_id)
+        logger.info(f"Start loading TMS data from CSV for '{self}'")
+        tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
         present_version = self.get_by_table_name(tms_table_name)
 
-        if present_version is None or overwrite:
-            if present_version is not None and overwrite:
-                logger.warning(f"Existing object will be overwritten (overwrite = True): {present_version}")
-            obj = self.create_update_version_from_csv(version_name, present_version, auto_commit)
+        if present_version is not None and not overwrite:
+            logger.warning(f"Existing version '{version_name}' will be not overwritten (overwrite = False): '{present_version}'")
+            return present_version
 
+        elif present_version is not None and overwrite:
+            logger.warning(f"Existing version '{version_name}' will be overwritten (overwrite = True): '{present_version}'")
+            version_id = present_version.version_id
+            self.version.remove(present_version)
 
+        else:  # present_version is None:
+            logger.debug(f"Create new Version '{version_name}'.")
+            version_id = None
+        try:
+            version = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name,
+                                            tms_table_name)
+            self.version.append(version)
+            logger.info(f"Loading {version} from CSV successful, attached to {self}.")
+            return version
 
-
-        else:
-            logger.warning(f"Object already exists, not overwritten (overwrite = False), obj: {present_version}")
+        except Exception as e:
+            logger.error(f"Failed to create Version '{version_name}' from {self}, csv file:{self.filepath}, error: {e}")
             return None
-
-        logger.debug(f"Loading TMS-CSV data for '{self}' successful")
-        return obj
 
     def get_by_table_name(self, tms_table_name: str) -> Optional[Version]:
         """
@@ -132,31 +139,6 @@ class Measurement(BaseClass):
 
         logger.debug(f"Version instance found with table_name {tms_table_name}.")
         return matching_versions[0]
-
-    # Hilfsmethode für load_from_csv
-    def create_update_version_from_csv(self, version_name: str, present_version: Optional[Version] = None,
-                                       auto_commit: bool = True) -> Optional[Version]:
-        """
-        Create or update a data object from a CSV file.
-
-        :param version_name: The version of the data.
-        :param present_version: An existing Version instance to update.
-        :param auto_commit: Determines whether to save the data to the database immediately.
-        :return: The created or updated Version instance, or None if an error occurs.
-        """
-        version_id = present_version.version_id if present_version else None
-        if present_version:
-            present_version.delete_from_db()
-
-        obj = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name, auto_commit)
-
-        if obj is None:
-            logger.error(f"Failed to create Version instance from csv file: {self.filepath}.")
-            return None
-
-        self.version.append(obj)
-        logger.info(f"Object {obj.__str__()} successfully created/updated and attached to {self.__str__()}.")
-        return obj
 
     def get_version_by_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
         """

@@ -28,7 +28,8 @@ class Version(BaseClass):
 
     measurement = relationship("Measurement", back_populates="version", lazy="joined")
 
-    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None, tms_table_name: str=None, **kwargs):
+    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None,
+                 tms_table_name: str = None, **kwargs):
         """
         Initializes a Version instance.
 
@@ -42,7 +43,7 @@ class Version(BaseClass):
         self.version_id = version_id
         self.measurement_id = measurement_id
         self.version_name = version_name
-        self.tms_table_name = None
+        self.tms_table_name = tms_table_name
         self.tms_wind_table_name = None
         self.datetime_start = None  # metadata
         self.datetime_end = None  # metadata
@@ -95,10 +96,44 @@ class Version(BaseClass):
         Returns:
             DataFrame: The loaded TMS data or None in case of failure.
         """
+        # logger.debug(f"{self.__class__.__name__} @tms_df.getter is running for {self}!")
         if not hasattr(self, '_tms_df') or self._tms_df is None:
-            return self.read_sql_tms()
+            self._tms_df = self.read_sql_tms_df()
 
+        self._validate_tms_df(self._tms_df)
         return self._tms_df
+
+    @dec_runtime
+    def read_sql_tms_df(self, session: Session = None):
+        """
+        Loads TMS data from the database if it's not loaded yet.
+        """
+        session = db_manager.get_session(session)
+        try:
+            tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
+            logger.info(f"Reading {self.__class__.__name__}.tms_df from SQLite '{self.tms_table_name}' successful: {self}")
+            return tms_df
+
+        except Exception as e:
+            logger.error(f"Reading {self.__class__.__name__}.tms_df failed: {self}, error: {e}")
+            return None
+
+
+    @dec_runtime
+    def write_sql_tms_df(self, session: Session = None):
+        """
+        Writs TMS data from to database table.
+        """
+        session = db_manager.get_session(session)
+        try:
+            self._tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace', index=False)
+            logger.debug(f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' successful: {self}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' failed: {self}, error: {e}")
+            return None
+
 
     @tms_df.setter
     def tms_df(self, tms_df: DataFrame) -> None:
@@ -108,7 +143,7 @@ class Version(BaseClass):
         Args:
             tms_df (DataFrame): The DataFrame to set as the TMS data.
         """
-        logger.debug(f"{self.__class__.__name__}  @tms_df.setter running!")
+        logger.debug(f"{self.__class__.__name__}  @tms_df.setter is running for {self}!")
         self._validate_tms_df(tms_df)
         self._tms_df = tms_df
         self.update_tms_df_metadata()
@@ -129,24 +164,6 @@ class Version(BaseClass):
         """
         try:
             validate_df(df=tms_df, columns=config.tms_df_columns)
-            return True
-        except Exception as e:
-            logger.error(f"Error during validation of the DataFrame: {e}")
-            return False
-
-    def validate_tms_df(self) -> bool:
-        """
-        Checks if the DataFrame tms_df is valid and contains the required columns.
-        If tms_df is not provided, it checks the instance's tms_df attribute.
-
-        Args:
-            tms_df: DataFrame to validate. If not provided, self._tms_df is validated.
-
-        Returns:
-            bool: True if the DataFrame is valid, False otherwise.
-        """
-        try:
-            validate_df(df=self.tms_df, columns=config.tms_df_columns)
             return True
         except Exception as e:
             logger.error(f"Error during validation of the DataFrame: {e}")
@@ -179,16 +196,6 @@ class Version(BaseClass):
             logger.error(f"Failed to update metadata for {self}: {e}")
             return False
 
-    @dec_runtime
-    def commit_tms_df(self):
-        try:
-            db_manager.commit_df(df=self.tms_df, table_name=self.tms_table_name)
-            logger.info(f"{self.__class__.__name__}.commit_tms_df committed successfully: {self.__str__()}")
-            return True
-        except Exception as e:
-            logger.error(f"{self.__class__.__name__}.commit_tms_df failed: {self.__str__()}, error: {str(e)}")
-            return False
-
     @staticmethod
     def get_tms_table_name(version_name: str, measurement_id: int) -> str:
         """
@@ -203,8 +210,7 @@ class Version(BaseClass):
 
     @classmethod
     def load_from_csv(cls, filepath: str, measurement_id: int, version_id: int = None,
-                      version_name: str = config.default_load_from_csv_version_name, auto_commit: bool = True) -> \
-            Optional['Version']:
+                      version_name: str = config.default_load_from_csv_version_name, tms_table_name: str = None) -> Optional['Version']:
         """
         Loads TMS Data from a CSV file.
 
@@ -212,21 +218,23 @@ class Version(BaseClass):
         :param version_id: Unique ID of the version.
         :param measurement_id: ID of the measurement to which the data belongs.
         :param version_name: Version Name of the data.
-        :param auto_commit:
+        :param tms_table_name:
         :return: Data object.
         """
         if not filepath:
-            logger.warning(f"Filepath Measurement ID '{measurement_id}' is None, process aborted.")
+            logger.warning(f"Process for measurement_id '{measurement_id}' canceled, no filename for tms_utils.csv (filepath = {filepath}).")
             return None
 
-        obj = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name)
+        version = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name,
+                      tms_table_name=tms_table_name)
 
-        obj.tms_df = cls.read_csv_tms(filepath)
+        version.tms_df = cls.read_csv_tms(filepath)
 
-        if auto_commit:
-            obj.commit_tms_df()
-            db_manager.commit()
-        return obj
+        session = db_manager.get_session()
+        session.add(version)
+        version.write_sql_tms_df(session)
+        db_manager.commit()
+        return version
 
     @staticmethod
     @dec_runtime
@@ -253,23 +261,9 @@ class Version(BaseClass):
             raise e
         return tms_df
 
-    @dec_runtime
-    def read_sql_tms(self):
-        """
-        Loads TMS data from the database if it's not loaded yet.
-        """
-        logger.info(f"{self.__class__.__name__} @tms_df.getter running for {self}!")
-        session = db_manager.get_session()
-        try:
-            logger.info(f"{self.__class__.__name__}.tms_df loaded successfully: {self}")
-            self._tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
-        except Exception as e:
-            logger.error(f"{self.__class__.__name__}.df could not be loaded: {self}, error: {e}")
-            return None
-        return self._tms_df
-
     @classmethod
-    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name, auto_commit=True) -> Optional['Version']:
+    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name, auto_commit=True) -> Optional[
+        'Version']:
         """
         Creates a new version of the Version object.
 
@@ -281,7 +275,8 @@ class Version(BaseClass):
 
         try:
             tms_table_name = cls.get_tms_table_name(copy_version_name, source_obj.measurement_id)
-            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=copy_version_name, tms_table_name=tms_table_name)
+            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=copy_version_name,
+                       tms_table_name=tms_table_name)
             if copy.tms_table_name == source_obj.tms_table_name:
                 logger.critical(
                     f"Table name for new instance is the same as the source instance table name.")
@@ -324,7 +319,6 @@ class Version(BaseClass):
             db_manager.commit(session)
 
         return copy
-
 
     # used by version_event_listener.py
     @dec_runtime

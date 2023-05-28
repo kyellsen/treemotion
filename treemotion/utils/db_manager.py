@@ -6,7 +6,6 @@ from shutil import copy
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-
 from utils.log import get_logger
 from utils.base import Base
 
@@ -129,15 +128,6 @@ class DatabaseManager:
             else:
                 logger.error(f"Error while committing to the database: {e}")
             return False
-    def commit_df(self, df, table_name):
-        session = self.get_session()
-        try:
-            df.to_sql(table_name, session.bind, if_exists='replace', index=False)
-            logger.debug(f"Committed table '{table_name}' to Database!")
-            return True
-        except Exception as e:
-            logger.error(f"Auto commit failed for table '{table_name}'. Error: {str(e)}")
-            raise e
 
     def open_session(self):
         """
@@ -232,5 +222,3 @@ class DatabaseManager:
                 raise e
         else:
             logger.warning("Changes were not committed to the database and discarded.")
-
-

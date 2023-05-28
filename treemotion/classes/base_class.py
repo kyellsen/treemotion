@@ -63,6 +63,28 @@ class BaseClass(Base):
                 f"Failed to load instances of '{cls.__name__}' with primary keys '{ids}' from db. Error: '{e}'")
             raise
 
+    @dec_runtime
+    def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name, overwrite: bool = False) -> Optional[List]:
+        """
+        Load data from CSV files for all series associated with the project.
+
+        Args:
+            version_name (str, optional): The version of the data to load_from_db.
+            overwrite (bool, optional): Whether to overwrite existing data.
+
+        Returns:
+            Optional[List]: A list of versions from loading the data.
+        """
+        logger.info(f"Starting process to load_from_db all CSV files for {self}")
+        try:
+            versions = self.method_for_all_in_list('load_from_csv', version_name, overwrite)
+        except Exception as e:
+            logger.error(f"Error loading all CSV files for {self}, Error: {e}")
+            return None
+        logger.info(
+            f"Process of loading CSV files for {len(versions)} from {self} successfully completed.")
+        return versions
+
     def get_child_attr_name(self) -> Optional[str]:
         """
         Get the attribute name of the children based on the class name.

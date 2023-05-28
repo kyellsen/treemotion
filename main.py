@@ -12,8 +12,9 @@ db_manager.connect(db_filename=filename_db_1)
 # series = Series.load_from_db(1)[0]
 # series.load_from_csv()
 measurement_1 = Measurement.load_from_db(1)[0]
-measurement_1.load_from_csv(auto_commit=False)
-print("Test")
+measurement_1.load_from_csv(overwrite=True)
+
+
 
 #measurements = Measurement.load_from_db(ids=list(range(1, 5)))
 # result = [m.load_from_csv() for m in measurements]
@@ -41,4 +42,5 @@ print("Test")
 
 # messreihe_1_short_3600 = messreihe_1.get_data_by_version(version="short_3600")
 # ergebnis = messreihe_1.limit_time_by_peaks(version="short_3600", duration=3600, dec_auto_commit=True)
-db_manager.disconnect()
+# db_manager.disconnect()
+print("Ende")

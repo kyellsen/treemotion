@@ -52,18 +52,14 @@ class Series(BaseClass):
 
         return self._version_dict
 
-    @dec_runtime
-    def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
-                      auto_commit=True):
-        logger.info(f"Starting process to load_from_db all CSV files for {self.__str__()}")
+    def add_version_list(self, version_name):
         try:
-            results = self.method_for_all_in_list('load_from_csv', version, overwrite, auto_commit)
+            version_list = self.get_version_by_version_name(version_name)
+            self.version_dict[version_name] = version_list
+
         except Exception as e:
-            logger.error(f"Error loading all CSV files for {self.__str__()}, Error: {e}")
-            return None
-        logger.info(
-            f"Process of loading CSV files for {len(results)} measurements from {self.__str__()} successfully completed.")
-        return results
+            raise e
+        return self.version_dict[version_name]
 
     @dec_runtime
     def add_filenames(self, csv_path: str, auto_commit: bool = True):
@@ -119,17 +115,6 @@ class Series(BaseClass):
         if auto_commit:
             db_manager.commit()
         return True
-
-    def add_version_list(self, version_name):
-        try:
-            version_list = self.get_version_by_version_name(version_name)
-            self.version_dict[version_name] = version_list
-
-        except Exception as e:
-            raise e
-        return self.version_dict[version_name]
-
-
 
     # def limit_time_by_version_and_peaks(self, version, duration: int, show_peaks: bool = False,
     #                                     values_col: str = 'Absolute-Inclination - drift compensated',
