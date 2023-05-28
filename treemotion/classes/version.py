@@ -111,13 +111,13 @@ class Version(BaseClass):
         session = db_manager.get_session(session)
         try:
             tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
-            logger.info(f"Reading {self.__class__.__name__}.tms_df from SQLite '{self.tms_table_name}' successful: {self}")
+            logger.info(
+                f"Reading {self.__class__.__name__}.tms_df from SQLite '{self.tms_table_name}' successful: {self}")
             return tms_df
 
         except Exception as e:
             logger.error(f"Reading {self.__class__.__name__}.tms_df failed: {self}, error: {e}")
             return None
-
 
     @dec_runtime
     def write_sql_tms_df(self, session: Session = None):
@@ -127,13 +127,14 @@ class Version(BaseClass):
         session = db_manager.get_session(session)
         try:
             self._tms_df.to_sql(self.tms_table_name, session.bind, if_exists='replace', index=False)
-            logger.debug(f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' successful: {self}")
+            logger.debug(
+                f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' successful: {self}")
             return True
 
         except Exception as e:
-            logger.error(f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' failed: {self}, error: {e}")
+            logger.error(
+                f"Writing {self.__class__.__name__}.tms_df to SQLite '{self.tms_table_name}' failed: {self}, error: {e}")
             return None
-
 
     @tms_df.setter
     def tms_df(self, tms_df: DataFrame) -> None:
@@ -210,7 +211,8 @@ class Version(BaseClass):
 
     @classmethod
     def load_from_csv(cls, filepath: str, measurement_id: int, version_id: int = None,
-                      version_name: str = config.default_load_from_csv_version_name, tms_table_name: str = None) -> Optional['Version']:
+                      version_name: str = config.default_load_from_csv_version_name, tms_table_name: str = None) -> \
+    Optional['Version']:
         """
         Loads TMS Data from a CSV file.
 
@@ -222,7 +224,8 @@ class Version(BaseClass):
         :return: Data object.
         """
         if not filepath:
-            logger.warning(f"Process for measurement_id '{measurement_id}' canceled, no filename for tms_utils.csv (filepath = {filepath}).")
+            logger.warning(
+                f"Process for measurement_id '{measurement_id}' canceled, no filename for tms_utils.csv (filepath = {filepath}).")
             return None
 
         version = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name,
@@ -262,19 +265,16 @@ class Version(BaseClass):
         return tms_df
 
     @classmethod
-    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name, auto_commit=True) -> Optional[
-        'Version']:
+    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name) -> Optional['Version']:
         """
         Creates a new version of the Version object.
 
         :param source_obj: The source Version object to be copied.
         :param copy_version_name: The new version.
-        :param auto_commit:
         :return: New Version instance.
         """
-
+        tms_table_name = cls.get_tms_table_name(copy_version_name, source_obj.measurement_id)
         try:
-            tms_table_name = cls.get_tms_table_name(copy_version_name, source_obj.measurement_id)
             copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=copy_version_name,
                        tms_table_name=tms_table_name)
             if copy.tms_table_name == source_obj.tms_table_name:
@@ -283,20 +283,16 @@ class Version(BaseClass):
                 return None
             copy.tms_df = source_obj.tms_df.copy(deep=True)
 
+            session = db_manager.get_session()
+            session.add(copy)
+            copy.write_sql_tms_df(session)
+            db_manager.commit()
+            logger.debug(f"Created and committed the new instance '{copy}' to the database successful.")
+            return copy
+
         except Exception as e:
-            logger.error(f"Error while creating a copy or committing of the data instance: {e}")
+            logger.error(f"Error while copying from '{source_obj}' or committing: {e}")
             return None
-
-        session = db_manager.get_session()
-        session.add(copy)
-
-        if auto_commit:
-            db_manager.commit(session)
-            copy.commit_tms_df()
-            logger.debug(f"Created and auto committed the new instance '{copy}' to the database successful.")
-        else:
-            logger.debug(f"Created new Version '{copy}' successful.")
-        return copy
 
     @dec_runtime
     def copy(self, auto_commit: bool = False, copy_version_name: str = None) -> 'Version':
@@ -317,7 +313,6 @@ class Version(BaseClass):
         if auto_commit:
             logger.debug(f"Auto committing the new instance '{copy}' to the database")
             db_manager.commit(session)
-
         return copy
 
     # used by version_event_listener.py

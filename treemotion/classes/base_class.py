@@ -224,41 +224,41 @@ class BaseClass(Base):
         return results
 
     @dec_runtime
-    def get_version_by_filter(self, filter_dict: Dict[str, Any]) -> Optional[List[Any]]:
+    def get_versions_by_filter_db(self, filter_dict: Dict[str, Any]) -> Optional[List[Any]]:
         """
-        Executes 'get_version_by_filter' method in all 'Measurement' class children with given filter.
+        Executes 'get_versions_by_filter_db' method in all 'Measurement' class children with given filter.
 
         :param filter_dict: Dictionary with filter keys and values
         :return: List with version_objs of method execution on all 'Measurement' class children,
                  or None if an error occurred.
         """
-        logger.info(f"Start 'get_version_by_filter' with filter '{filter_dict}' for instance of '{self}'")
+        logger.info(f"Start 'get_versions_by_filter_db' with filter '{filter_dict}' for instance of '{self}'")
         try:
-            version_objs = self.method_for_all_of_class(class_name="Measurement", method_name='get_version_by_filter',
+            version_objs = self.method_for_all_of_class(class_name="Measurement", method_name='get_versions_by_filter_db',
                                                         filter_dict=filter_dict)
-            logger.info(f"Finished 'get_version_by_filter' for instance of '{self}'")
+            logger.info(f"Finished 'get_versions_by_filter_db' for instance of '{self}'")
 
             return version_objs
         except Exception as e:
-            logger.error(f"Error in '{self.__class__.__name__}'.get_version_by_filter from '{self}', Error: {e}")
+            logger.error(f"Error in '{self.__class__.__name__}'.get_versions_by_filter_db from '{self}', Error: {e}")
             return None
 
     @dec_runtime
-    def get_version_by_version_name(self, version_name: str = config.default_load_from_csv_version_name) -> \
+    def get_versions_by_version_name(self, version_name: str = config.default_load_from_csv_version_name) -> \
             Optional[List[Any]]:
         """
-        Executes 'get_version_by_filter' method with 'version_name' filter in all 'Measurement' class children.
+        Executes 'get_versions_by_filter_db' method with 'version_name' filter in all 'Measurement' class children.
 
         :param version_name: Version name to use as filter
-        :return: List with version_objs of method execution on all 'Measurement' class children from instance,
+        :return: List with versions of method execution on all 'Measurement' class children from instance,
                  or None if an error occurred.
         """
-        logger.info(f"Start 'get_version_by_version_name' for '{self}'")
-        version_objs = self.get_version_by_filter({"version_name": version_name})
+        logger.info(f"Start 'get_versions_by_version_name' for '{self}'")
+        versions = self.get_versions_by_filter_db({"version_name": version_name})
 
-        logger.info(f"Finished 'get_version_by_version_name' for '{self}'")
+        logger.info(f"Finished 'get_versions_by_version_name' for '{self}'")
 
-        return version_objs
+        return versions
 
     def copy(self, auto_commit: bool = False) -> 'BaseClass':
         """

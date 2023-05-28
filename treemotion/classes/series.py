@@ -54,7 +54,7 @@ class Series(BaseClass):
 
     def add_version_list(self, version_name):
         try:
-            version_list = self.get_version_by_version_name(version_name)
+            version_list = self.get_versions_by_version_name(version_name)
             self.version_dict[version_name] = version_list
 
         except Exception as e:

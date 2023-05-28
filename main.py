@@ -12,7 +12,7 @@ db_manager.connect(db_filename=filename_db_1)
 # series = Series.load_from_db(1)[0]
 # series.load_from_csv()
 measurement_1 = Measurement.load_from_db(1)[0]
-measurement_1.load_from_csv(overwrite=True)
+measurement_1.load_from_csv(overwrite=False)
 
 
 
@@ -28,7 +28,7 @@ measurement_1.load_from_csv(overwrite=True)
 
 # version = Version.load_from_db(1)[0]
 # version_new = Version.create_copy(version, "Hallo")
-# version_raw = project.get_version_by_version_name(version_name="raw")
+# version_raw = project.get_versions_by_version_name(version_name="raw")
 
 
 # measurement_list = Measurement.load_from_db(list(range(1, 5)))
