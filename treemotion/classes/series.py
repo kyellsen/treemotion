@@ -40,8 +40,17 @@ class Series(BaseClass):
         self.annotation = annotation
         self.filepath_tms = filepath_tms
 
+        self._version_dict = {}
+
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id})"
+
+    @property
+    def version_dict(self) -> Dict:
+        if not hasattr(self, '_version_dict') or self._version_dict is None:
+            self._version_dict = {}
+
+        return self._version_dict
 
     @dec_runtime
     def load_from_csv(self, version=config.default_load_from_csv_version_name, overwrite=False,
@@ -111,7 +120,17 @@ class Series(BaseClass):
             db_manager.commit()
         return True
 
-    #
+    def add_version_list(self, version_name):
+        try:
+            version_list = self.get_version_by_version_name(version_name)
+            self.version_dict[version_name] = version_list
+
+        except Exception as e:
+            raise e
+        return self.version_dict[version_name]
+
+
+
     # def limit_time_by_version_and_peaks(self, version, duration: int, show_peaks: bool = False,
     #                                     values_col: str = 'Absolute-Inclination - drift compensated',
     #                                     time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,

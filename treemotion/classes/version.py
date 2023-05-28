@@ -28,22 +28,21 @@ class Version(BaseClass):
 
     measurement = relationship("Measurement", back_populates="version", lazy="joined")
 
-    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None,
-                 tms_table_name: str = None, **kwargs):
+    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None, tms_table_name: str=None, **kwargs):
         """
-        Initializes a Data instance.
+        Initializes a Version instance.
 
-        :param version_id: Unique ID of the data.
-        :param measurement_id: ID of the measurement to which the data belongs.
-        :param version_name: Data version.
-        :param df: DataFrame with the data.
+        Args:
+            version_id: Unique ID of the version.
+            measurement_id: ID of the measurement to which the version belongs.
+            version_name: Version name.
         """
         super().__init__(*args, **kwargs)
         # in SQLite Database
         self.version_id = version_id
         self.measurement_id = measurement_id
         self.version_name = version_name
-        self.tms_table_name = tms_table_name
+        self.tms_table_name = None
         self.tms_wind_table_name = None
         self.datetime_start = None  # metadata
         self.datetime_end = None  # metadata
@@ -61,7 +60,6 @@ class Version(BaseClass):
         self._tms_df = None
         self._wind_df = None
         self._tms_wind_df = None
-        # self.update_metadata()
 
     def __str__(self):
         return f"{self.__class__.__name__}(id={self.version_id}, tms_table_name={self.tms_table_name})"
@@ -89,57 +87,102 @@ class Version(BaseClass):
         except Exception as e:
             raise e
 
-
-    @dec_runtime
-    def get_tms_df(self) -> Optional[pd.DataFrame]:
+    @property
+    def tms_df(self) -> Optional[DataFrame]:
         """
-        Loads TMS data from the database if it's not loaded yet.
-
-        :return: The loaded TMS data.
-        """
-        logger.debug(f"{self.__class__.__name__}.get_tms_df running for {self}!")
-        if not hasattr(self, '_tms_df') or self._tms_df is None:
-            session = db_manager.get_session()
-            try:
-                self._tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
-                logger.info(f"{self.__class__.__name__}.tms_df loaded successfully: {self}")
-            except Exception as e:
-                logger.error(f"{self.__class__.__name__}.df could not be loaded: {self}, error: {e}")
-                return None
-        return self._tms_df
-
-    def set_tms_df(self, tms_df: pd.DataFrame, update_metadata: bool = True) -> bool:
-        """
-        Sets the TMS data to the given DataFrame and updates the database.
-
-        Args:
-            tms_df (pd.DataFrame): The DataFrame to set as the TMS data.
-            update_metadata (bool, optional): If True, metadata is updated. Defaults to True.
+        Returns the loaded TMS data or loads it from the database if it's not loaded yet.
 
         Returns:
-            bool: True if the operation was successful, False otherwise.
-
+            DataFrame: The loaded TMS data or None in case of failure.
         """
-        logger.debug(f"{self.__class__.__name__}.set_tms_df running!")
+        if not hasattr(self, '_tms_df') or self._tms_df is None:
+            return self.read_sql_tms()
+
+        return self._tms_df
+
+    @tms_df.setter
+    def tms_df(self, tms_df: DataFrame) -> None:
+        """
+        Sets the TMS Data to the given DataFrame and updates the metadata.
+
+        Args:
+            tms_df (DataFrame): The DataFrame to set as the TMS data.
+        """
+        logger.debug(f"{self.__class__.__name__}  @tms_df.setter running!")
+        self._validate_tms_df(tms_df)
+        self._tms_df = tms_df
+        self.update_tms_df_metadata()
+
+        logger.debug(f"{self.__class__.__name__}.tms_df set successfully: {self.__str__()}")
+
+    @staticmethod
+    def _validate_tms_df(tms_df: Optional[DataFrame]) -> bool:
+        """
+        Checks if the DataFrame tms_df is valid and contains the required columns.
+        If tms_df is not provided, it checks the instance's tms_df attribute.
+
+        Args:
+            tms_df: DataFrame to validate. If not provided, self._tms_df is validated.
+
+        Returns:
+            bool: True if the DataFrame is valid, False otherwise.
+        """
         try:
-            validate_df(tms_df, columns=config.tms_df_columns)
+            validate_df(df=tms_df, columns=config.tms_df_columns)
+            return True
         except Exception as e:
-            logger.error(f"Error during validation of the TMS-DataFrame: {e}")
+            logger.error(f"Error during validation of the DataFrame: {e}")
             return False
 
-        if update_metadata:
-            if not self.update_metadata(tms_df):
-                return False
+    def validate_tms_df(self) -> bool:
+        """
+        Checks if the DataFrame tms_df is valid and contains the required columns.
+        If tms_df is not provided, it checks the instance's tms_df attribute.
 
-        self._tms_df = tms_df
+        Args:
+            tms_df: DataFrame to validate. If not provided, self._tms_df is validated.
 
-        logger.debug(f"{self.__class__.__name__}.tms_df set/edit successfully: {self.__str__()}")
-        return True
+        Returns:
+            bool: True if the DataFrame is valid, False otherwise.
+        """
+        try:
+            validate_df(df=self.tms_df, columns=config.tms_df_columns)
+            return True
+        except Exception as e:
+            logger.error(f"Error during validation of the DataFrame: {e}")
+            return False
+
+    def update_tms_df_metadata(self) -> bool:
+        """
+        Updates the metadata of the Version instance based on the provided DataFrame.
+
+        Returns:
+            bool: True if the metadata update was successful, False otherwise.
+        """
+        try:
+            self.datetime_start = pd.to_datetime(self.tms_df['Time'].min(), format='%Y-%m-%d %H:%M:%S.%f')
+            self.datetime_end = pd.to_datetime(self.tms_df['Time'].max(), format='%Y-%m-%d %H:%M:%S.%f')
+            self.duration = (self.datetime_end - self.datetime_start).total_seconds()
+            self.length = len(self.tms_df)
+
+            peak = self.find_max_peak()
+            if peak:
+                self.peak_index = peak['peak_index']
+                self.peak_time = peak['peak_time']
+                self.peak_value = peak['peak_value']
+            else:
+                logger.warning(f"No peak found for {self}, updating other metadata for {self}!")
+
+            logger.debug(f"Metadata updated successfully for {self}")
+            return True
+        except (KeyError, ValueError) as e:
+            logger.error(f"Failed to update metadata for {self}: {e}")
+            return False
 
     @dec_runtime
     def commit_tms_df(self):
         try:
-            db_manager.commit_df(df=self.get_tms_df(), table_name=self.tms_table_name)
+            db_manager.commit_df(df=self.tms_df, table_name=self.tms_table_name)
             logger.info(f"{self.__class__.__name__}.commit_tms_df committed successfully: {self.__str__()}")
             return True
         except Exception as e:
@@ -147,43 +190,16 @@ class Version(BaseClass):
             return False
 
     @staticmethod
-    def get_tms_table_name(version_name: str, id_measurement: int) -> str:
+    def get_tms_table_name(version_name: str, measurement_id: int) -> str:
         """
-        Generates a tms table name.
+        Generates a tms data frame table name.
 
         :param version_name: Version of the data.
-        :param id_measurement: ID of the measurement to which the data belongs.
-        :return: New table name.
+        :param measurement_id: ID of the measurement to which the data belongs.
+        :return: New table name in the format of "auto_tms_df_{version_name}_{id_measurement}_measurement".
         """
-        return f"auto_tms_df_{version_name}_{str(id_measurement).zfill(3)}_measurement"
 
-    # @classmethod
-    # @dec_runtime
-    # def load_from_db(cls, version_id: Optional[Union[int, List[int]]] = None, version_name=None,
-    #                  get_tms_df: bool = True) -> List['Version']:
-    #     """
-    #     Loads Version objects from the database based on the provided filters.
-    #
-    #     :param version_id: The id of the version to load_from_db.
-    #     :param version_name: The name of the version to load_from_db.
-    #     :param get_tms_df
-    #     :return: A list of Version objects matching the provided filters.
-    #     """
-    #     filter_by = {}
-    #     if version_id:
-    #         filter_by['version_id'] = version_id
-    #     if version_name:
-    #         filter_by['name'] = version_name
-    #
-    #     if isinstance(version_id, list):
-    #         objs = super().load_from_db(ids=version_id)
-    #     else:
-    #         objs = super().load_from_db(filter_by=filter_by or None)
-    #
-    #     if get_tms_df:
-    #         objs = [obj.get_tms_df() for obj in objs]
-    #
-    #     return objs
+        return f"auto_tms_df_{version_name}_{str(measurement_id).zfill(3)}_measurement"
 
     @classmethod
     def load_from_csv(cls, filepath: str, measurement_id: int, version_id: int = None,
@@ -202,12 +218,10 @@ class Version(BaseClass):
         if not filepath:
             logger.warning(f"Filepath Measurement ID '{measurement_id}' is None, process aborted.")
             return None
-        tms_table_name = cls.get_tms_table_name(version_name, measurement_id)
-        obj = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name,
-                  tms_table_name=tms_table_name)
 
-        tms_df = cls.read_csv_tms(filepath)
-        obj.set_tms_df(tms_df, update_metadata=True)
+        obj = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name)
+
+        obj.tms_df = cls.read_csv_tms(filepath)
 
         if auto_commit:
             obj.commit_tms_df()
@@ -230,30 +244,87 @@ class Version(BaseClass):
             raise e
 
         try:
-            df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",", index_col=False)
+            tms_df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",", index_col=False)
         except pd.errors.ParserError as e:
             logger.error(f"Error while reading the file {filepath.stem}. Please check the file format.")
             raise e
         except Exception as e:
             logger.error(f"Unusual error while loading {filepath.stem}: {e}")
             raise e
-
-        return df
+        return tms_df
 
     @dec_runtime
-    def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'Version':
+    def read_sql_tms(self):
         """
-        Create a copy of the data object.
+        Loads TMS data from the database if it's not loaded yet.
+        """
+        logger.info(f"{self.__class__.__name__} @tms_df.getter running for {self}!")
+        session = db_manager.get_session()
+        try:
+            logger.info(f"{self.__class__.__name__}.tms_df loaded successfully: {self}")
+            self._tms_df = pd.read_sql_table(self.tms_table_name, session.bind)
+        except Exception as e:
+            logger.error(f"{self.__class__.__name__}.df could not be loaded: {self}, error: {e}")
+            return None
+        return self._tms_df
 
-        :param reset_id: Whether to reset the ID of the new object.
+    @classmethod
+    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name, auto_commit=True) -> Optional['Version']:
+        """
+        Creates a new version of the Version object.
+
+        :param source_obj: The source Version object to be copied.
+        :param copy_version_name: The new version.
+        :param auto_commit:
+        :return: New Version instance.
+        """
+
+        try:
+            tms_table_name = cls.get_tms_table_name(copy_version_name, source_obj.measurement_id)
+            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=copy_version_name, tms_table_name=tms_table_name)
+            if copy.tms_table_name == source_obj.tms_table_name:
+                logger.critical(
+                    f"Table name for new instance is the same as the source instance table name.")
+                return None
+            copy.tms_df = source_obj.tms_df.copy(deep=True)
+
+        except Exception as e:
+            logger.error(f"Error while creating a copy or committing of the data instance: {e}")
+            return None
+
+        session = db_manager.get_session()
+        session.add(copy)
+
+        if auto_commit:
+            db_manager.commit(session)
+            copy.commit_tms_df()
+            logger.debug(f"Created and auto committed the new instance '{copy}' to the database successful.")
+        else:
+            logger.debug(f"Created new Version '{copy}' successful.")
+        return copy
+
+    @dec_runtime
+    def copy(self, auto_commit: bool = False, copy_version_name: str = None) -> 'Version':
+        """
+        Create a copy of the Version instance.
+
         :param auto_commit: Whether to auto-commit after copying.
+        :param copy_version_name:
         :return: Copied data object.
         """
-        obj = super().copy(reset_id, auto_commit)
-        tms_df = self.get_tms_df()
-        obj.set_tms_df(tms_df.copy(deep=True))
+        copy = super().copy(auto_commit=False)
+        copy.tms_df = self.tms_df.copy(deep=True)
+        if copy_version_name:
+            copy.version_name = copy_version_name
+            copy.get_tms_table_name = self.get_tms_table_name(copy_version_name, copy.measurement_id)
 
-        return obj
+        session = db_manager.get_session()
+        if auto_commit:
+            logger.debug(f"Auto committing the new instance '{copy}' to the database")
+            db_manager.commit(session)
+
+        return copy
+
 
     # used by version_event_listener.py
     @dec_runtime
@@ -275,88 +346,9 @@ class Version(BaseClass):
             logger.error(f"For {self.__str__()} delete_tms_table '{self.tms_table_name}' error: {e}")
             return False
 
-    @classmethod
-    def create_new_version(cls, source_obj, new_version_name: str, auto_commit):
-        """
-        Creates a new version of the Version object.
-
-        :param source_obj: The source Version object to be copied.
-        :param new_version_name: The new version.
-        :param auto_commit:
-        :return: New data object.
-        """
-        tms_table_name = cls.get_tms_table_name(new_version_name, id_measurement=source_obj.measurement_id)
-        obj = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=new_version_name, tms_table_name=tms_table_name)
-        try:
-            tms_df = source_obj.get_tms_df().copy(deep=True)
-            obj.set_tms_df(tms_df, update_metadata=True)
-
-            session = db_manager.get_session()
-            session.add(obj)
-            if auto_commit:
-                db_manager.commit(session)
-                logger.debug(f"Created and auto committed the new instance '{obj}' to the database successful.")
-            else:
-                logger.debug(f"Created new Version '{obj}' successful.")
-            return obj
-
-        except Exception as e:
-            logger.error(f"Error while creating a copy or committing of the data instance: {e}")
-            return None
-
-    def _validate_tms_df(self):
-        """
-        Checks if the DataFrame Data.df is valid and contains the required columns.
-        """
-
-        try:
-            validate_df(self._tms_df, columns=config.tms_df_columns)
-        except Exception as e:
-            logger.error(f"Error during validation of the DataFrame: {e}")
-            return False
-        return True
-
-    def update_metadata(self, tms_df):
-        """
-        Updates the metadata of the data object (Data.df).
-
-        First checks if the DataFrame is valid. If the DataFrame is invalid, it returns False.
-        If the DataFrame is valid, it updates the metadata and returns True.
-
-        Parameters
-        ----------
-        tms_df : Pandas DataFrame
-
-
-        Returns
-        -------
-        bool
-            True if the metadata update was successful, False if the DataFrame is invalid or an error occurred.
-        """
-
-        try:
-            self.datetime_start = pd.to_datetime(tms_df['Time'].min(), format='%Y-%m-%d %H:%M:%S.%f')
-            self.datetime_end = pd.to_datetime(tms_df['Time'].max(), format='%Y-%m-%d %H:%M:%S.%f')
-            self.duration = (self.datetime_end - self.datetime_start).total_seconds()
-            self.length = len(tms_df)
-            # peak = self.find_max_peak()
-            # if peak is None:
-            #     logger.warning(f"No peak found for {self}, updating other metadata for {self}!")
-            #     return True
-            # self.peak_index = peak['peak_index']
-            # self.peak_time = peak['peak_time']
-            # self.peak_value = peak['peak_value']
-            logger.debug(f"Metadata updated successfully for {self}")
-        except (KeyError, ValueError) as e:
-            logger.error(f"Failed to update metadata for {self}: {e}")
-            return False
-        return True
-
     def find_max_peak(self, show_peak: bool = False, value_col: str = "Absolute-Inclination - drift compensated",
-                      time_col: str = "Time"):
-        result = self._validate_tms_df()
-        if not result:
-            return None
+                      time_col: str = "Time") -> Optional[Dict]:
+
         try:
             peak = find_max_peak(self.tms_df, value_col, time_col)
         except Exception as e:
@@ -370,9 +362,6 @@ class Version(BaseClass):
     def find_n_peaks(self, show_peaks: bool = False, values_col: str = 'Absolute-Inclination - drift compensated',
                      time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
                      min_time_diff: float = 60, prominence: int = None):
-        result = self._validate_tms_df()
-        if not result:
-            return None
         try:
             peaks = find_n_peaks(self.tms_df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
         except Exception as e:
@@ -406,15 +395,10 @@ class Version(BaseClass):
             logger.error("Invalid time format.")
             return False
 
-        # Validate DataFrame
-        if not self._validate_tms_df():
-            return False
-
         # Limit time
         try:
-            tms_df = self.get_tms_df
-            tms_df = limit_df_by_time(tms_df, time_col="Time", start_time=start_time, end_time=end_time)
-            self.set_tms_df(tms_df, update_metadata=True)
+            self.tms_df = limit_df_by_time(self.tms_df, time_col="Time", start_time=start_time, end_time=end_time)
+
         except Exception as e:
             logger.error(f"Error limiting the data of '{self.__str__()}': {str(e)}")
             return False
@@ -424,7 +408,6 @@ class Version(BaseClass):
         if auto_commit:
             self.commit_tms_df()
             db_manager.commit()
-
         return True
 
     def limit_time_by_peaks(self, duration: int, values_col: str = 'Absolute-Inclination - drift compensated',
@@ -550,9 +533,6 @@ class Version(BaseClass):
             logger.error(
                 f'Error while retrieving wind data for wind measurement with ID {wind_measurement_id}: {str(e)}')
             raise e
-
-
-
 
 # def sync_wind_df(self, wind_measurement_id, max_time_shift_secs=0, session=None):
 #

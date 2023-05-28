@@ -54,7 +54,7 @@ class Configuration:
                            'Inclination direction of the tree - drift compensated']
         self.tms_df_time_column_name = 'Time'
         self.default_load_from_csv_version_name = "raw"
-        self.default_copy_data_by_version_name = "copy"
+        self.default_copy_version_name = "copy"
 
         # WindMessreihe
 

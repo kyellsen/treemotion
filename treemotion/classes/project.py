@@ -46,7 +46,7 @@ class Project(BaseClass):
         Returns:
             str: A string representation of the Project instance.
         """
-        return f"Project(id={self.project_id}, name={self.name}"
+        return f"Project(id={self.project_id}, name={self.name})"
 
     @dec_runtime
     def load_from_csv(self, version: str = config.default_load_from_csv_version_name, overwrite: bool = False,

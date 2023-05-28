@@ -95,21 +95,43 @@ class Measurement(BaseClass):
             return None
 
         logger.info(f"Start loading TMS-CSV data for '{self}'")
-        tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        present_version = self.get_version_by_filter(filter_dict={'tms_table_name': tms_table_name})
+        tms_table_name = Version.get_tms_table_name(version_name=version_name, measurement_id=self.measurement_id)
+        present_version = self.get_by_table_name(tms_table_name)
 
         if present_version is None or overwrite:
             if present_version is not None and overwrite:
                 logger.warning(f"Existing object will be overwritten (overwrite = True): {present_version}")
             obj = self.create_update_version_from_csv(version_name, present_version, auto_commit)
+
+
+
+
         else:
             logger.warning(f"Object already exists, not overwritten (overwrite = False), obj: {present_version}")
             return None
 
-        if auto_commit:
-            db_manager.commit()
         logger.debug(f"Loading TMS-CSV data for '{self}' successful")
         return obj
+
+    def get_by_table_name(self, tms_table_name: str) -> Optional[Version]:
+        """
+        Find a version object based on its tms table name.
+
+        :param tms_table_name: The name of the table being searched.
+        :return: The found version instance, or None if no match is found.
+        """
+        matching_versions = [version for version in self.version if version.tms_table_name == tms_table_name]
+
+        if not matching_versions:
+            logger.debug(f"No Version instance found with tms table_name '{tms_table_name}'.")
+            return None
+
+        if len(matching_versions) > 1:
+            logger.warning(
+                f"Multiple Version instances found with table_name {tms_table_name}. Returning only the first instance.")
+
+        logger.debug(f"Version instance found with table_name {tms_table_name}.")
+        return matching_versions[0]
 
     # Hilfsmethode für load_from_csv
     def create_update_version_from_csv(self, version_name: str, present_version: Optional[Version] = None,
@@ -156,7 +178,7 @@ class Measurement(BaseClass):
                                 .first())
 
             if matching_version is None:
-                logger.warning(f"No Version instance found with the given filters: {filter_dict}.")
+                logger.info(f"No Version instance found with the given filters: {filter_dict}.")
                 return None
 
             logger.info(f"Version instance found with the given filters: {filter_dict}.")
@@ -165,7 +187,6 @@ class Measurement(BaseClass):
         except Exception as e:
             logger.error(f"An error occurred while querying the Version: {str(e)}")
             return None
-
 
     # @dec_runtime
     # def copy_data_by_version(self, version_new=config.default_copy_data_by_version_name,
@@ -196,7 +217,7 @@ class Measurement(BaseClass):
     #     # Load the data for this Version instance if it hasn't been loaded yet.
     #     source_obj.load_df_if_missing()
     #
-    #     new_obj = Version.create_new_version(source_obj, version_new)
+    #     new_obj = Version.create_copy(source_obj, version_new)
     #
     #     if new_obj is None:
     #         return None

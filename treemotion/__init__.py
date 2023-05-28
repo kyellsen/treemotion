@@ -30,8 +30,6 @@ from .classes.version import Version
 from .classes.version_event_listener import listen_to_version_delete_and_delete_table
 from .classes.wind_measurement import WindMeasurement
 
-from .classes.series_version import SeriesVersion
-
 #from .tms.validation_manager import ValidationManager
 
 

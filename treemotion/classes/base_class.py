@@ -1,7 +1,7 @@
 # treemotionen/classes/base_class.py
 from typing import List
 from sqlalchemy import inspect
-from copy import deepcopy
+# from copy import deepcopy # nur für auskommentiert deep_copy Methode
 from common_imports.classes_heavy import *
 from utils.base import Base
 
@@ -19,7 +19,7 @@ class BaseClass(Base):
 
     @classmethod
     @dec_runtime
-    def load_from_db(cls, ids: Optional[Union[int, List[int]]] = None, get_tms_df: bool = False) -> List[Any]:
+    def load_from_db(cls, ids: Optional[Union[int, List[int]]] = None) -> List[Any]:
         """
         Load instances of the own class from a SQLite database using SQLAlchemy.
 
@@ -28,7 +28,6 @@ class BaseClass(Base):
         ids : int, list of int, or None, optional
             The primary keys of the instances to load_from_db. If ids is None, all instances are loaded.
             Default is None.
-        get_tms_df :
 
         Returns
         -------
@@ -57,9 +56,6 @@ class BaseClass(Base):
 
             if not objs:
                 logger.warning(f"No instances of '{cls.__name__}' with primary keys '{ids}' found")
-
-            if get_tms_df:
-                cls.apply_get_tms_df(objs)
 
             return objs
         except Exception as e:
@@ -104,39 +100,6 @@ class BaseClass(Base):
 
         return child_instances
 
-    @staticmethod
-    def apply_get_tms_df(objs: List[Any]) -> bool:
-        """
-        Applies Version.get_tms_df method on the list of loaded objects, sets the result to obj._tms_df,
-        and counts the number of successful operations.
-
-        Parameters
-        ----------
-        objs : list of any type
-            The list of objects to apply get_tms_df.
-
-        Returns
-        -------
-        bool
-            True if the operation is successful, False otherwise.
-        """
-        logger.info("Start Version.get_tms_df.")
-        count_version_objs = 0
-        count_get_tms_df_success = 0
-        try:
-            for obj in objs:
-                for result in obj.method_for_all_of_class(class_name='Version', method_name='get_tms_df'):
-                    count_version_objs += 1
-                    if result is not None:
-                        obj._tms_df = result
-                        count_get_tms_df_success += 1
-            logger.info(
-                f"Version.get_tms_df successfully applied on '{count_get_tms_df_success}/{count_version_objs}' instance(s).")
-            return True
-        except Exception as e:
-            logger.error("Failed to apply Version.get_tms_df. Error: %s", e)
-            return False
-
     def method_for_all_in_list(self, method_name: Optional[str], *args: Any, **kwargs: Any) -> List[Any]:
         """
         Call a method on all objects in an attribute list and return the results.
@@ -174,6 +137,33 @@ class BaseClass(Base):
 
         return results
 
+    def find_all_of_class(self, class_name: str) -> List[Any]:
+        """
+        Find all instances of a given class within the hierarchy of the current instance.
+
+        Args:
+            class_name (str): The name of the class of which instances are to be found.
+
+        Returns:
+            List[Any]: A list containing all the found instances of the class.
+        """
+        if self.__class__.__name__ == class_name:
+            return [self]
+
+        found_instances: List[Any] = []
+        children_instances = self.get_children_instances()
+
+        if children_instances is not None:
+            for child in children_instances:
+                try:
+                    found_child_instances = child.find_all_of_class(class_name)
+                    found_instances.extend(found_child_instances)
+                except Exception as e:
+                    logger.error(
+                        f"Error occurred while executing 'find_all_of_class' on '{child.__class__.__name__}': {e}")
+
+        return found_instances
+
     def method_for_all_of_class(self, class_name: Optional[str] = None, method_name: Optional[str] = None, *args: Any,
                                 **kwargs: Any) -> List[Any]:
         """
@@ -192,29 +182,23 @@ class BaseClass(Base):
         method_name = method_name or '__str__'
         results: List[Any] = []
 
-        if self.__class__.__name__ == class_name:
-            method = getattr(self, method_name, None)
+        instances_of_class = self.find_all_of_class(class_name)
+        logger.info(f"Found '{len(instances_of_class)}' instances of class '{class_name}'.")
+
+        for instance in instances_of_class:
+            method = getattr(instance, method_name, None)
             if callable(method):
                 try:
                     result = method(*args, **kwargs)
-                    results.append(result)
+                    if result:
+                        results.append(result)
                 except Exception as e:
                     logger.error(
-                        f"Error occurred while executing the method '{method_name}' on '{self.__class__.__name__}': {e}"
+                        f"Error occurred while executing the method '{method_name}' on '{instance.__class__.__name__}': {e}"
                     )
             else:
-                logger.error(f"The method '{method_name}' does not exist in the class '{self.__class__.__name__}'.")
-        else:
-            children_instances = self.get_children_instances()
-            if children_instances is not None:
-                for child in children_instances:
-                    try:
-                        result = child.method_for_all_of_class(class_name, method_name, *args, **kwargs)
-                        results.extend(result)
-                    except Exception as e:
-                        logger.error(
-                            f"Error occurred while executing the method '{method_name}' on '{child.__class__.__name__}': {e}"
-                        )
+                logger.error(f"The method '{method_name}' does not exist in the class '{instance.__class__.__name__}'.")
+
         return results
 
     @dec_runtime
@@ -231,48 +215,35 @@ class BaseClass(Base):
             version_objs = self.method_for_all_of_class(class_name="Measurement", method_name='get_version_by_filter',
                                                         filter_dict=filter_dict)
             logger.info(f"Finished 'get_version_by_filter' for instance of '{self}'")
+
             return version_objs
         except Exception as e:
             logger.error(f"Error in '{self.__class__.__name__}'.get_version_by_filter from '{self}', Error: {e}")
             return None
 
     @dec_runtime
-    def get_version(self, version_name: str = config.default_load_from_csv_version_name) -> \
+    def get_version_by_version_name(self, version_name: str = config.default_load_from_csv_version_name) -> \
             Optional[List[Any]]:
         """
         Executes 'get_version_by_filter' method with 'version_name' filter in all 'Measurement' class children.
 
         :param version_name: Version name to use as filter
-        :return: List with version_objs of method execution on all 'Measurement' class children,
+        :return: List with version_objs of method execution on all 'Measurement' class children from instance,
                  or None if an error occurred.
         """
-        logger.info(f"Start 'get_version' for '{self}'")
+        logger.info(f"Start 'get_version_by_version_name' for '{self}'")
         version_objs = self.get_version_by_filter({"version_name": version_name})
 
-        logger.info(f"Finished 'get_version' for '{self}'")
+        logger.info(f"Finished 'get_version_by_version_name' for '{self}'")
 
         return version_objs
 
-    def reset_id_attr(self, primary_key: str) -> None:
-        """
-        Resets the primary key attribute of an instance.
-        :param primary_key: Name of the primary key attribute.
-        """
-        try:
-            setattr(self, primary_key, None)
-            logger.debug(f"Reset id attribute {primary_key} in new instance.")
-        except Exception as e:
-            logger.error(f"Error resetting id attribute {primary_key}: {e}")
-            raise
-
-    def copy(self, reset_id: bool = False, auto_commit: bool = False) -> 'BaseClass':
+    def copy(self, auto_commit: bool = False) -> 'BaseClass':
         """
         Create a shallow copy of this instance.
 
         Parameters
         ----------
-        reset_id : bool
-            Whether to reset the ID attribute of the new instance. Default is False.
         auto_commit : bool
             Whether to automatically commit the new instance to the database. Default is False.
 
@@ -285,66 +256,18 @@ class BaseClass(Base):
         cls = self.__class__
         primary_key = inspect(cls).primary_key[0].name
 
-        new_instance = cls(**{attr: value for attr, value in self.__dict__.items() if attr != '_sa_instance_state'})
-
-        if reset_id:
-            logger.info("Resetting id for the new instance")
-            new_instance.reset_id_attr(primary_key)
+        copy = cls(**{attr: value for attr, value in self.__dict__.items() if attr != '_sa_instance_state'})
+        setattr(self, primary_key, None)  # set primary key = None
 
         session = db_manager.get_session()
         session.add(self)
 
         if auto_commit:
-            logger.debug(f"Auto committing the new instance '{new_instance}' to the database")
+            logger.debug(f"Auto committing the new instance '{copy}' to the database")
             db_manager.commit(session)
         else:
-            logger.debug(f"Copy '{new_instance}' successful.")
-        return new_instance
-
-    def deep_copy(self, auto_commit: bool = False) -> 'BaseClass':
-        """
-        Create a deep copy of this instance along with its related instances.
-
-        Parameters
-        ----------
-        auto_commit : bool
-            Whether to automatically commit the new instance to the database. Default is False.
-
-        Returns
-        -------
-        BaseClass
-            A new instance that is a deep copy of the current instance.
-        """
-        logger.info(f"Start copy of '{self}'")
-        cls = self.__class__
-        primary_key = inspect(cls).primary_key[0].name
-
-        copied_attrs = deepcopy(self.__dict__)
-        copied_attrs.pop(primary_key, None)  # exclude the primary key
-        copied_attrs.pop('_sa_instance_state', None)  # exclude SQLAlchemy's instance state
-
-        # Create a new instance with the copied attributes
-        new_instance = cls(**copied_attrs)
-
-        # Copy the related instances
-        children = self.get_children_instances()
-        if children:
-            logger.info("Copying child instances")
-            copied_children = [child.deep_copy() for child in children]
-            attr_name = self.get_child_attr_name()
-            if attr_name:
-                setattr(new_instance, attr_name, copied_children)
-
-        session = db_manager.get_session()
-        session.add(self)
-
-        if auto_commit:
-            logger.debug(f"Auto committing the new instance '{new_instance}' to the database")
-            db_manager.commit(session)
-        else:
-            logger.debug(f"Copy '{new_instance}' successful.")
-
-        return new_instance
+            logger.debug(f"Copy '{copy}' successful.")
+        return copy
 
     @dec_runtime
     def delete_from_db(self, auto_commit=False) -> bool:
@@ -360,3 +283,108 @@ class BaseClass(Base):
             db_manager.commit(session)
         logger.info(f"Object {self.__str__()} was deleted.")
         return True
+
+    @staticmethod
+    def get_attribute_from_instances(instances: List[Any], attribute_name: str) -> List[Any]:
+        """
+        Retrieves the given attribute for each instance in the provided list of instances.
+
+        Args:
+            instances (List[Any]): The list of instances from which the attribute should be retrieved.
+            attribute_name (str): The name of the attribute to be retrieved.
+
+        Returns:
+            List[Any]: A list containing the values of the attribute for each instance.
+        """
+        attribute_values: List[Any] = []
+        successful_retrievals = 0
+
+        for instance in instances:
+            attribute_value = getattr(instance, attribute_name, None)
+            if attribute_value is not None:
+                attribute_values.append(attribute_value)
+                successful_retrievals += 1
+
+        total_instances = len(instances)
+        logger.info(
+            f"Successfully retrieved '{attribute_name}' from '{successful_retrievals}/{total_instances}' instances.")
+
+        return attribute_values
+
+    def get_tms_dfs(self) -> Optional[List[Any]]:
+        """
+        Finds instances of the 'Version' class for the given object or list of objects and retrieves the attribute 'tms_df'
+        for each of them.
+
+        Returns
+        -------
+        Optional[List[Any]]
+            The list of 'tms_df' attribute values for all found 'Version' instances.
+
+        Raises
+        ------
+        Exception
+            If an error occurs during the search of 'Version' instances or retrieval of 'tms_df' attributes.
+        """
+        try:
+            version_instances: List[Any] = []
+            objects = [self] if not isinstance(self, list) else self
+            for obj in objects:
+                found_versions = obj.find_all_of_class("Version")
+                version_instances.extend(found_versions)
+
+            logger.info(f"Found '{len(version_instances)}' instances of the 'Version' class")
+
+            tms_dfs = self.get_attribute_from_instances(version_instances, "tms_df")
+
+            return tms_dfs
+        except Exception as e:
+            logger.error(
+                f"Failed to get 'tms_df' attributes from 'Version' instances. Error: '{e}'")
+            return None
+
+    # Auskommentiert, weil ids nicht richtig nach commit angepasst werden
+    # def deep_copy(self, auto_commit: bool = False) -> 'BaseClass':
+    #     """
+    #     Create a deep copy of this instance along with its related instances.
+    #
+    #     Parameters
+    #     ----------
+    #     auto_commit : bool
+    #         Whether to automatically commit the new instance to the database. Default is False.
+    #
+    #     Returns
+    #     -------
+    #     BaseClass
+    #         A new instance that is a deep copy of the current instance.
+    #     """
+    #     logger.info(f"Start copy of '{self}'")
+    #     cls = self.__class__
+    #     primary_key = inspect(cls).primary_key[0].name
+    #
+    #     copied_attrs = deepcopy(self.__dict__)
+    #     copied_attrs.pop(primary_key, None)  # exclude the primary key
+    #     copied_attrs.pop('_sa_instance_state', None)  # exclude SQLAlchemy's instance state
+    #
+    #     # Create a new instance with the copied attributes
+    #     new_instance = cls(**copied_attrs)
+    #
+    #     # Copy the related instances
+    #     children = self.get_children_instances()
+    #     if children:
+    #         logger.info("Copying child instances")
+    #         copied_children = [child.deep_copy() for child in children]
+    #         attr_name = self.get_child_attr_name()
+    #         if attr_name:
+    #             setattr(new_instance, attr_name, copied_children)
+    #
+    #     session = db_manager.get_session()
+    #     session.add(self)
+    #
+    #     if auto_commit:
+    #         logger.debug(f"Auto committing the new instance '{new_instance}' to the database")
+    #         db_manager.commit(session)
+    #     else:
+    #         logger.debug(f"Copy '{new_instance}' successful.")
+    #
+    #     return new_instance

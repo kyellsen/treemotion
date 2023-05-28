@@ -48,22 +48,22 @@ class ValidationManager:
             logger.info('Datenvalidierung erfolgreich.')
         return df
 
-    def visualize_results(self, df: pd.DataFrame) -> None:
-        """
-        Visualisiert die Ergebnisse der Datenvalidierung.
-
-        Parameter:
-        df (pd.DataFrame): Der DataFrame, der visualisiert werden soll.
-        """
-        try:
-            for column in df.columns:
-                fig = go.Figure(data=go.Scatter(x=df.index, y=df[column]))
-                fig.update_layout(title_text=f'Datenverteilung für {column}')
-                fig.show()
-            logging.info('Visualisierung erfolgreich.')
-        except Exception as e:
-            logging.error(f'Visualisierung fehlgeschlagen: {e}')
-            raise e
+    # def visualize_results(self, df: pd.DataFrame) -> None:
+    #     """
+    #     Visualisiert die Ergebnisse der Datenvalidierung.
+    #
+    #     Parameter:
+    #     df (pd.DataFrame): Der DataFrame, der visualisiert werden soll.
+    #     """
+    #     try:
+    #         for column in df.columns:
+    #             fig = go.Figure(data=go.Scatter(x=df.index, y=df[column]))
+    #             fig.update_layout(title_text=f'Datenverteilung für {column}')
+    #             fig.show()
+    #         logging.info('Visualisierung erfolgreich.')
+    #     except Exception as e:
+    #         logging.error(f'Visualisierung fehlgeschlagen: {e}')
+    #         raise e
 
     def create_report(self, df: pd.DataFrame, file_name: str) -> None:
         """
