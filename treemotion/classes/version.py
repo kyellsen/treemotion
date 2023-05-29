@@ -236,7 +236,7 @@ class Version(BaseClass):
         session = db_manager.get_session()
         session.add(version)
         version.write_sql_tms_df(session)
-        db_manager.commit()
+        db_manager.commit(session)
         return version
 
     @staticmethod
@@ -265,17 +265,17 @@ class Version(BaseClass):
         return tms_df
 
     @classmethod
-    def create_copy(cls, source_obj, copy_version_name: config.default_copy_version_name) -> Optional['Version']:
+    def create_copy(cls, source_obj, new_version_name: config.default_new_version_name) -> Optional['Version']:
         """
         Creates a new version of the Version object.
 
         :param source_obj: The source Version object to be copied.
-        :param copy_version_name: The new version.
+        :param new_version_name: The new version.
         :return: New Version instance.
         """
-        tms_table_name = cls.get_tms_table_name(copy_version_name, source_obj.measurement_id)
+        tms_table_name = cls.get_tms_table_name(new_version_name, source_obj.measurement_id)
         try:
-            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=copy_version_name,
+            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=new_version_name,
                        tms_table_name=tms_table_name)
             if copy.tms_table_name == source_obj.tms_table_name:
                 logger.critical(
@@ -286,7 +286,7 @@ class Version(BaseClass):
             session = db_manager.get_session()
             session.add(copy)
             copy.write_sql_tms_df(session)
-            db_manager.commit()
+            db_manager.commit(session)
             logger.debug(f"Created and committed the new instance '{copy}' to the database successful.")
             return copy
 
@@ -295,24 +295,26 @@ class Version(BaseClass):
             return None
 
     @dec_runtime
-    def copy(self, auto_commit: bool = False, copy_version_name: str = None) -> 'Version':
+    def copy(self, new_version_name: str = config.default_new_version_name) -> Optional['Version']:
         """
         Create a copy of the Version instance.
 
-        :param auto_commit: Whether to auto-commit after copying.
-        :param copy_version_name:
+        :param new_version_name:
         :return: Copied data object.
         """
         copy = super().copy(auto_commit=False)
+        if copy is None:
+            return None
+
         copy.tms_df = self.tms_df.copy(deep=True)
-        if copy_version_name:
-            copy.version_name = copy_version_name
-            copy.get_tms_table_name = self.get_tms_table_name(copy_version_name, copy.measurement_id)
+        if new_version_name:
+            copy.version_name = new_version_name
+            copy.tms_table_name = copy.get_tms_table_name(copy.version_name, copy.measurement_id)
 
         session = db_manager.get_session()
-        if auto_commit:
-            logger.debug(f"Auto committing the new instance '{copy}' to the database")
-            db_manager.commit(session)
+        copy.write_sql_tms_df(session)
+        db_manager.commit(session)
+        logger.debug(f"Copy '{copy}' successful (auto_commit={True}.")
         return copy
 
     # used by version_event_listener.py

@@ -95,8 +95,8 @@ class Measurement(BaseClass):
 
         logger.info(f"Start loading TMS data from CSV for '{self}'")
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        # present_version = self.get_versions_by_filter_db({'tms_table_name': tms_table_name}) # runtime from get_versions_by_filter_list way faster, same result
-        present_version = self.get_versions_by_filter_list({'tms_table_name': tms_table_name})
+        # present_version = self.get_versions_by_db_filter({'tms_table_name': tms_table_name}) # runtime from get_versions_by_list_filter way faster, same result
+        present_version = self.get_versions_by_list_filter({'tms_table_name': tms_table_name})
         if present_version is not None and not overwrite:
             logger.warning(f"Existing version '{version_name}' will be not overwritten (overwrite = False): '{present_version}'")
             return present_version
@@ -120,7 +120,7 @@ class Measurement(BaseClass):
             logger.error(f"Failed to create Version '{version_name}' from {self}, csv file:{self.filepath}, error: {e}")
             return None
 
-    def get_versions_by_filter_list(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
+    def get_versions_by_list_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
         """
         Find a version object based on the provided filters.
 
@@ -128,10 +128,6 @@ class Measurement(BaseClass):
                             For example: {'tms_table_name': tms_table_name}
         :return: The found Version instance, or None if no match is found.
 
-        -------
-        Examples:
-        >>> present_version = self.get_versions_by_filter_list({'tms_table_name': tms_table_name})
-        Version
         """
 
         if not isinstance(filter_dict, dict):
@@ -153,7 +149,7 @@ class Measurement(BaseClass):
         return matching_versions[0]
 
 
-    def get_versions_by_filter_db(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
+    def get_versions_by_db_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
         """
         Find a version object based on the provided filters.
 
