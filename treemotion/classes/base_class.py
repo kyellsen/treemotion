@@ -79,7 +79,7 @@ class BaseClass(Base):
         """
         logger.info(f"Starting process to load_from_db all CSV files for {self}")
         try:
-            versions = self.method_for_all_in_list('load_from_csv', version_name, overwrite)
+            versions = self.method_for_all_children('load_from_csv', version_name, overwrite)
         except Exception as e:
             logger.error(f"Error loading all CSV files for {self}, Error: {e}")
             return None
@@ -124,7 +124,29 @@ class BaseClass(Base):
 
         return child_instances
 
-    def method_for_all_in_list(self, method_name: Optional[str], *args: Any, **kwargs: Any) -> List[Any]:
+    @staticmethod
+    def method_for_all_in_list(instances, method_name, *args: Any, **kwargs: Any) -> List[Any]:
+        logger.info(
+            f"Applying '{method_name}' to '{len(instances)}' of class '{instances[0].__class__.__name__}'!")
+        results: List[Any] = []
+
+        for i in instances:
+            method = getattr(i, method_name, None)
+            if callable(method):
+                try:
+                    result = method(*args, **kwargs)
+                    results.append(result)
+                except Exception as e:
+                    logger.error(
+                        f"Error occurred while executing the method '{method_name}' on '{i}': {e}"
+                    )
+            else:
+                logger.error(f"The method '{method_name}' does not exist in the class '{i.__class__.__name__}'.")
+                return []
+
+        return results
+
+    def method_for_all_children(self, method_name, *args: Any, **kwargs: Any) -> List[Any]:
         """
         Call a method on all objects in an attribute list and return the results.
 

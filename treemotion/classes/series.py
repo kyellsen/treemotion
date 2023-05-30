@@ -3,8 +3,13 @@ from sqlalchemy import distinct, Table, MetaData
 
 from common_imports.classes_heavy import *
 from utils.path_utils import validate_and_get_path, validate_and_get_file_list, extract_sensor_id
+from tms.time_limits import optimal_time_frame
+from tms.find_peaks import merge_peak_dicts
 
 logger = get_logger(__name__)
+
+from .version import Version
+from .measurement import Measurement
 
 
 class Series(BaseClass):
@@ -46,6 +51,50 @@ class Series(BaseClass):
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id})"
 
+    @dec_runtime
+    def get_versions_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") \
+            -> Optional[List[Version]]:
+        """
+        Overwrites BaseClass Method. It´s way faster.
+        Finds all version objects associated with measurements related to this series based on the provided filters.
+
+        :param filter_dict: A dictionary of attributes and their desired values.
+                            For example: {'tms_table_name': tms_table_name}
+        :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
+                       The default value is "list_filter".
+        :return: A list of found Version instances, or None if no match is found.
+        """
+
+        if not isinstance(filter_dict, dict):
+            logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
+            return None
+
+        try:
+            if method == "list_filter":
+                matching_versions = [version for measurement in self.measurement for version in measurement.version if
+                                     all(getattr(version, k, None) == v for k, v in filter_dict.items())]
+            elif method == "db_filter":
+                session = db_manager.get_session()
+                matching_versions = (session.query(Version)
+                                     .join(Measurement, Version.measurement_id == Measurement.id)
+                                     .filter(Measurement.series_id == self.series_id)
+                                     .filter_by(**filter_dict)
+                                     .all())
+            else:
+                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
+                return None
+
+            if not matching_versions:
+                logger.debug(f"No Version instance found with the given filters: {filter_dict}.")
+                return None
+
+            logger.debug(f"{len(matching_versions)} Version instances found with the given filters: {filter_dict}.")
+            return matching_versions
+
+        except Exception as e:
+            logger.error(f"An error occurred while querying the Version: {str(e)}")
+            return None
+
     @property
     @dec_runtime
     def version_dict(self) -> Dict:
@@ -70,7 +119,8 @@ class Series(BaseClass):
                     self._version_dict[unique_version_name] = versions
 
                 except Exception as e:
-                    logger.error(f"Error occurred while creating version dictionary for version_name '{unique_version_name}': {e}")
+                    logger.error(
+                        f"Error occurred while creating version dictionary for version_name '{unique_version_name}': {e}")
                     raise
             logger.info(f"{self} version_dict created for {unique_version_names}!")
         else:
@@ -78,6 +128,7 @@ class Series(BaseClass):
 
         return self._version_dict
 
+    # helper for version_dict
     def get_unique_version_names_in_series(self) -> List[str]:
         """
         This method retrieves all unique 'version_name's from 'Version' that are associated
@@ -166,44 +217,94 @@ class Series(BaseClass):
             db_manager.commit()
         return True
 
-    # def limit_time_by_version_and_peaks(self, version, duration: int, show_peaks: bool = False,
-    #                                     values_col: str = 'Absolute-Inclination - drift compensated',
-    #                                     time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
-    #                                     min_time_diff: float = 60, prominence: int = None, auto_commit: bool = False,
-    #                                     session=None):
-    #     """
-    #     Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
-    #     """
-    #
-    #     objs = self.get_data_by_version(version)
-    #     peak_dicts = []
-    #
-    #     for obj in objs:
-    #         peaks = obj.find_n_peaks(show_peaks, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
-    #         if peaks is None:
-    #             continue
-    #         peak_dicts.append(peaks)
-    #
-    #     # Hier aus vielen peaks_dicts in Liste einen peaks_dict zusammensetzen
-    #     merged_peaks = self.merge_peak_dicts(peak_dicts)
-    #     try:
-    #         timeframe_dict = optimal_time_frame(duration, merged_peaks)
-    #     except Exception as e:
-    #         logger.error(f"Optimaler Timeframe konnte nicht ermittelt werden, error: {e}")
-    #         return False
-    #
-    #     for obj in objs:
-    #         obj.limit_by_time(timeframe_dict['start_time'], timeframe_dict['end_time'], auto_commit, session)
-    #
-    #     return True
-    #
-    # @staticmethod
-    # def merge_peak_dicts(peak_dicts):
-    #     """
-    #     Führt eine Liste von 'peak' Wörterbüchern zusammen.
-    #     """
-    #     return {
-    #         'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
-    #         'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
-    #         'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
-    #    }
+    @dec_runtime
+    def limit_by_time(self, version_name: str, start_time: str, end_time: str, auto_commit: bool = False) -> Optional[
+        List[Version]]:
+        """
+        Limits the versions by time range.
+
+        Args:
+            version_name (str): Name of the version.
+            start_time (str): Start time of the range.
+            end_time (str): End time of the range.
+            auto_commit (bool, optional): Flag indicating whether to automatically commit changes. Defaults to False.
+
+        Returns:
+            List[Version]: List of versions limited by time range, or None if an error occurs.
+        """
+        logger.info(f"{self} starts limit_by_time for version '{version_name}'")
+        versions = self.get_versions_by_filter({"version_name": version_name})
+        if versions is None:
+            logger.warning(f"No versions found for version name '{version_name}'")
+            return None
+
+        try:
+            result = [version.limit_by_time(start_time, end_time, auto_commit) for version in versions]
+            logger.info(f"{self} successfully limited {len(result)} instances of version '{version_name}' by time")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error occurred during limit_by_time: {e}")
+            return None
+
+    @dec_runtime
+    def limit_time_by_peaks(self, version_name, duration: int, show_peaks: bool = False,
+                            values_col: str = 'Absolute-Inclination - drift compensated',
+                            time_col: str = config.tms_df_time_column_name, n_peaks: int = 10, sample_rate: float = 20,
+                            min_time_diff: float = 60, prominence: int = None, auto_commit: bool = False) \
+            -> Optional[List[Version]]:
+        """
+        Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
+        """
+        logger.info(f"{self} starts limit_by_time for version '{version_name}'.")
+        versions = self.get_versions_by_filter({"version_name": version_name})
+        if versions is None:
+            logger.warning(f"No versions found for version name '{version_name}'")
+            return None
+
+        peak_dicts = []
+        for version in versions:
+            peaks = version.find_n_peaks(show_peaks, values_col, time_col, n_peaks, sample_rate, min_time_diff,
+                                         prominence)
+            if peaks is None:
+                continue
+            peak_dicts.append(peaks)
+
+        # Hier aus vielen peaks_dicts in Liste einen peaks_dict zusammensetzen
+        merged_peaks = merge_peak_dicts(peak_dicts)
+        try:
+            timeframe_dict = optimal_time_frame(duration, merged_peaks)
+            logger.info(f"Optimaler timeframe: '{timeframe_dict}'")
+        except Exception as e:
+            logger.error(f"Optimal timeframe konnte nicht ermittelt werden, error: {e}")
+            return None
+
+        try:
+            result = [version.limit_by_time(timeframe_dict['start_time'], timeframe_dict['end_time'], auto_commit) for
+                      version in versions]
+            logger.info(f"{self} successfully limited {len(result)} instances of version '{version_name}' by time")
+
+        except Exception as e:
+            logger.error(f"Error occurred during limit_by_time: {e}")
+            return None
+
+        return result
+
+    @dec_runtime
+    def get_wind_df(self, version_name: str, wind_measurement_id: int, time_extension_secs: int=0) \
+            -> Optional[List[Version]]:
+
+        logger.info(f"{self} starts get_wind_df for version '{version_name}'")
+        versions = self.get_versions_by_filter({"version_name": version_name})
+        if versions is None:
+            logger.warning(f"No versions found for version name '{version_name}'")
+            return None
+
+        try:
+            result = [version.get_wind_df(wind_measurement_id, time_extension_secs) for version in versions]
+            logger.info(f"{self} successfully loaded wind for {len(result)} instances of version '{version_name}'")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error occurred during get_wind_df: {e}")
+            return None

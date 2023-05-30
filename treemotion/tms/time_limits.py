@@ -24,7 +24,7 @@ def validate_time_format(time_str: str):
     return time_str
 
 
-def limit_df_by_time(data: pd.DataFrame, time_col: str, start_time, end_time) -> pd.DataFrame:
+def df_limit_by_time(data: pd.DataFrame, time_col: str, start_time, end_time) -> pd.DataFrame:
     """
     Returns a Pandas DataFrame that is limited to the specified time range.
 
@@ -74,10 +74,10 @@ def optimal_time_frame(duration: int, peaks: dict) -> dict:
     """
 
     # Überprüfen, ob die Peaks-Liste leer ist
-    if not peaks['peak_times']:
+    if not peaks['peak_time']:
         raise ValueError("Die Peaks-Liste ist leer.")
 
-    peak_time_list = peaks['peak_times']
+    peak_time_list = peaks['peak_time']
 
     # Initialisieren der Variablen für den optimalen Zeitrahmen
     optimal_start_time = peak_time_list[0]

@@ -1,6 +1,7 @@
 import pandas as pd
 from scipy.signal import find_peaks
 
+
 def find_max_peak(df: pd.DataFrame, value_col: str, time_col: str) -> dict:
     """
     Findet den höchsten Peak in einem gegebenen Pandas DataFrame.
@@ -25,7 +26,7 @@ def find_max_peak(df: pd.DataFrame, value_col: str, time_col: str) -> dict:
 
 
 def find_n_peaks(df: pd.DataFrame, value_col: str, time_col: str, n_peaks: int,
-                 sample_rate: float, min_time_diff: float=None,
+                 sample_rate: float, min_time_diff: float = None,
                  prominence: int = None) -> dict:
     """
     Findet die n höchsten Peaks in einem gegebenen Pandas DataFrame.
@@ -74,4 +75,15 @@ def find_n_peaks(df: pd.DataFrame, value_col: str, time_col: str, n_peaks: int,
         'peak_index': peaks,
         'peak_time': df[time_col].iloc[peaks].tolist(),
         'peak_value': df[value_col].iloc[peaks].tolist()
+    }
+
+
+def merge_peak_dicts(peak_dicts):
+    """
+    Führt eine Liste von 'peak' Wörterbüchern zusammen.
+    """
+    return {
+        'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
+        'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
+        'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
     }

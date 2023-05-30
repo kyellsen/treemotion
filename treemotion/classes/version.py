@@ -3,7 +3,7 @@ from sqlalchemy import text
 from common_imports.classes_heavy import *
 from utils.path_utils import validate_and_get_filepath
 from utils.dataframe_utils import validate_df
-from tms.time_limits import validate_time_format, limit_df_by_time, optimal_time_frame
+from tms.time_limits import validate_time_format, df_limit_by_time, optimal_time_frame
 from tms.find_peaks import find_max_peak, find_n_peaks
 
 from .wind_measurement import WindMeasurement
@@ -92,7 +92,7 @@ class Version(BaseClass):
         if not hasattr(self, '_tms_df') or self._tms_df is None:
             self._tms_df = self.read_sql_tms_df()
 
-        self._validate_tms_df(self._tms_df)
+        self._tms_df_validate(self._tms_df)
         return self._tms_df
 
     @dec_runtime
@@ -137,14 +137,14 @@ class Version(BaseClass):
             tms_df (DataFrame): The DataFrame to set as the TMS data.
         """
         logger.debug(f"{self.__class__.__name__}  @tms_df.setter is running for {self}!")
-        self._validate_tms_df(tms_df)
+        self._tms_df_validate(tms_df)
         self._tms_df = tms_df
-        self.update_tms_df_metadata()
+        self._tms_df_update_metadata()
 
         logger.debug(f"{self.__class__.__name__}.tms_df set successfully: {self.__str__()}")
 
     @staticmethod
-    def _validate_tms_df(tms_df: Optional[DataFrame]) -> bool:
+    def _tms_df_validate(tms_df: Optional[DataFrame]) -> bool:
         """
         Checks if the DataFrame tms_df is valid and contains the required columns.
         If tms_df is not provided, it checks the instance's tms_df attribute.
@@ -162,7 +162,7 @@ class Version(BaseClass):
             logger.error(f"Error during validation of the DataFrame: {e}")
             return False
 
-    def update_tms_df_metadata(self) -> bool:
+    def _tms_df_update_metadata(self) -> bool:
         """
         Updates the metadata of the Version instance based on the provided DataFrame.
 
@@ -338,7 +338,7 @@ class Version(BaseClass):
             return False
 
     def find_max_peak(self, show_peak: bool = False, value_col: str = "Absolute-Inclination - drift compensated",
-                      time_col: str = "Time") -> Optional[Dict]:
+                      time_col: str = config.tms_df_time_column_name) -> Optional[Dict]:
 
         try:
             peak = find_max_peak(self.tms_df, value_col, time_col)
@@ -351,7 +351,7 @@ class Version(BaseClass):
         return peak
 
     def find_n_peaks(self, show_peaks: bool = False, values_col: str = 'Absolute-Inclination - drift compensated',
-                     time_col: str = 'Time', n_peaks: int = 10, sample_rate: float = 20,
+                     time_col: str = config.tms_df_time_column_name, n_peaks: int = 10, sample_rate: float = 20,
                      min_time_diff: float = 60, prominence: int = None):
         try:
             peaks = find_n_peaks(self.tms_df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
@@ -362,7 +362,7 @@ class Version(BaseClass):
             logger.info(f"Peaks found in {self.__str__()}: {peaks.__str__()}")
         return peaks
 
-    def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False):
+    def limit_by_time(self, start_time: str, end_time: str, auto_commit: bool = False) -> 'Version':
         """
         Limits the data to a specific time range.
 
@@ -376,35 +376,35 @@ class Version(BaseClass):
 
         Returns
         -------
-        bool
-            True if successful, False if error occurs.
+        Version
+            Self-reference for method chaining.
         """
         # Validate time format
         start_time = validate_time_format(start_time)
         end_time = validate_time_format(end_time)
         if start_time is None or end_time is None:
             logger.error("Invalid time format.")
-            return False
+            return self
 
         # Limit time
         try:
-            self.tms_df = limit_df_by_time(self.tms_df, time_col="Time", start_time=start_time, end_time=end_time)
+            self.tms_df = df_limit_by_time(self.tms_df, time_col="Time", start_time=start_time, end_time=end_time)
 
         except Exception as e:
             logger.error(f"Error limiting the data of '{self.__str__()}': {str(e)}")
-            return False
+            return self
 
         logger.debug(f"Successfully limited the data of '{self.__str__()}' between {start_time} and {end_time}.")
 
         if auto_commit:
-            self.commit_tms_df()
+            self.write_sql_tms_df()
             db_manager.commit()
-        return True
+        return self
 
     def limit_time_by_peaks(self, duration: int, values_col: str = 'Absolute-Inclination - drift compensated',
                             time_col: str = 'Time', n_peaks: int = 10,
                             sample_rate: float = 20, min_time_diff: float = 60,
-                            prominence: int = None, auto_commit: bool = False):
+                            prominence: int = None, auto_commit: bool = False) -> 'Version':
         """
         Limits the data based on the peaks in a specified column.
 
@@ -428,33 +428,33 @@ class Version(BaseClass):
 
         Returns
         -------
-        bool
-            True if the data was successfully limited, False otherwise.
+        Version
+            Self-reference for method chaining.
         """
         # Check the DataFrame
         if self.tms_df is None or self.tms_df.empty:
             logger.warning(f"The DataFrame of {self.__str__()} is None or empty.")
-            return False
+            return self
 
         # Check if the columns exist in the DataFrame
         if values_col not in self.tms_df.columns or time_col not in self.tms_df.columns:
             logger.warning(f"The columns {values_col} and/or {time_col} do not exist in the DataFrame.")
-            return False
+            return self
 
         peaks_dict = find_n_peaks(self.tms_df, values_col, time_col, n_peaks, sample_rate, min_time_diff, prominence)
 
         timeframe_dict = optimal_time_frame(duration, peaks_dict)
-        self.tms_df = limit_df_by_time(self.tms_df, time_col="Time", start_time=timeframe_dict['start_time'],
+        self.tms_df = df_limit_by_time(self.tms_df, time_col="Time", start_time=timeframe_dict['start_time'],
                                        end_time=timeframe_dict['end_time'])
 
         logger.info(
             f"Successfully limited the data of '{self.__str__()}' between {timeframe_dict['start_time']} and {timeframe_dict['end_time']}.")
         if auto_commit:
+            self.write_sql_tms_df()
             db_manager.commit()
+        return self
 
-        return True
-
-    def random_sample(self, n: int, auto_commit: bool = False):
+    def random_sample(self, n: int, auto_commit: bool = False) -> 'Version':
         """
         Selects a random sample of data while preserving the original order.
 
@@ -482,10 +482,11 @@ class Version(BaseClass):
             logger.error(f"Error while selecting the random sample: {e}")
             return self
         if auto_commit:
+            self.write_sql_tms_df()
             db_manager.commit()
         return self
 
-    def get_wind_df(self, wind_measurement_id, time_extension_secs=0):
+    def get_wind_df(self, wind_measurement_id: int, time_extension_secs: int=0):
         """
         Query the wind data based on a given wind measurement ID and store the resulting DataFrame.
 
@@ -530,7 +531,7 @@ class Version(BaseClass):
 #     tms_df = self.tms_df
 #     wind_df = self.get_wind_df(wind_measurement_id, time_extension_secs=max_time_shift_secs, session=session)
 #
-#     if not self._validate_tms_df(wind_in_df=False):
+#     if not self._tms_df_validate(wind_in_df=False):
 #         logger.error(f"")
 #         return None
 #     if not validate_df(wind_df, columns=config.wind_df_columns_selected):

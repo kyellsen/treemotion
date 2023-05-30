@@ -44,7 +44,7 @@ class Project(BaseClass):
             csv_path (str): The path to the CSV files.
             auto_commit (bool, optional): From dec_auto_commit, If True, automatically commits the database session. Defaults to False.
         """
-        result = self.method_for_all_in_list('add_filenames', csv_path=csv_path)
+        result = self.method_for_all_children('add_filenames', csv_path=csv_path)
         if auto_commit:
             db_manager.commit()
         return result

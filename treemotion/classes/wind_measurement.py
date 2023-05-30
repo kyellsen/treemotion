@@ -349,7 +349,7 @@ class WindMeasurement(BaseClass):
 
             for idx, row in merged_df.iterrows():
                 wind_data = WindData(
-                    id=None,
+                    wind_data_id=None,
                     wind_measurement_id=obj.wind_measurement_id,
                     datetime=row['MESS_DATUM'],
                     quality_level_wind_avg=row['QN_file1'],
