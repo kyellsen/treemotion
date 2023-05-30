@@ -25,22 +25,21 @@ class Series(BaseClass):
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
     wind_measurement = relationship('WindMeasurement', lazy="joined")
 
-    def __init__(self, *args, series_id=None, project_id=None, wind_measurement_id=None, description=None,
-                 datetime_start=None, datetime_end=None, location=None, annotation=None, filepath_tms=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args)
 
         # in SQLite Database
-        self.series_id = series_id
-        self.project_id = project_id
-        self.wind_measurement_id = wind_measurement_id
-        self.description = description
-        self.datetime_start = datetime_start
-        self.datetime_end = datetime_end
-        self.location = location
-        self.annotation = annotation
-        self.filepath_tms = filepath_tms
+        self.series_id = kwargs.get('series_id', None)
+        self.project_id = kwargs.get('project_id', None)
+        self.wind_measurement_id = kwargs.get('wind_measurement_id', None)
+        self.description = kwargs.get('description', None)
+        self.datetime_start = kwargs.get('datetime_start', None)
+        self.datetime_end = kwargs.get('datetime_end', None)
+        self.location = kwargs.get('location', None)
+        self.annotation = kwargs.get('annotation', None)
+        self.filepath_tms = kwargs.get('filepath_tms', None)
 
-        self._version_dict = {}
+        self._version_dict = kwargs.get('_version_dict', {})
 
     def __str__(self):
         return f"Series(series_id={self.series_id}, series_id={self.series_id})"

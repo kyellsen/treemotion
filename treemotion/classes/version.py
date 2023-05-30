@@ -28,39 +28,30 @@ class Version(BaseClass):
 
     measurement = relationship("Measurement", back_populates="version", lazy="joined")
 
-    def __init__(self, *args, version_id: int = None, measurement_id: int = None, version_name: str = None,
-                 tms_table_name: str = None, **kwargs):
-        """
-        Initializes a Version instance.
-
-        Args:
-            version_id: Unique ID of the version.
-            measurement_id: ID of the measurement to which the version belongs.
-            version_name: Version name.
-        """
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args)
         # in SQLite Database
-        self.version_id = version_id
-        self.measurement_id = measurement_id
-        self.version_name = version_name
-        self.tms_table_name = tms_table_name
-        self.tms_wind_table_name = None
-        self.datetime_start = None  # metadata
-        self.datetime_end = None  # metadata
-        self.duration = None  # metadata
-        self.length = None  # metadata
-        self.tempdrift_method = None  # metadata
-        self.peak_index = None  # metadata
-        self.peak_time = None  # metadata
-        self.peak_value = None  # metadata
+        self.version_id = kwargs.get('version_id', None)
+        self.measurement_id = kwargs.get('measurement_id', None)
+        self.version_name = kwargs.get('version_name', None)
+        self.tms_table_name = kwargs.get('tms_table_name', None)
+        self.tms_wind_table_name = kwargs.get('tms_wind_table_name', None)
+        self.datetime_start = kwargs.get('datetime_start', None)  # metadata
+        self.datetime_end = kwargs.get('datetime_end', None)  # metadata
+        self.duration = kwargs.get('duration', None)  # metadata
+        self.length = kwargs.get('length', None)  # metadata
+        self.tempdrift_method = kwargs.get('tempdrift_method', None)  # metadata
+        self.peak_index = kwargs.get('peak_index', None)  # metadata
+        self.peak_time = kwargs.get('peak_time', None)  # metadata
+        self.peak_value = kwargs.get('peak_value', None)  # metadata
         # additional only in class-object
-        self.peaks_indexes = None
-        self.peaks_times = None
-        self.peaks_values = None
+        self.peaks_indexes = kwargs.get('peaks_indexes', None)
+        self.peaks_times = kwargs.get('peaks_times', None)
+        self.peaks_values = kwargs.get('peaks_values', None)
         # additional only in class-object, own table in database "auto_{}_df_{version}_{id_measurement}_measurement
-        self._tms_df = None
-        self._wind_df = None
-        self._tms_wind_df = None
+        self._tms_df = kwargs.get('_tms_df', None)
+        self._wind_df = kwargs.get('_wind_df', None)
+        self._tms_wind_df = kwargs.get('_tms_wind_df', None)
 
     def __str__(self):
         return f"{self.__class__.__name__}(id={self.version_id}, tms_table_name={self.tms_table_name})"
@@ -209,10 +200,23 @@ class Version(BaseClass):
 
         return f"auto_tms_df_{version_name}_{str(measurement_id).zfill(3)}_measurement"
 
+    @staticmethod
+    def get_tms_wind_table_name(version_name: str, measurement_id: int) -> str:
+        """
+        Generates a tms data frame table name.
+
+        :param version_name: Version of the data.
+        :param measurement_id: ID of the measurement to which the data belongs.
+        :return: New table name in the format of "auto_tms_df_{version_name}_{id_measurement}_measurement".
+        """
+
+        return f"auto_tms_wind_df_{version_name}_{str(measurement_id).zfill(3)}_measurement"
+
     @classmethod
     def load_from_csv(cls, filepath: str, measurement_id: int, version_id: int = None,
-                      version_name: str = config.default_load_from_csv_version_name, tms_table_name: str = None) -> \
-    Optional['Version']:
+                      version_name: str = config.default_load_from_csv_version_name, tms_table_name: str = None,
+                      tms_wind_table_name: str = None) -> \
+            Optional['Version']:
         """
         Loads TMS Data from a CSV file.
 
@@ -221,6 +225,7 @@ class Version(BaseClass):
         :param measurement_id: ID of the measurement to which the data belongs.
         :param version_name: Version Name of the data.
         :param tms_table_name:
+        :param tms_wind_table_name:
         :return: Data object.
         """
         if not filepath:
@@ -229,7 +234,7 @@ class Version(BaseClass):
             return None
 
         version = cls(version_id=version_id, measurement_id=measurement_id, version_name=version_name,
-                      tms_table_name=tms_table_name)
+                      tms_table_name=tms_table_name, tms_wind_table_name=tms_wind_table_name)
 
         version.tms_df = cls.read_csv_tms(filepath)
 
@@ -264,54 +269,48 @@ class Version(BaseClass):
             raise e
         return tms_df
 
-    @classmethod
-    def create_copy(cls, source_obj, new_version_name: config.default_new_version_name) -> Optional['Version']:
-        """
-        Creates a new version of the Version object.
-
-        :param source_obj: The source Version object to be copied.
-        :param new_version_name: The new version.
-        :return: New Version instance.
-        """
-        tms_table_name = cls.get_tms_table_name(new_version_name, source_obj.measurement_id)
-        try:
-            copy = cls(version_id=None, measurement_id=source_obj.measurement_id, version_name=new_version_name,
-                       tms_table_name=tms_table_name)
-            if copy.tms_table_name == source_obj.tms_table_name:
-                logger.critical(
-                    f"Table name for new instance is the same as the source instance table name.")
-                return None
-            copy.tms_df = source_obj.tms_df.copy(deep=True)
-
-            session = db_manager.get_session()
-            session.add(copy)
-            copy.write_sql_tms_df(session)
-            db_manager.commit(session)
-            logger.debug(f"Created and committed the new instance '{copy}' to the database successful.")
-            return copy
-
-        except Exception as e:
-            logger.error(f"Error while copying from '{source_obj}' or committing: {e}")
-            return None
-
     @dec_runtime
-    def copy(self, new_version_name: str = config.default_new_version_name) -> Optional['Version']:
+    def copy(self, new_version_name: str = config.default_new_version_name, overwrite: bool = False) \
+            -> Optional['Version']:
         """
         Create a copy of the Version instance.
 
-        :param new_version_name:
-        :return: Copied data object.
+        :param version: The Version instance to copy.
+        :param new_version_name: The name of the new version.
+        :param overwrite: Determines whether to overwrite an existing version.
+        :return: The copied Version instance, or None if the copy was unsuccessful.
         """
-        copy = super().copy(auto_commit=False)
+        new_tms_table_name = self.get_tms_table_name(new_version_name, self.measurement_id)
+        new_tms_wind_table_name = self.get_tms_wind_table_name(new_version_name, self.measurement_id)
+
+        # Check in the parents Measurement Instance in measurement.version, if a version with same table_name is
+        versions = self.measurement.get_versions_by_filter({'tms_table_name': new_tms_table_name}, method='db_filter')
+        present_version = versions[0] if versions is not None else None
+
+        if present_version is not None:
+            if not overwrite:
+                logger.warning(
+                    f"Existing version with tms_table_name '{new_tms_table_name}' will be not overwritten. Present '{present_version}'")
+                return present_version
+            logger.warning(
+                f"Existing version with tms_table_name '{new_tms_table_name}' will be overwritten. Present {present_version} overwritten.")
+            version_id = present_version.version_id
+        else:  # present_version is None
+            logger.debug(f"Create new Version with version_name '{new_version_name}'.")
+            version_id = None
+
+        copy = super().copy(add_to_session=False, auto_commit=False)
         if copy is None:
             return None
 
+        copy.version_id = version_id
+        copy.version_name = new_version_name
+        copy.tms_table_name = new_tms_table_name
+        copy.tms_wind_table_name = new_tms_wind_table_name
         copy.tms_df = self.tms_df.copy(deep=True)
-        if new_version_name:
-            copy.version_name = new_version_name
-            copy.tms_table_name = copy.get_tms_table_name(copy.version_name, copy.measurement_id)
 
         session = db_manager.get_session()
+        session.merge(copy)
         copy.write_sql_tms_df(session)
         db_manager.commit(session)
         logger.debug(f"Copy '{copy}' successful (auto_commit={True}.")

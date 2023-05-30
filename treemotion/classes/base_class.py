@@ -57,6 +57,7 @@ class BaseClass(Base):
             if not objs:
                 logger.warning(f"No instances of '{cls.__name__}' with primary keys '{ids}' found")
 
+            logger.info(f"Loading successful '{len(objs)}' of class {cls.__name__}.")
             return objs
         except Exception as e:
             logger.error(
@@ -65,7 +66,7 @@ class BaseClass(Base):
 
     @dec_runtime
     def load_from_csv(self, version_name: str = config.default_load_from_csv_version_name, overwrite: bool = False) -> \
-    Optional[List]:
+            Optional[List]:
         """
         Load data from CSV files for all series associated with the project.
 
@@ -225,49 +226,55 @@ class BaseClass(Base):
         return results
 
     @dec_runtime
-    def get_versions_by_db_filter(self, filter_dict: Dict[str, Any]) -> Optional[List[Any]]:
+    def get_versions_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[List]]:
         """
-        Executes 'get_versions_by_db_filter' method in all 'Measurement' class children with given filter.
+        Executes 'get_versions_by_filter' method in all 'Measurement' class children with given filter.
 
         :param filter_dict: Dictionary with filter keys and values
-        :return: List with version_objs of method execution on all 'Measurement' class children,
+        :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
+               The default value is "list_filter".
+               list_filter is way faster, but not searching in database.
+        :return: List with versions_lists of method execution on all 'Measurement' class children,
                  or None if an error occurred.
         """
-        logger.info(f"Start 'get_versions_by_db_filter' with filter '{filter_dict}' for instance of '{self}'")
+        logger.info(f"Start 'get_versions_by_filter' with filter '{filter_dict}' for instance of '{self}'")
         try:
-            version_objs = self.method_for_all_of_class(class_name="Measurement",
-                                                        method_name='get_versions_by_db_filter',
-                                                        filter_dict=filter_dict)
-            logger.info(f"Finished 'get_versions_by_db_filter' for instance of '{self}'")
+            versions_lists = self.method_for_all_of_class(class_name="Measurement",
+                                                          method_name='get_versions_by_filter',
+                                                          filter_dict=filter_dict,
+                                                          method=method)
+            logger.info(f"Finished 'get_versions_by_filter' for instance of '{self}'")
 
-            return version_objs
+            return versions_lists
         except Exception as e:
-            logger.error(f"Error in '{self.__class__.__name__}'.get_versions_by_db_filter from '{self}', Error: {e}")
+            logger.error(f"Error in '{self.__class__.__name__}'.get_versions_by_filter from '{self}', Error: {e}")
             return None
 
     @dec_runtime
     def get_versions_by_version_name(self, version_name: str = config.default_load_from_csv_version_name) -> \
             Optional[List[Any]]:
         """
-        Executes 'get_versions_by_db_filter' method with 'version_name' filter in all 'Measurement' class children.
+        Executes 'get_versions_by_filter' method with 'version_name' filter in all 'Measurement' class children.
 
         :param version_name: Version name to use as filter
         :return: List with versions of method execution on all 'Measurement' class children from instance,
                  or None if an error occurred.
         """
         logger.info(f"Start 'get_versions_by_version_name' for '{self}'")
-        versions = self.get_versions_by_db_filter({"version_name": version_name})
+        versions = self.get_versions_by_filter({"version_name": version_name})
 
         logger.info(f"Finished 'get_versions_by_version_name' for '{self}'")
 
         return versions
 
-    def copy(self, auto_commit: bool = False) -> Optional['BaseClass']:
+    def copy(self, add_to_session: bool = True, auto_commit: bool = False) -> Optional['BaseClass']:
         """
         Create a shallow copy of this instance.
 
         Parameters
         ----------
+        add_to_session : bool
+            Whether to automatically add the new instance to the Session. Default is True.
         auto_commit : bool
             Whether to automatically commit the new instance to the database. Default is False.
 
@@ -284,12 +291,13 @@ class BaseClass(Base):
             copy = cls(**{attr: value for attr, value in self.__dict__.items() if attr != '_sa_instance_state'})
             setattr(copy, primary_key, None)  # set primary key = None
 
+        except Exception as e:
+            logger.error(f"Copy '{self}' failed ,error: {e}")
+            return None
+
+        if add_to_session:
             session = db_manager.get_session()
             session.add(copy)
-
-        except Exception as e:
-            logger.error(f"Copy '{copy}' failed ,error: {e}")
-            return None
 
         if auto_commit:
             logger.debug(f"Copy '{copy}' successful (auto_commit={auto_commit}).")

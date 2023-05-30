@@ -16,28 +16,15 @@ class Project(BaseClass):
     series = relationship('Series', back_populates="project", lazy="joined", cascade='all, delete-orphan',
                           order_by='Series.series_id')
 
-    def __init__(self, *args, project_id=None, name=None, location=None, researcher=None,
-                 datetime_start=None, **kwargs):
-        """
-        Initialize the Project instance.
-
-        Args:
-            *args: Variable length argument list.
-            project_id (int): The ID of the project.
-            name (str): The name of the project.
-            location (str): The location of the project.
-            researcher (str): The researcher associated with the project.
-            datetime_start (datetime): The start date and time of the project.
-            **kwargs: Arbitrary keyword arguments.
-        """
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args)
 
         # in SQLite Database
-        self.project_id = project_id
-        self.name = name
-        self.location = location
-        self.researcher = researcher
-        self.datetime_start = datetime_start
+        self.project_id = kwargs.get('project_id', None)
+        self.name = kwargs.get('name', None)
+        self.location = kwargs.get('location', None)
+        self.researcher = kwargs.get('researcher', None)
+        self.datetime_start = kwargs.get('datetime_start', None)
 
     def __str__(self):
         """

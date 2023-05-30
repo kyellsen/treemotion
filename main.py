@@ -9,16 +9,25 @@ filename_db_1 = r"TREEMOTION_BOSAU_backup - kopie.db"
 csv_path = r"C:\Users\mail\Meine Ablage\Kyellsen\005_Projekte\2022_Bosau\020_Daten"
 
 db_manager.connect(db_filename=filename_db_1)
+
 project_1 = Project.load_from_db()[0]
 # filenames = project_1.add_filenames(csv_path)
+#
 # series = Series.load_from_db(1)[0]
 # series.load_from_csv()
-version_1 = Version.load_from_db()[0]
-copy = version_1.copy()
-
-# measurement_1 = Measurement.load_from_db(1)[0]
 #
-# measurement_1.load_from_csv(overwrite=False)
+measurement_1 = Measurement.load_from_db(1)[0]
+measurement_1.load_from_csv(overwrite=False)
+measurement_1.load_from_csv(overwrite=False)
+measurement_1.load_from_csv(overwrite=True)
+
+version_1 = Version.load_from_db()[0]
+copy_1 = version_1.copy(overwrite=False)
+copy_2 = version_1.copy(overwrite=True)
+copy_3 = version_1.copy(overwrite=False)
+copy_4 = version_1.copy(overwrite=True)
+
+
 
 
 

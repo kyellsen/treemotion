@@ -38,38 +38,20 @@ class Measurement(BaseClass):
     version = relationship('Version', back_populates="measurement", lazy="joined", cascade='all, delete-orphan',
                            order_by='Version.version_id')
 
-    def __init__(self, *args, measurement_id: int = None, series_id: int = None,
-                 tree_treatment_id: int = None, sensor_id: int = None, measurement_status_id: int = None,
-                 filename: str = None, filepath: str = None, sensor_location_id: int = None, sensor_height: int = None,
-                 sensor_circumference: int = None, sensor_compass_direction: int = None, **kwargs):
-        """
-        Initialize a new instance of the Measurement class.
-
-        :param measurement_id: The ID of the measurement.
-        :param series_id: The ID of the series.
-        :param tree_treatment_id: The ID of the tree treatment.
-        :param sensor_id: The ID of the sensor.
-        :param measurement_status_id: The ID of the measurement status.
-        :param filename: The name of the TMS.csv file.
-        :param filepath: The path to the TMS.csv file.
-        :param sensor_location_id: The ID of the sensor location.
-        :param sensor_height: The height of the sensor.
-        :param sensor_circumference: The circumference of the tree trunk at sensor height.
-        :param sensor_compass_direction: The orientation of the sensor (degrees relative to North).
-        """
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args)
         # in SQLite Database
-        self.measurement_id = measurement_id
-        self.series_id = series_id
-        self.tree_treatment_id = tree_treatment_id
-        self.sensor_id = sensor_id
-        self.measurement_status_id = measurement_status_id
-        self.filename = filename
-        self.filepath = filepath
-        self.sensor_location_id = sensor_location_id
-        self.sensor_height = sensor_height
-        self.sensor_circumference = sensor_circumference
-        self.sensor_orientation = sensor_compass_direction
+        self.measurement_id = kwargs.get('measurement_id', None)
+        self.series_id = kwargs.get('series_id', None)
+        self.tree_treatment_id = kwargs.get('tree_treatment_id', None)
+        self.sensor_id = kwargs.get('sensor_id', None)
+        self.measurement_status_id = kwargs.get('measurement_status_id', None)
+        self.filename = kwargs.get('filename', None)
+        self.filepath = kwargs.get('filepath', None)
+        self.sensor_location_id = kwargs.get('sensor_location_id', None)
+        self.sensor_height = kwargs.get('sensor_height', None)
+        self.sensor_circumference = kwargs.get('sensor_circumference', None)
+        self.sensor_orientation = kwargs.get('sensor_compass_direction', None)
 
     def __str__(self) -> str:
         """
@@ -90,28 +72,34 @@ class Measurement(BaseClass):
         :return: The updated or newly created Version instance, or None if an error occurs.
         """
         if self.filepath is None:
-            logger.warning(f"Process for '{self}' canceled, no filename for tms_utils.csv (filename = {self.filename}).")
+            logger.warning(
+                f"Process for '{self}' canceled, no filename for tms_utils.csv (filename = {self.filename}).")
             return None
 
         logger.info(f"Start loading TMS data from CSV for '{self}'")
+
         tms_table_name = Version.get_tms_table_name(version_name, self.measurement_id)
-        # present_version = self.get_versions_by_db_filter({'tms_table_name': tms_table_name}) # runtime from get_versions_by_list_filter way faster, same result
-        present_version = self.get_versions_by_list_filter({'tms_table_name': tms_table_name})
+        tms_wind_table_name = Version.get_tms_wind_table_name(version_name, self.measurement_id)
+        versions = self.get_versions_by_filter({'tms_table_name': tms_table_name})
+        present_version = versions[0] if versions is not None else None
+
         if present_version is not None and not overwrite:
-            logger.warning(f"Existing version '{version_name}' will be not overwritten (overwrite = False): '{present_version}'")
+            logger.warning(
+                f"Existing version '{version_name}' will be not overwritten (overwrite = False): '{present_version}'")
             return present_version
 
         elif present_version is not None and overwrite:
-            logger.warning(f"Existing version '{version_name}' will be overwritten (overwrite = True): '{present_version}'")
+            logger.warning(
+                f"Existing version '{version_name}' will be overwritten (overwrite = True): '{present_version}'")
             version_id = present_version.version_id
             self.version.remove(present_version)
 
         else:  # present_version is None:
-            logger.debug(f"Create new Version '{version_name}'.")
+            logger.debug(f"Create new Version with version_name '{version_name}'.")
             version_id = None
         try:
             version = Version.load_from_csv(self.filepath, self.measurement_id, version_id, version_name,
-                                            tms_table_name)
+                                            tms_table_name, tms_wind_table_name)
             self.version.append(version)
             logger.info(f"Loading {version} from CSV successful, attached to {self}.")
             return version
@@ -120,60 +108,41 @@ class Measurement(BaseClass):
             logger.error(f"Failed to create Version '{version_name}' from {self}, csv file:{self.filepath}, error: {e}")
             return None
 
-    def get_versions_by_list_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
+    def get_versions_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[Version]]:
         """
-        Find a version object based on the provided filters.
+        Find all version objects based on the provided filters.
 
         :param filter_dict: A dictionary of attributes and their desired values.
                             For example: {'tms_table_name': tms_table_name}
-        :return: The found Version instance, or None if no match is found.
-
+        :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
+                       The default value is "list_filter".
+        :return: A list of found Version instances, or None if no match is found.
         """
 
         if not isinstance(filter_dict, dict):
             logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
             return None
 
-        matching_versions = [version for version in self.version if
-                             all(getattr(version, k, None) == v for k, v in filter_dict.items())]
-
-        if not matching_versions:
-            logger.debug(f"No Version instance found with the given filters: {filter_dict}.")
-            return None
-
-        if len(matching_versions) > 1:
-            logger.warning(
-                f"Multiple Version instances found with the given filters: {filter_dict}. Returning only the first instance.")
-
-        logger.debug(f"Version instance found with the given filters: {filter_dict}.")
-        return matching_versions[0]
-
-
-    def get_versions_by_db_filter(self, filter_dict: Dict[str, Any]) -> Optional[Version]:
-        """
-        Find a version object based on the provided filters.
-
-        :param filter_dict: A dictionary of attributes and their desired values.
-                            For example: {'tms_table_name': tms_table_name}
-        :return: The found Version instance, or None if no match is found.
-        """
-
-        if not isinstance(filter_dict, dict):
-            logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
-            return None
-        session = db_manager.get_session()
         try:
-            matching_version = (session.query(Version)
-                                .filter(Version.measurement == self)
-                                .filter_by(**filter_dict)
-                                .first())
-
-            if matching_version is None:
-                logger.info(f"No Version instance found with the given filters: {filter_dict}.")
+            if method == "list_filter":
+                matching_versions = [version for version in self.version if
+                                     all(getattr(version, k, None) == v for k, v in filter_dict.items())]
+            elif method == "db_filter":
+                session = db_manager.get_session()
+                matching_versions = (session.query(Version)
+                                     .filter(Version.measurement == self)
+                                     .filter_by(**filter_dict)
+                                     .all())
+            else:
+                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
                 return None
 
-            logger.info(f"Version instance found with the given filters: {filter_dict}.")
-            return matching_version
+            if not matching_versions:
+                logger.debug(f"No Version instance found with the given filters: {filter_dict}.")
+                return None
+
+            logger.debug(f"{len(matching_versions)} Version instances found with the given filters: {filter_dict}.")
+            return matching_versions
 
         except Exception as e:
             logger.error(f"An error occurred while querying the Version: {str(e)}")
