@@ -1,4 +1,6 @@
 # treemotion/classes/series.py
+from sqlalchemy import distinct, Table, MetaData
+
 from common_imports.classes_heavy import *
 from utils.path_utils import validate_and_get_path, validate_and_get_file_list, extract_sensor_id
 
@@ -45,20 +47,69 @@ class Series(BaseClass):
         return f"Series(series_id={self.series_id}, series_id={self.series_id})"
 
     @property
+    @dec_runtime
     def version_dict(self) -> Dict:
+        """
+        This property gets the version dictionary.
+
+        Returns:
+            dict: Version dictionary.
+        """
+        logger.info(f"{self} start loading version_dict!")
         if not hasattr(self, '_version_dict') or self._version_dict is None:
             self._version_dict = {}
 
+        unique_version_names = self.get_unique_version_names_in_series()
+
+        # Check if the unique_version_names have changed since last update
+        if set(self._version_dict.keys()) != set(unique_version_names):
+            for unique_version_name in unique_version_names:
+                logger.debug(f"Create Series.version_dict[{unique_version_name}].")
+                try:
+                    versions = self.get_versions_by_filter({"version_name": unique_version_name})
+                    self._version_dict[unique_version_name] = versions
+
+                except Exception as e:
+                    logger.error(f"Error occurred while creating version dictionary for version_name '{unique_version_name}': {e}")
+                    raise
+            logger.info(f"{self} version_dict created for {unique_version_names}!")
+        else:
+            logger.info(f"{self} version_dict returns present version_dict for {unique_version_names}!")
+
         return self._version_dict
 
-    def add_version_list(self, version_name):
+    def get_unique_version_names_in_series(self) -> List[str]:
+        """
+        This method retrieves all unique 'version_name's from 'Version' that are associated
+        with 'Measurement' entities belonging to this 'Series' instance.
+
+        Returns:
+            List[str]: List of unique version names
+        """
         try:
-            version_list = self.get_versions_by_version_name(version_name)
-            self.version_dict[version_name] = version_list
+            # Assuming that session is correctly set up and initialized
+            session = db_manager.get_session()
+
+            # Get the table objects from the metadata instance of your engine
+            metadata = MetaData()
+            measurement_table = Table("Measurement", metadata, autoload_with=session.get_bind())
+            version_table = Table("Version", metadata, autoload_with=session.get_bind())
+
+            # Query to get distinct version_names
+            unique_version_names = (session.query(distinct(version_table.c.version_name))
+                                    .select_from(measurement_table)
+                                    .join(version_table)
+                                    .filter(measurement_table.c.series_id == self.series_id)
+                                    .all())
+
+            # Extract version names from the returned list of tuples
+            unique_version_names = [name[0] for name in unique_version_names]
+            logger.debug(f"Found the following unique version names '{unique_version_names}'")
+            return unique_version_names
 
         except Exception as e:
-            raise e
-        return self.version_dict[version_name]
+            logger.error(f"Error occurred while retrieving unique version names: {e}")
+            return []
 
     @dec_runtime
     def add_filenames(self, csv_path: str, auto_commit: bool = True):

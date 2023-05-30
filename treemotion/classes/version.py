@@ -17,6 +17,7 @@ class Version(BaseClass):
     measurement_id = Column(Integer, ForeignKey('Measurement.measurement_id', onupdate='CASCADE'), nullable=False)
     version_name = Column(String)
     tms_table_name = Column(String)
+    tms_wind_table_name = Column(String)
     datetime_start = Column(DateTime)
     datetime_end = Column(DateTime)
     duration = Column(Float)

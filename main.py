@@ -13,19 +13,27 @@ db_manager.connect(db_filename=filename_db_1)
 project_1 = Project.load_from_db()[0]
 # filenames = project_1.add_filenames(csv_path)
 #
-# series = Series.load_from_db(1)[0]
-# series.load_from_csv()
+series = Series.load_from_db(1)[0]
+series.load_from_csv()
 #
-measurement_1 = Measurement.load_from_db(1)[0]
-measurement_1.load_from_csv(overwrite=False)
-measurement_1.load_from_csv(overwrite=False)
-measurement_1.load_from_csv(overwrite=True)
+# measurement_1 = Measurement.load_from_db(1)[0]
+# measurement_1.load_from_csv(overwrite=False)
+# measurement_2 = Measurement.load_from_db(2)[0]
+# measurement_2.load_from_csv(overwrite=False)
 
-version_1 = Version.load_from_db()[0]
-copy_1 = version_1.copy(overwrite=False)
-copy_2 = version_1.copy(overwrite=True)
-copy_3 = version_1.copy(overwrite=False)
-copy_4 = version_1.copy(overwrite=True)
+series.copy_versions_by_version_name()
+
+#version_names = series.get_unique_version_names_in_series()
+
+version_dict = series.version_dict
+version_dict = series.version_dict
+version_dict = series.version_dict
+
+# version_1 = Version.load_from_db()[0]
+# copy_1 = version_1.copy(overwrite=False)
+# copy_2 = version_1.copy(overwrite=True)
+# copy_3 = version_1.copy(overwrite=False)
+# copy_4 = version_1.copy(overwrite=True)
 
 
 

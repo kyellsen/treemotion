@@ -215,7 +215,7 @@ class BaseClass(Base):
                 try:
                     result = method(*args, **kwargs)
                     if result:
-                        results.append(result)
+                        results.extend(result)
                 except Exception as e:
                     logger.error(
                         f"Error occurred while executing the method '{method_name}' on '{instance.__class__.__name__}': {e}"
@@ -226,7 +226,7 @@ class BaseClass(Base):
         return results
 
     @dec_runtime
-    def get_versions_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[List]]:
+    def get_versions_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[Any]]:
         """
         Executes 'get_versions_by_filter' method in all 'Measurement' class children with given filter.
 
@@ -234,7 +234,7 @@ class BaseClass(Base):
         :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
                The default value is "list_filter".
                list_filter is way faster, but not searching in database.
-        :return: List with versions_lists of method execution on all 'Measurement' class children,
+        :return: List with versions of method execution on all 'Measurement' class children,
                  or None if an error occurred.
         """
         logger.info(f"Start 'get_versions_by_filter' with filter '{filter_dict}' for instance of '{self}'")
@@ -251,21 +251,42 @@ class BaseClass(Base):
             return None
 
     @dec_runtime
-    def get_versions_by_version_name(self, version_name: str = config.default_load_from_csv_version_name) -> \
-            Optional[List[Any]]:
+    def copy_versions_by_version_name(self,
+                                      version_name: str = config.default_load_from_csv_version_name,
+                                      new_version_name: str = config.default_new_version_name,
+                                      overwrite: bool = False) -> List:
         """
-        Executes 'get_versions_by_filter' method with 'version_name' filter in all 'Measurement' class children.
+        This function copies versions based on a provided version_name and generates copies with a new version name.
+        If a version with the new name already exists, it can be overwritten if 'overwrite' is set to True.
 
-        :param version_name: Version name to use as filter
-        :return: List with versions of method execution on all 'Measurement' class children from instance,
-                 or None if an error occurred.
+        Args:
+            version_name (str): The name of the version(s) to be copied.
+            new_version_name (str): The name for the new version(s).
+            overwrite (bool): Determines if existing versions with the same name should be overwritten. Defaults to False.
+
+        Returns:
+            List[VersionInstance]: Returns a list of copied version instances.
         """
-        logger.info(f"Start 'get_versions_by_version_name' for '{self}'")
-        versions = self.get_versions_by_filter({"version_name": version_name})
 
-        logger.info(f"Finished 'get_versions_by_version_name' for '{self}'")
+        logger.info(f"Start 'copy_versions_by_version_name' for '{self}'")
 
-        return versions
+        # Get the versions to be copied
+        present_versions = self.get_versions_by_filter({"version_name": version_name})
+
+        if not present_versions:
+            logger.warning(
+                f"No versions found for version_name: {version_name}. Exiting 'copy_versions_by_version_name'")
+            return []
+
+        # Copy the versions
+        try:
+            copy_versions = [present_version.copy(new_version_name, overwrite) for present_version in present_versions]
+        except Exception as e:
+            logger.error(f"Error occurred while copying versions: {e}")
+            return []
+
+        logger.info(f"Finished 'copy_versions_by_version_name' for {len(copy_versions)} Version instances in '{self}'.")
+        return copy_versions
 
     def copy(self, add_to_session: bool = True, auto_commit: bool = False) -> Optional['BaseClass']:
         """
