@@ -49,3 +49,36 @@ class Measurement(BaseClass):
         self.sensor_height = sensor_height
         self.sensor_circumference = sensor_circumference
         self.sensor_orientation = sensor_orientation
+
+    def __str__(self) -> str:
+        """
+        Represents the Measurement instance as a string.
+
+        :return: A string representation of the Measurement instance.
+        """
+        return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filename})"
+
+    @property
+    def filepath_tms(self):
+        """
+        Calculates the full file path for TMS files,
+        composed of the path in the Series table and the file name in this table.
+        Logs an error if the path information is incomplete or invalid.
+        """
+        if not self.series:
+            logger.error("Series object is missing in Measurement.")
+            return None
+        if not self.series.filepath_tms:
+            logger.error("Filepath for TMS is missing in Series.")
+            return None
+        if not self.filename_tms:
+            logger.error("Filename for TMS is missing in Measurement.")
+            return None
+        try:
+            series_path = Path(self.series.filepath_tms)
+            return series_path / self.filename_tms
+        except Exception as e:
+            logger.error(f"Error constructing filepath for TMS: {e}")
+            return None
+
+

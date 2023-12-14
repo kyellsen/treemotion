@@ -21,9 +21,13 @@ if __name__ == "__main__":
     DATABASE_MANAGER.connect(db_name=str(db_name))
     session = DATABASE_MANAGER.get_session()
 
-    #project = Project(project_name="Bosau_Test")
-    #session.add(project)
+    project = Project(project_name="Bosau_Test")
+    session.add(project)
     series_ls = session.query(Series).all()
+    series_1 = series_ls[0]
+    series_1.DATABASE_MANAGER = DATABASE_MANAGER
+    series_1.add_filenames(r"C:\kyellsen\005_Projekte\2022_Bosau\020_Daten", auto_commit=True)
 
-    DATABASE_MANAGER.commit()
+    #DATABASE_MANAGER.commit()
+
     #DATABASE_MANAGER.disconnect()

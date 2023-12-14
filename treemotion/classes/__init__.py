@@ -1,3 +1,4 @@
+from .base_class import BaseClass
 from .measurement import Measurement
 from .measurement_version import MeasurementVersion
 from .measurement_status import MeasurementStatus

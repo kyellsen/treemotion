@@ -33,22 +33,26 @@ class MeasurementVersion(BaseClass):
                              order_by='DataWind.data_id')
 
 
-def __init__(self, measurement_version_id=None, measurement_version_name=None, measurement_id=None, data_tms_id=None,
-             data_ls3_id=None, data_wind_id=None, datetime_start=None, datetime_end=None,
-             duration=None, length=None, tempdrift_method=None, peak_index=None,
-             peak_time=None, peak_value=None):
-    super().__init__()
-    self.measurement_version_id = measurement_version_id
-    self.measurement_version_name = measurement_version_name
-    self.measurement_id = measurement_id
-    self.data_tms_id = data_tms_id
-    self.data_ls3_id = data_ls3_id
-    self.data_wind_id = data_wind_id
-    self.datetime_start = datetime_start
-    self.datetime_end = datetime_end
-    self.duration = duration
-    self.length = length
-    self.tempdrift_method = tempdrift_method
-    self.peak_index = peak_index
-    self.peak_time = peak_time
-    self.peak_value = peak_value
+    def __init__(self, measurement_version_id=None, measurement_version_name=None, measurement_id=None, data_tms_id=None,
+                 data_ls3_id=None, data_wind_id=None, datetime_start=None, datetime_end=None,
+                 duration=None, length=None, tempdrift_method=None, peak_index=None,
+                 peak_time=None, peak_value=None):
+        super().__init__()
+        self.measurement_version_id = measurement_version_id
+        self.measurement_version_name = measurement_version_name
+        self.measurement_id = measurement_id
+        self.data_tms_id = data_tms_id
+        self.data_ls3_id = data_ls3_id
+        self.data_wind_id = data_wind_id
+        self.datetime_start = datetime_start
+        self.datetime_end = datetime_end
+        self.duration = duration
+        self.length = length
+        self.tempdrift_method = tempdrift_method
+        self.peak_index = peak_index
+        self.peak_time = peak_time
+        self.peak_value = peak_value
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(id={self.measurement_version_id}, measurement_version_name={self.measurement_version_name})"
+
