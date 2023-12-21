@@ -21,6 +21,7 @@ class Measurement(BaseClass):
     measurement_status_id = Column(Integer, ForeignKey('MeasurementStatus.measurement_status_id',
                                                        onupdate='CASCADE'))
     filename_tms = Column(String)
+    filepath_tms = Column(String)
     sensor_location_id = Column(Integer, ForeignKey('SensorLocation.sensor_location_id', onupdate='CASCADE'))
     sensor_height = Column(Integer)
     sensor_circumference = Column(Integer)
@@ -36,7 +37,7 @@ class Measurement(BaseClass):
                                        order_by='MeasurementVersion.measurement_version_id')
 
     def __init__(self, measurement_id=None, series_id=None, tree_treatment_id=None, sensor_id=None,
-                 measurement_status_id=None, filename_tms=None, sensor_location_id=None,
+                 measurement_status_id=None, filename_tms=None, filepath_tms=None, sensor_location_id=None,
                  sensor_height=None, sensor_circumference=None, sensor_orientation=None):
         super().__init__()
         self.measurement_id = measurement_id
@@ -45,6 +46,7 @@ class Measurement(BaseClass):
         self.sensor_id = sensor_id
         self.measurement_status_id = measurement_status_id
         self.filename_tms = filename_tms
+        self.filepath_tms = filepath_tms
         self.sensor_location_id = sensor_location_id
         self.sensor_height = sensor_height
         self.sensor_circumference = sensor_circumference
@@ -56,29 +58,58 @@ class Measurement(BaseClass):
 
         :return: A string representation of the Measurement instance.
         """
-        return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filename})"
+        return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filepath_tms})"
 
-    @property
-    def filepath_tms(self):
+    @dec_runtime
+    def load_from_csv(self, measurement_version_name: str = None,
+                      overwrite: bool = False) -> Optional[MeasurementVersion]:
         """
-        Calculates the full file path for TMS files,
-        composed of the path in the Series table and the file name in this table.
-        Logs an error if the path information is incomplete or invalid.
+        Load data from a CSV file and update existing data if necessary.
+
+        :param measurement_version_name: MeasurementVersion of the data.
+        :param overwrite: Determines whether to overwrite existing data.
+        :return: The updated or newly created MeasurementVersion instance, or None if an error occurs.
         """
-        if not self.series:
-            logger.error("Series object is missing in Measurement.")
+
+        if self.filepath_tms is None or not Path(self.filepath_tms).is_file():
+            logger.warning(f"Process for '{self}' canceled, no filepath_tms: '{self.filepath_tms}'.")
             return None
-        if not self.series.filepath_tms:
-            logger.error("Filepath for TMS is missing in Series.")
-            return None
-        if not self.filename_tms:
-            logger.error("Filename for TMS is missing in Measurement.")
-            return None
+
+        logger.info(f"Start loading TMS data from CSV for '{self}'")
+
         try:
-            series_path = Path(self.series.filepath_tms)
-            return series_path / self.filename_tms
+            m_v_name = measurement_version_name or self.get_config().MeasurementVersion.default_load_from_csv_measurement_version_name
+
+            present_m_v = (self.get_database_manager().session.query(MeasurementVersion)
+                           .filter(MeasurementVersion.measurement_id == self.measurement_id,
+                                   MeasurementVersion.measurement_version_name == m_v_name)
+                           .first())
+
         except Exception as e:
-            logger.error(f"Error constructing filepath for TMS: {e}")
+            logger.error(
+                f"Failed to retrieve MeasurementVersion '{measurement_version_name}' for Measurement ID '{self.measurement_id}'. Error: {e}")
             return None
 
+        # Wenn present_m_v vorhanden und overwrite=False -> return present_m_v
+        if present_m_v and not overwrite:
+            logger.warning(f"Existing measurement_version '{m_v_name}' will not be overwritten: '{present_m_v}'")
+            return present_m_v
+        try:
+            DATABASE_MANAGER = self.get_database_manager()
+            session = DATABASE_MANAGER.session
+            if present_m_v and overwrite:
+                logger.warning(f"Existing measurement_version '{m_v_name}' will be overwritten: '{present_m_v}'")
+                session.delete(present_m_v)
+                session.flush()
 
+            m_v = MeasurementVersion.load_from_csv(filepath_tms=self.filepath_tms, measurement_id=self.measurement_id,
+                                                   measurement_version_id=None, measurement_version_name=m_v_name)
+            self.measurement_version.append(m_v)
+            DATABASE_MANAGER.commit()
+            logger.info(f"{'Updated' if present_m_v else 'Created'} '{m_v}' from CSV, attached to '{self}'.")
+            return m_v
+        except Exception as e:
+            logger.error(
+                f"Failed to {'update' if present_m_v else 'create'} MeasurementVersion '{m_v_name}' for '{self}', error: {e}")
+
+            return None

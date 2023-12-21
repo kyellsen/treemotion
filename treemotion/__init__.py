@@ -1,12 +1,12 @@
 from typing import Tuple, Optional
-from .utils.base import Base
 from kj_core import DataManager
 from kj_core import DatabaseManager
 from kj_core import PlotManager
 from kj_core import log_manager, get_logger
-# from .classes import Series, Sensor, Measurement
 
 from .config import Config
+
+# from .classes import Series, Sensor, Measurement
 
 CONFIG = None
 DATA_MANAGER = None
@@ -39,7 +39,7 @@ def setup(working_directory: Optional[str] = None, log_level: Optional[str] = No
     DATA_MANAGER = DataManager(CONFIG)
     logger.info(f"{name_s}: DATA_MANAGER initialized: {DATA_MANAGER}")
 
-    DATABASE_MANAGER = DatabaseManager(CONFIG) #, Base
+    DATABASE_MANAGER = DatabaseManager(CONFIG)  # , Base
     logger.info(f"{name_s}: DATABASE_MANAGER initialized: {DATABASE_MANAGER}")
 
     PLOT_MANAGER = PlotManager(CONFIG)
@@ -48,4 +48,3 @@ def setup(working_directory: Optional[str] = None, log_level: Optional[str] = No
     logger.info(f"{name_s}: {name} setup completed.")
 
     return CONFIG, DATA_MANAGER, DATABASE_MANAGER, PLOT_MANAGER
-

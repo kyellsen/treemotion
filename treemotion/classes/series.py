@@ -6,7 +6,6 @@ from .wind_measurement import WindMeasurement
 
 import treemotion
 
-
 logger = get_logger(__name__)
 
 
@@ -82,7 +81,7 @@ class Series(BaseClass):
             return
 
         search_path = csv_path.joinpath(filepath_tms)
-        if not search_path.exists():
+        if not search_path.is_dir():
             logger.error(f"search_path {search_path} does not exist.")
             return
 
@@ -104,7 +103,8 @@ class Series(BaseClass):
                 corresponding_file = next(
                     (f for f in csv_files if extract_last_three_digits(f) == measurement.sensor_id), None)
                 if corresponding_file and corresponding_file.is_file():
-                    measurement.filename_tms = corresponding_file.name
+                    measurement.filename_tms = str(corresponding_file.name)
+                    measurement.filepath_tms = str(search_path / corresponding_file.name)
                     successful_updates += 1
                 else:
                     logger.warning(f"No corresponding file for sensor ID {measurement.sensor_id} found or invalid.")
@@ -112,7 +112,7 @@ class Series(BaseClass):
                 logger.warning(f"Sensor ID {measurement.sensor_id} not found in the extracted sensor IDs.")
 
         if auto_commit:
-            self.DATABASE_MANAGER.commit()
+            self.get_database_manager().commit()
 
         total_measurements = len(self.measurement)
         logger.info(f"Updated filenames for {successful_updates} out of {total_measurements} measurements.")

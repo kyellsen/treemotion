@@ -21,3 +21,19 @@ class Config(CoreConfig):
 
         """
         super().__init__(working_directory, log_level)
+
+    class Measurement:
+        tms_df_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
+                           'Absolute-Inclination', 'Inclination direction of the tree',
+                           'Temperature', 'East-West-Inclination - drift compensated',
+                           'North-South-Inclination - drift compensated',
+                           'Absolute-Inclination - drift compensated',
+                           'Inclination direction of the tree - drift compensated']
+
+        tms_df_time_column_name = 'Time'
+        tms_df_main_column_name = 'Absolute-Inclination - drift compensated'
+        default_new_version_name = "copy"
+
+    class MeasurementVersion:
+        default_load_from_csv_measurement_version_name = "raw"
+
