@@ -3,6 +3,7 @@ from kj_core import DataManager
 from kj_core import DatabaseManager
 from kj_core import PlotManager
 from kj_core import log_manager, get_logger
+from .classes import DataTMS, DataLS3, DataWind
 
 from .config import Config
 
@@ -38,6 +39,8 @@ def setup(working_directory: Optional[str] = None, log_level: Optional[str] = No
 
     DATA_MANAGER = DataManager(CONFIG)
     logger.info(f"{name_s}: DATA_MANAGER initialized: {DATA_MANAGER}")
+
+    DATA_MANAGER.register_listeners([DataTMS, DataLS3, DataWind])
 
     DATABASE_MANAGER = DatabaseManager(CONFIG)  # , Base
     logger.info(f"{name_s}: DATABASE_MANAGER initialized: {DATABASE_MANAGER}")

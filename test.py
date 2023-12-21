@@ -21,13 +21,10 @@ if __name__ == "__main__":
     DATABASE_MANAGER.connect(db_name=str(db_name))
     project = DATABASE_MANAGER.load(Project, 1)[0]
     project.method_for_all_children("add_filenames", csv_path=csv_path)
-    # series = DATABASE_MANAGER.load(Series, 1)[0]
-    #measurement = DATABASE_MANAGER.load(Measurement, 1)[0]
-    #
+    series = DATABASE_MANAGER.load(Series, 1)[0]
+    measurement = DATABASE_MANAGER.load(Measurement, 1)[0]
 
-    project.method_for_all_of_class("Measurement", "load_from_csv", overwrite=False)
-    project.method_for_all_of_class("Measurement", "load_from_csv", overwrite=True)
-    project.method_for_all_of_class("Measurement", "load_from_csv", measurement_version_name="test", overwrite=True)
+    measurement.method_for_all_of_class("Measurement", "load_from_csv", overwrite=True)
 
     DataTMS_list = DATABASE_MANAGER.load(DataTMS)
     MeasurementVersion_list = DATABASE_MANAGER.load(MeasurementVersion)
@@ -46,7 +43,5 @@ if __name__ == "__main__":
 
     # Commit die Änderungen
     DATABASE_MANAGER.commit()
-
-    # DATABASE_MANAGER.commit()
 
     # DATABASE_MANAGER.disconnect()
