@@ -2,7 +2,7 @@ from kj_core.utils.path_utils import validate_and_get_file_list, extract_sensor_
 from ..common_imports.imports_classes import *
 
 from .measurement import Measurement
-from .wind_measurement import WindMeasurement
+from .data_wind_station import DataWindStation
 
 import treemotion
 
@@ -16,25 +16,23 @@ class Series(BaseClass):
     __tablename__ = 'Series'
     series_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     project_id = Column(Integer, ForeignKey('Project.project_id', onupdate='CASCADE'))
-    wind_measurement_id = Column(Integer, ForeignKey('WindMeasurement.wind_measurement_id', onupdate='CASCADE'))
     description = Column(String)
     datetime_start = Column(DateTime)
     datetime_end = Column(DateTime)
     location = Column(String)
+    data_wind_station_id = Column(Integer, ForeignKey('DataWindStation.data_id', onupdate='CASCADE'))
     note = Column(String)
     filepath_tms = Column(String)
     filepath_ls3 = Column(String)
-
     measurement = relationship(Measurement, backref="series", lazy="joined",
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
-    wind_measurement = relationship(WindMeasurement, lazy="joined")
+    data_wind_station = relationship("DataWindStation", backref="series", cascade='all')
 
-    def __init__(self, series_id=None, project_id=None, wind_measurement_id=None, description=None, datetime_start=None,
+    def __init__(self, series_id=None, project_id=None, description=None, datetime_start=None,
                  datetime_end=None, location=None, note=None, filepath_tms=None, filepath_ls3=None):
         super().__init__()
         self.series_id = series_id
         self.project_id = project_id
-        self.wind_measurement_id = wind_measurement_id
         self.description = description
         self.datetime_start = datetime_start
         self.datetime_end = datetime_end
@@ -116,4 +114,54 @@ class Series(BaseClass):
 
         total_measurements = len(self.measurement)
         logger.info(f"Updated filenames for {successful_updates} out of {total_measurements} measurements.")
+
+    def add_wind_station(self,
+                         station_id: str,
+                         alternative_filename_wind: Optional[str] = None,
+                         alternative_filename_wind_extreme: Optional[str] = None,
+                         alternative_filename_stations_list: Optional[str] = None,
+                         auto_commit: bool = True,
+                         overwrite: bool = False):
+        """
+        Adds or updates a wind station in the database.
+
+        :param station_id: Identifier for the station.
+        :param alternative_filename_wind: Alternative filename for wind data.
+        :param alternative_filename_wind_extreme: Alternative filename for wind extreme data.
+        :param alternative_filename_stations_list: Alternative filename for stations list.
+        :param auto_commit: If True, commits the transaction automatically.
+        :param overwrite: If True, overwrites the existing wind station data; otherwise, retains the existing data.
+        :return: DataWindStation instance that was added or found in the database.
+        """
+        session = self.get_database_manager().session
+
+        try:
+            # Check for an existing DataWindStation with the given station_id
+            existing_station = session.query(DataWindStation).filter(DataWindStation.station_id == station_id).first()
+
+            if existing_station and not overwrite:
+                # Return the existing DataWindStation without creating a new one
+                data_wind_station = existing_station
+            else:
+                # Create a new instance or update the existing one
+                if existing_station:
+                    session.delete(existing_station)
+                    session.flush()
+
+                data_wind_station = DataWindStation.create_from_dwd(station_id, alternative_filename_wind,
+                                                                    alternative_filename_wind_extreme,
+                                                                    alternative_filename_stations_list)
+                session.add(data_wind_station)
+
+            session.flush()
+            self.data_wind_station_id = data_wind_station.data_id
+
+            if auto_commit:
+                session.commit()
+            return data_wind_station
+
+        except Exception as e:
+            logger.error(f"Error in add_wind_station: {e}")
+            session.rollback()  # Roll back in case of error
+            raise  # Optionally re-raise the exception to notify calling functions
 

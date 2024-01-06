@@ -102,8 +102,8 @@ class Measurement(BaseClass):
                 session.delete(present_m_v)
                 session.flush()
 
-            m_v = MeasurementVersion.load_from_csv(filepath_tms=self.filepath_tms, measurement_id=self.measurement_id,
-                                                   measurement_version_id=None, measurement_version_name=m_v_name)
+            m_v = MeasurementVersion.load_tms_from_csv(filepath_tms=self.filepath_tms, measurement_id=self.measurement_id,
+                                                       measurement_version_id=None, measurement_version_name=m_v_name)
             self.measurement_version.append(m_v)
             DATABASE_MANAGER.commit()
             logger.info(f"{'Updated' if present_m_v else 'Created'} '{m_v}' from CSV, attached to '{self}'.")

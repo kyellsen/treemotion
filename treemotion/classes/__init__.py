@@ -16,6 +16,5 @@ from .tree_treatment import TreeTreatment
 from .tree_treatment_type import TreeTreatmentType
 from .data_tms import DataTMS
 from .data_ls3 import DataLS3
+from .data_wind_station import DataWindStation
 from .data_wind import DataWind
-from .wind_data import WindData
-from .wind_measurement import WindMeasurement

@@ -1,50 +1,68 @@
 # treemotion/tms_csv/wind_dwd_download.py
 
 from pathlib import Path
+from typing import Optional, Union, Tuple
 
 import requests
 from bs4 import BeautifulSoup
 import zipfile
 import re
 
-from utils.path_utils import get_directory
-from utils.log import get_logger
+from kj_core.utils.log_manager import get_logger
+from kj_core.utils.path_utils import get_directory
 
 logger = get_logger(__name__)
 
+LINK_WIND: str = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/10_minutes/wind/recent/"
+LINK_WIND_EXTREME: str = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/10_minutes/extreme_wind/recent/"
+LINK_STATIONS_LIST: str = "https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/10_minutes/wind/recent/zehn_min_ff_Beschreibung_Stationen.txt"
 
-def download_dwd_files(stations_id, directory, link_wind, link_wind_extreme, link_stations_liste):
+
+def download_dwd_files(stations_id: str, directory: Union[str, Path], link_wind: str = LINK_WIND,
+                       link_wind_extreme: str = LINK_WIND_EXTREME,
+                       link_stations_list: str = LINK_STATIONS_LIST) -> Tuple[
+    Optional[str], Optional[str], Optional[str]]:
     """
-    Download and extract data files from DWD and return their names.
+    Download and extract data files from DWD and return their paths.
 
     :param stations_id: the id of the station
     :param directory: the folder where the files will be saved
     :param link_wind: the url of the wind data
     :param link_wind_extreme: the url of the wind extreme data
-    :param link_stations_liste: the url of the stations list
-    :return: the path of the folder and the names of the files
+    :param link_stations_list: the url of the stations list
+    :return: Tuple containing paths to wind data file, wind extreme data file, and stations list file
     """
-    get_directory(directory)
+    directory = get_directory(directory)
 
-    links = [link_wind, link_wind_extreme]
-    filenames = []
+    filename_wind = None
+    filename_wind_extreme = None
 
-    for link in links:
-        response = requests.get(link)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        file = soup.find('a', href=re.compile(f"{stations_id}_akt.zip"))
-        if file is not None:
-            url = link + file['href']
-            filename = download_wind_files(url, directory, stations_id)
-            filenames.append(filename)
-        else:
-            logger.warning(f"No file found for station {stations_id} at {link}")
-            filenames.append(None)
+    # Download wind and wind extreme data files
+    for link in [link_wind, link_wind_extreme]:
+        try:
+            response = requests.get(link)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            file = soup.find('a', href=re.compile(f"{stations_id}_akt.zip"))
+            if file is not None:
+                url = link + file['href']
+                filename = download_wind_files(url, directory, stations_id)
+                if link == link_wind:
+                    filename_wind = filename
+                else:
+                    filename_wind_extreme = filename
+            else:
+                logger.warning(f"No file found for station {stations_id} at {link}")
+        except Exception as e:
+            logger.error(f"Error downloading file from {link}: {e}")
 
-    filename = download_stations_list_file(link_stations_liste, directory)
-    filenames.append(filename)
+    # Download stations list file
+    try:
+        filename_stations_list = download_stations_list_file(link_stations_list, directory)
+    except Exception as e:
+        logger.error(f"Error downloading stations list file: {e}")
+        filename_stations_list = None
 
-    return directory, filenames[0], filenames[1], filenames[2]
+    return filename_wind, filename_wind_extreme, filename_stations_list
 
 
 def download_wind_files(url, folder_path, stations_id):
