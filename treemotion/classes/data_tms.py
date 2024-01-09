@@ -99,6 +99,7 @@ class DataTMS(CoreDataClass, BaseClass):
         """
         try:
             validate_df(df=self.data, columns=self.get_config().DataTMS.data_columns)
+            logger.debug(f"Data validation for '{self}' correct!")
             return True
         except Exception as e:
             logger.error(f"Error during validation of the DataFrame: {e}")

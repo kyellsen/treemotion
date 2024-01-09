@@ -128,7 +128,7 @@ class DataWindStation(CoreDataClass, BaseClass):
         self.source = None
         return
 
-    def _validate_data(self) -> bool:
+    def validate_data(self) -> bool:
         """
         Checks if the DataFrame data is valid and contains the required columns.
 

@@ -41,6 +41,7 @@ if __name__ == "__main__":
     measurement = series.measurement[0]
     measurement.load_from_csv(update_existing=False)
     mv: MeasurementVersion = measurement.measurement_version[0]
+    data = mv.data_tms.data
     mv.add_data_merge(update_existing=False)
 
     # series.method_for_all_of_class("Measurement", "load_from_csv", update_existing=False)
