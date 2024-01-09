@@ -3,7 +3,7 @@ import pandas as pd
 
 
 def wind_station_to_site(df, distance, direction, front_speed_factor):
-    # Addiere auf die Windrichtung die Ausrichtung der Achse von Punkt A nach B. Werte belieb zwischen 0 und 359
+    # Addiere auf die Windrichtung die Ausrichtung der Achse von Punkt A nach B. Werte beliebig zwischen 0 und 359
 
     df['wind_direction_10min_avg'] = (df['wind_direction_10min_avg'] + direction) % 360
     # Konvertiere den Winkel von Grad in Radiant

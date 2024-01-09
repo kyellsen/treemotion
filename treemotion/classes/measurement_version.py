@@ -1,9 +1,9 @@
 from ..common_imports.imports_classes import *
 
-# from .wind_measurement import WindMeasurement
+from .data_wind_station import DataWindStation
 from .data_tms import DataTMS
+from .data_merge import DataMerge
 from .data_ls3 import DataLS3
-from .data_wind import DataWind
 
 logger = get_logger(__name__)
 
@@ -16,17 +16,17 @@ class MeasurementVersion(BaseClass):
 
     data_tms = relationship("DataTMS", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
     data_ls3 = relationship("DataLS3", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
-    data_wind = relationship("DataWind", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
+    data_merge = relationship("DataMerge", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
 
     def __init__(self, measurement_version_id=None, measurement_version_name=None, measurement_id=None,
-                 data_tms_id=None, data_ls3_id=None, data_wind_id=None):
+                 data_tms_id=None, data_ls3_id=None, data_merge_id=None):
         super().__init__()
         self.measurement_version_id = measurement_version_id
         self.measurement_version_name = measurement_version_name
         self.measurement_id = measurement_id
         self.data_tms_id = data_tms_id
         self.data_ls3_id = data_ls3_id
-        self.data_wind_id = data_wind_id
+        self.data_merge_id = data_merge_id
 
     def __str__(self):
         return f"{self.__class__.__name__}(id={self.measurement_version_id}, measurement_version_name={self.measurement_version_name})"
@@ -48,7 +48,7 @@ class MeasurementVersion(BaseClass):
         :return: MeasurementVersion object.
         """
 
-        m_v = cls(measurement_id=measurement_id, measurement_version_name=measurement_version_name)
+        obj = cls(measurement_id=measurement_id, measurement_version_name=measurement_version_name)
 
         data_directory = cls.get_config().data_directory
 
@@ -64,52 +64,63 @@ class MeasurementVersion(BaseClass):
                            data_filepath=str(data_tms_filepath),
                            measurement_version_id=measurement_version_id)
 
-        m_v.data_tms = data_tms
+        obj.data_tms = data_tms
 
-        # folder = cls.get_config().DataWind.data_directory
-        # filename = (cls.
-        #             get_data_manager().
-        #             get_new_filename(measurement_id,
-        #                              prefix=f"tms_{measurement_version_name}",
-        #                              file_extension="feather"))
-        # data_wind_filepath = data_directory / folder / filename
-        #
-        # data_wind = DataWind(data_id=None, data=DataWind.read_csv_tms(filepath=filepath_tms),
-        #                      data_filepath=data_wind_filepath,
-        #                      measurement_version_id=measurement_version_id)
-        #
-        # m_v.data_wind = data_wind
+        session = obj.get_database_manager().session
+        session.add(obj)
+        return obj
 
-        session = m_v.get_database_manager().session
-        session.add(m_v)
-        return m_v
+    def add_data_merge(self, update_existing: bool = True) -> Optional[DataMerge]:
+        logger.info(f"Processing add_data_merge for '{self}'")
+        session = self.get_database_manager().session
 
-    def add_wind_from_station(self) -> Optional['MeasurementVersion']:
-        """
-        Loads TMS Data from a CSV file.
-        """
-        # get correct DataWindStation instance from Series
-        data_wind_station = self.measurement.series.data_wind_station
-        logger.debug(f"Found '{data_wind_station}'")
+        try:
+            # Check for an existing DataWindStation with the given station_id
+            existing_data: DataMerge = session.query(DataMerge).filter(
+                DataMerge.measurement_version_id == self.measurement_version_id).first()
 
-        data_directory = self.get_config().data_directory
-        folder = self.get_config().DataWind.data_directory
-        filename = (self.get_data_manager().
-                    get_new_filename(data_id=self.measurement_version_id,
-                                     prefix=f"wind_{self.measurement_version_name}",
-                                     file_extension="feather"))
-        data_wind_filepath = data_directory / folder / filename
+            if existing_data and not update_existing:
+                data_merge = existing_data
+                session.flush()
+                logger.debug(f"Return existing {data_merge.__class__.__name__}, update_existing = '{update_existing}': '{data_merge}'")
 
-        datetime_start = self.data_tms.datetime_start
-        datetime_end = self.data_tms.datetime_end
+            else:
+                if not existing_data:   # Create a new instance
+                    if self.measurement.series.data_wind_station:
+                        data_wind_station: DataWindStation = self.measurement.series.data_wind_station
+                        logger.debug(f"Found {DataWindStation.__class__.__name__}: '{data_wind_station}'")
+                    else:
+                        raise ValueError(f"Found no {DataWindStation.__class__.__name__} in: '{self}'")
 
-        data =
+                    if self.data_tms:
+                        data_tms: DataTMS = self.data_tms
+                        logger.debug(f"Found {DataTMS.__class__.__name__}: '{data_tms}'")
+                    else:
+                        raise ValueError(f"Found no {DataTMS.__class__.__name__} in: '{self}'")
 
-        data_wind = DataWind(data=data,
-                             data_filepath=data_wind_filepath,
-                             measurement_version_id=self.measurement_version_id,
-                             data_wind_station_id=data_wind_station.data_id)
+                    data_merge = DataMerge.create_from_measurement_version(
+                        measurement_version=self,
+                        data_wind_station=data_wind_station,
+                        data_tms=data_tms)
 
-        self.data_wind = data_wind
-        self.get_database_manager().commit()
-        return self
+                    session.flush()
+                    logger.debug(f"Created new {DataMerge.__class__.__name__}: '{data_merge}'")
+
+                else: # Update existing  instance
+                    pass
+                    # data_merge = existing_data
+                    # data_merge.update_from_measurement_version(measurement_version=self)
+                    # session.flush()
+                    # logger.debug(f"Update existing {DataMerge.__class__.__name__}, update_existing = '{update_existing}': '{data_merge}'")
+
+            self.data_merge = data_merge
+            self.get_database_manager().commit()
+
+            return data_merge
+
+        except Exception as e:
+            logger.error(f"Error in add_data_merge: {e}")
+            raise  # Optionally re-raise the exception to notify calling functions
+
+
+

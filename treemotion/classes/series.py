@@ -24,9 +24,10 @@ class Series(BaseClass):
     note = Column(String)
     filepath_tms = Column(String)
     filepath_ls3 = Column(String)
+
     measurement = relationship(Measurement, backref="series", lazy="joined",
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
-    data_wind_station = relationship("DataWindStation", backref="series", cascade='all')
+    data_wind_station = relationship("DataWindStation", backref="series", uselist=False, cascade='all')
 
     def __init__(self, series_id=None, project_id=None, description=None, datetime_start=None,
                  datetime_end=None, location=None, note=None, filepath_tms=None, filepath_ls3=None):
@@ -44,7 +45,7 @@ class Series(BaseClass):
         self._version_dict = {}
 
     def __str__(self):
-        return f"Series(series_id={self.series_id}, series_id={self.series_id})"
+        return f"Series(series_id={self.series_id}, location={self.location})"
 
     @dec_runtime
     def add_filenames(self, csv_path: str, auto_commit: bool = True):
@@ -117,51 +118,56 @@ class Series(BaseClass):
 
     def add_wind_station(self,
                          station_id: str,
-                         alternative_filename_wind: Optional[str] = None,
-                         alternative_filename_wind_extreme: Optional[str] = None,
-                         alternative_filename_stations_list: Optional[str] = None,
+                         filename_wind: Optional[str] = None,
+                         filename_wind_extreme: Optional[str] = None,
+                         filename_stations_list: Optional[str] = None,
                          auto_commit: bool = True,
-                         overwrite: bool = False):
+                         update_existing: bool = False):
         """
         Adds or updates a wind station in the database.
 
         :param station_id: Identifier for the station.
-        :param alternative_filename_wind: Alternative filename for wind data.
-        :param alternative_filename_wind_extreme: Alternative filename for wind extreme data.
-        :param alternative_filename_stations_list: Alternative filename for stations list.
+        :param filename_wind: Alternative filename for wind data.
+        :param filename_wind_extreme: Alternative filename for wind extreme data.
+        :param filename_stations_list: Alternative filename for stations list.
         :param auto_commit: If True, commits the transaction automatically.
-        :param overwrite: If True, overwrites the existing wind station data; otherwise, retains the existing data.
+        :param update_existing: If True, overwrites the existing wind station data; otherwise, retains the existing data.
         :return: DataWindStation instance that was added or found in the database.
         """
+        logger.info(f"Processing add_wind_station for '{self}'")
         session = self.get_database_manager().session
 
         try:
             # Check for an existing DataWindStation with the given station_id
-            existing_station = session.query(DataWindStation).filter(DataWindStation.station_id == station_id).first()
+            existing_station: DataWindStation = session.query(DataWindStation).filter(
+                DataWindStation.station_id == station_id).first()
 
-            if existing_station and not overwrite:
+            if existing_station and not update_existing:
                 # Return the existing DataWindStation without creating a new one
+                logger.debug(f"Return existing DataWindStation, overwrite = 'False: '{existing_station}'")
                 data_wind_station = existing_station
+
             else:
                 # Create a new instance or update the existing one
                 if existing_station:
-                    session.delete(existing_station)
-                    session.flush()
-
-                data_wind_station = DataWindStation.create_from_dwd(station_id, alternative_filename_wind,
-                                                                    alternative_filename_wind_extreme,
-                                                                    alternative_filename_stations_list)
-                session.add(data_wind_station)
+                    data_wind_station = existing_station.update_from_dwd(filename_wind,
+                                                                         filename_wind_extreme,
+                                                                         filename_stations_list)
+                    logger.debug(f"Update existing DataWindStation, overwrite = 'True: '{existing_station}'")
+                else:
+                    data_wind_station = DataWindStation.create_from_station(station_id, filename_wind,
+                                                                            filename_wind_extreme,
+                                                                            filename_stations_list)
+                    session.add(data_wind_station)
+                    logger.debug(f"Created new DataWindStation: '{data_wind_station}'")
 
             session.flush()
             self.data_wind_station_id = data_wind_station.data_id
 
             if auto_commit:
-                session.commit()
+                self.get_database_manager().commit()
             return data_wind_station
 
         except Exception as e:
             logger.error(f"Error in add_wind_station: {e}")
-            session.rollback()  # Roll back in case of error
             raise  # Optionally re-raise the exception to notify calling functions
-

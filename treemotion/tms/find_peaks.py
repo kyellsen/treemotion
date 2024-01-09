@@ -78,12 +78,12 @@ def find_n_peaks(df: pd.DataFrame, value_col: str, time_col: str, n_peaks: int,
     }
 
 
-# def merge_peak_dicts(peak_dicts):
-#     """
-#     Merges a list of 'peak' dictionaries.
-#     """
-#     return {
-#         'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
-#         'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
-#         'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
-#     }
+def merge_peak_dicts(peak_dicts):
+    """
+    Merges a list of 'peak' dictionaries.
+    """
+    return {
+        'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
+        'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
+        'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
+    }

@@ -20,7 +20,7 @@ RENAME_DICT = {
     'DX_10': 'wind_direction_max_wind_speed'
 }
 
-def load_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
+def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
     """
     Loads and prepares the dataframes from the provided txt files.
 
@@ -54,8 +54,8 @@ def load_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
     return merged_df
 
 
-def load_station_metadata(station_id: str,
-                          filepath_stations_list: str) -> dict:
+def extract_station_metadata(station_id: str,
+                             filepath_stations_list: str) -> dict:
     """
     Load and prepare station data from a text file.
 

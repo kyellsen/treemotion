@@ -62,12 +62,12 @@ class Measurement(BaseClass):
 
     @dec_runtime
     def load_from_csv(self, measurement_version_name: str = None,
-                      overwrite: bool = False) -> Optional[MeasurementVersion]:
+                      update_existing: bool = False) -> Optional[MeasurementVersion]:
         """
         Load data from a CSV file and update existing data if necessary.
 
         :param measurement_version_name: MeasurementVersion of the data.
-        :param overwrite: Determines whether to overwrite existing data.
+        :param update_existing: Determines whether to overwrite existing data.
         :return: The updated or newly created MeasurementVersion instance, or None if an error occurs.
         """
 
@@ -91,13 +91,13 @@ class Measurement(BaseClass):
             return None
 
         # Wenn present_m_v vorhanden und overwrite=False -> return present_m_v
-        if present_m_v and not overwrite:
+        if present_m_v and not update_existing:
             logger.warning(f"Existing measurement_version '{m_v_name}' will not be overwritten: '{present_m_v}'")
             return present_m_v
         try:
             DATABASE_MANAGER = self.get_database_manager()
             session = DATABASE_MANAGER.session
-            if present_m_v and overwrite:
+            if present_m_v and update_existing:
                 logger.warning(f"Existing measurement_version '{m_v_name}' will be overwritten: '{present_m_v}'")
                 session.delete(present_m_v)
                 session.flush()
