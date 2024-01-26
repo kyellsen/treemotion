@@ -31,52 +31,49 @@ class Config(CoreConfig):
     class MeasurementVersion:
         default_load_from_csv_measurement_version_name = "raw"
 
-    class DataWindStation:
-        data_directory = "data_wind_station"
-        download_folder = f"{data_directory}_download"
-        data_columns = ['station_id',
-                        'datetime',
-                        'quality_level_wind_avg',
-                        'wind_speed_10min_avg',
-                        'wind_direction_10min_avg',
-                        'quality_level_wind_extremes',
-                        'wind_speed_max_10min',
-                        'wind_speed_min_10min',
-                        'wind_speed_max_10min_moving_avg',
-                        'wind_direction_max_wind_speed']
-        # main_value = ""
+    class Data:
+        data_wind_directory = "data_wind_station"
+        wind_download_folder = f"{data_wind_directory}_download"
+        data_tms_directory = 'data_tms'
+        data_merge_directory = 'data_merge'
+        data_ls3_directory = 'data_ls3'
 
-    class DataTMS:
-        data_directory = 'data_tms'
-        data_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
-                        'Absolute-Inclination', 'Inclination direction of the tree',
-                        'Temperature', 'East-West-Inclination - drift compensated',
-                        'North-South-Inclination - drift compensated',
-                        'Absolute-Inclination - drift compensated',
-                        'Inclination direction of the tree - drift compensated']
-        main_value = 'Absolute-Inclination - drift compensated'
+        data_wind_columns = ['station_id',
+                             # 'quality_level_wind_avg', # drop
+                             'wind_speed_10min_avg',
+                             'wind_direction_10min_avg',
+                             # 'quality_level_wind_extremes',  # drop
+                             'wind_speed_max_10min',
+                             # 'wind_speed_min_10min', # drop
+                             'wind_speed_max_10min_moving_avg',
+                             'wind_direction_max_wind_speed']  # 'datetime' is index!
 
-        # find_n_peaks
-        n_peaks: int = 10
-        sample_rate: float = 20
-        min_time_diff: float = 60
-        prominence: int = None
+        data_wind_columns_drop = ['quality_level_wind_avg', 'quality_level_wind_extremes',
+                                  'wind_speed_min_10min']  # 'station_id',
 
-    class DataMerge:
-        data_directory = 'data_merge'
-        data_columns = ['Time', 'East-West-Inclination', 'North-South-Inclination',
-                        'Absolute-Inclination', 'Inclination direction of the tree',
-                        'Temperature', 'East-West-Inclination - drift compensated',
-                        'North-South-Inclination - drift compensated',
-                        'Absolute-Inclination - drift compensated',
-                        'Inclination direction of the tree - drift compensated', 'station_id',
-                        'datetime', 'quality_level_wind_avg', 'wind_speed_10min_avg',
-                        'wind_direction_10min_avg', 'quality_level_wind_extremes',
-                        'wind_speed_max_10min', 'wind_speed_min_10min',
-                        'wind_speed_max_10min_moving_avg', 'wind_direction_max_wind_speed']
-        main_value_tms = 'Absolute-Inclination - drift compensated'
-        main_value_wind = ''
+        data_wind_columns_int = []  # , 'station_id', 'quality_level_wind_avg', 'quality_level_wind_extremes']
 
-    class DataLS3:
-        data_directory = 'data_ls3'
-        main_value = ""
+        wind_resample_freq = "60S"
+
+        data_tms_columns = ['East-West-Inclination',
+                            'North-South-Inclination',
+                            'Absolute-Inclination',
+                            'Inclination direction of the tree',
+                            'Temperature',
+                            'East-West-Inclination - drift compensated',
+                            'North-South-Inclination - drift compensated',
+                            'Absolute-Inclination - drift compensated',
+                            'Inclination direction of the tree - drift compensated']  # 'Time' is the index!
+
+        data_merge_columns = data_tms_columns + data_tms_columns
+
+        main_wind_value = 'wind_speed_max_10min_moving_avg'
+        main_tms_value = 'Absolute-Inclination - drift compensated'
+
+        time_rolling_max = '30min'  # pandas time format!
+        merge_wind_value = 'wind_rolling_max_' + time_rolling_max
+        merge_tms_value = 'tms_rolling_max_' + time_rolling_max
+        calc_optimal_shift_down_sample_rate = "60S"  # default "60S"
+        max_shift_sec: float = 90 * 60  # Default 7200 sec or 2 hours
+
+        tms_sample_rate = '50ms'

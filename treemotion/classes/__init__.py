@@ -15,6 +15,7 @@ from .tree_species import TreeSpecies
 from .tree_treatment import TreeTreatment
 from .tree_treatment_type import TreeTreatmentType
 from .data_wind_station import DataWindStation
+from .base_class_data_tms import BaseClassDataTMS
 from .data_tms import DataTMS
 from .data_merge import DataMerge
 from .data_ls3 import DataLS3

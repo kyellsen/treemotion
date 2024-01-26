@@ -1,4 +1,5 @@
 from pathlib import Path
+import numpy as np
 import pandas as pd
 
 from typing import Union
@@ -29,12 +30,12 @@ def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
     :return: Merged DataFrame with prepared data.
     """
     # Read each file into a DataFrame
-    df1 = pd.read_csv(filepath_wind, sep=';', index_col=False)
-    df2 = pd.read_csv(filepath_wind_extreme, sep=';', index_col=False)
+    df1 = pd.read_csv(filepath_wind, sep=';', index_col=False, skipinitialspace=True)
+    df2 = pd.read_csv(filepath_wind_extreme, sep=';', index_col=False, skipinitialspace=True)
 
-    # Remove leading and trailing spaces from column names
-    df1.columns = df1.columns.str.strip()
-    df2.columns = df2.columns.str.strip()
+    # # Remove leading and trailing spaces from column names
+    # df1.columns = df1.columns.str.strip()
+    # df2.columns = df2.columns.str.strip()
 
     # Ensure 'MESS_DATUM' is in the correct date format
     df1['MESS_DATUM'] = pd.to_datetime(df1['MESS_DATUM'], format='%Y%m%d%H%M')
@@ -48,8 +49,21 @@ def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
 
     merged_df.rename(columns=RENAME_DICT, inplace=True)
 
-    # Replace -999 with None as -999 is marked as missing value
-    merged_df = merged_df.replace(-999, None)
+    merged_df.set_index('datetime', inplace=True)
+
+    for col in merged_df.columns:
+        if merged_df[col].dtype == 'float64':
+            # Ersetze -999 durch NaN in float64 Spalten
+            merged_df[col] = merged_df[col].replace(-999, np.nan)
+        elif merged_df[col].dtype == 'int64':
+            # Temporär auf float konvertieren für NaN Unterstützung
+            temp_col = merged_df[col].astype('float64')
+            # Ersetze -999 durch den letzten gültigen Wert
+            temp_col.replace(-999, np.nan, inplace=True)
+            temp_col.ffill(inplace=True)
+            # Zurück zu int64 konvertieren
+            merged_df[col] = temp_col.astype('int64')
+
     logger.debug(f"Loaded wind and extreme wind data from {filepath_wind} and {filepath_wind_extreme}!")
     return merged_df
 

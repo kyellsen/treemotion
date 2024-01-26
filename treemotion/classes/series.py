@@ -2,7 +2,9 @@ from kj_core.utils.path_utils import validate_and_get_file_list, extract_sensor_
 from ..common_imports.imports_classes import *
 
 from .measurement import Measurement
+from .measurement_version import MeasurementVersion
 from .data_wind_station import DataWindStation
+from .data_merge import DataMerge
 
 import treemotion
 
@@ -24,13 +26,15 @@ class Series(BaseClass):
     note = Column(String)
     filepath_tms = Column(String)
     filepath_ls3 = Column(String)
+    optimal_shift_sec_median = Column(Float)
 
     measurement = relationship(Measurement, backref="series", lazy="joined",
                                cascade='all, delete-orphan', order_by='Measurement.measurement_id')
     data_wind_station = relationship("DataWindStation", backref="series", uselist=False, cascade='all')
 
     def __init__(self, series_id=None, project_id=None, description=None, datetime_start=None,
-                 datetime_end=None, location=None, note=None, filepath_tms=None, filepath_ls3=None):
+                 datetime_end=None, location=None, note=None, filepath_tms=None, filepath_ls3=None,
+                 optimal_shift_sec_median: int = None):
         super().__init__()
         self.series_id = series_id
         self.project_id = project_id
@@ -41,6 +45,8 @@ class Series(BaseClass):
         self.note = note
         self.filepath_tms = filepath_tms
         self.filepath_ls3 = filepath_ls3
+
+        self.optimal_shift_sec_median = optimal_shift_sec_median
 
         self._version_dict = {}
 
@@ -171,3 +177,112 @@ class Series(BaseClass):
         except Exception as e:
             logger.error(f"Error in add_wind_station: {e}")
             raise  # Optionally re-raise the exception to notify calling functions
+
+    @dec_runtime
+    def get_measurement_version_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") \
+            -> Optional[List[MeasurementVersion]]:
+        """
+        Overwrites BaseClass Method. It´s way faster.
+        Finds all MeasurementVersion objects associated with measurements related to this series based on the provided filters.
+
+        :param filter_dict: A dictionary of attributes and their desired values.
+                            For example: {'tms_table_name': tms_table_name}
+        :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
+                       The default value is "list_filter".
+        :return: A list of found MeasurementVersion instances, or None if no match is found.
+        """
+
+        if not isinstance(filter_dict, dict):
+            logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
+            return None
+
+        try:
+            if method == "list_filter":
+                matching_versions = [mv for measurement in self.measurement for mv in measurement.measurement_version if
+                                     all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
+            elif method == "db_filter":
+                session = self.get_database_manager().session()
+                matching_versions = (session.query(MeasurementVersion)
+                                     .join(Measurement, MeasurementVersion.measurement_id == Measurement.id)
+                                     .filter(Measurement.series_id == self.series_id)
+                                     .filter_by(**filter_dict)
+                                     .all())
+            else:
+                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
+                return None
+
+            if not matching_versions:
+                logger.debug(f"No MeasurementVersion instance found with the given filters: {filter_dict}.")
+                return None
+
+            logger.debug(
+                f"{len(matching_versions)} MeasurementVersion instances found with the given filters: {filter_dict}.")
+            return matching_versions
+
+        except Exception as e:
+            logger.error(f"An error occurred while querying the Version: {str(e)}")
+            return None
+
+    from typing import Tuple
+    import pandas as pd
+    import logging
+
+    def calc_optimal_shift_median(self, measurement_version_name: str = None, filter_min_corr: float = 0.5) -> Tuple[
+        pd.DataFrame, float]:
+        """
+        Calculates the median of the optimal shift in seconds for a specified measurement version,
+        considering only those measurements with a maximum correlation above a specified threshold.
+
+        Args:
+            measurement_version_name (str, optional): The name of the measurement version. If None, uses the default from configuration.
+            filter_min_corr (float, optional): The minimum correlation threshold to filter measurements. Defaults to 0.5.
+
+        Returns:
+            Tuple[pd.DataFrame, float]: A tuple containing a DataFrame with the detailed calculation results for each measurement
+            and the median of the optimal shift in seconds for measurements above the correlation threshold.
+        """
+        try:
+            # Use default measurement version name if not specified
+            measurement_version_name = measurement_version_name or self.get_config().MeasurementVersion.default_load_from_csv_measurement_version_name
+
+            results = []  # Initialize list to store result dictionaries
+
+            # Retrieve list of MeasurementVersion instances based on the specified name
+            mv_list = self.get_measurement_version_by_filter(
+                filter_dict={'measurement_version_name': measurement_version_name})
+
+            for mv in mv_list:
+                try:
+                    optimal_shift, optimal_shift_sec, corr_shift_0, max_corr = mv.calc_optimal_shift()
+                    results.append({
+                        'optimal_shift': optimal_shift,
+                        'optimal_shift_sec': optimal_shift_sec,
+                        'initial_corr': corr_shift_0,  # Renamed for clarity
+                        'max_corr': max_corr
+                    })
+                except Exception as e:
+                    logger.error(f"Error calculating optimal shift for {mv}: {e}")
+
+            # Convert results to DataFrame
+            optimal_shift_df = pd.DataFrame(results)
+
+            try:
+                # Filter DataFrame to keep rows with 'max_corr' above specified threshold
+                filtered_df = optimal_shift_df[optimal_shift_df['max_corr'] >= filter_min_corr]
+
+                # Calculate median of 'optimal_shift_sec' from the filtered DataFrame
+                optimal_shift_sec_median = filtered_df['optimal_shift_sec'].median()
+
+                # Store the median of optimal shift seconds for further reference
+                self.optimal_shift_sec_median = optimal_shift_sec_median
+
+                logger.info("Successfully calculated optimal shift median.")
+                return optimal_shift_df, optimal_shift_sec_median
+            except Exception as e:
+                logger.error(f"Error filtering data or calculating median: {e}")
+                raise  # Re-raise exception after logging
+
+        except Exception as e:
+            logger.critical(f"Critical error in calc_optimal_shift_median: {e}")
+            raise  # Ensuring that the exception is not silently swallowed
+

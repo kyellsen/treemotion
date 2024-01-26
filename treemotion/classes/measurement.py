@@ -113,3 +113,43 @@ class Measurement(BaseClass):
                 f"Failed to {'update' if present_m_v else 'create'} MeasurementVersion '{m_v_name}' for '{self}', error: {e}")
 
             return None
+
+    def get_measurement_version_by_filter_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[MeasurementVersion]]:
+        """
+        Find all MeasurementVersion objects based on the provided filters.
+
+        :param filter_dict: A dictionary of attributes and their desired values.
+                            For example: {'tms_table_name': tms_table_name}
+        :param method: The method to use for filtering. Possible values are "list_filter" and "db_filter".
+                       The default value is "list_filter".
+        :return: A list of found MeasurementVersion instances, or None if no match is found.
+        """
+
+        if not isinstance(filter_dict, dict):
+            logger.error("Input filter is not a dictionary. Please provide a valid filter dictionary.")
+            return None
+
+        try:
+            if method == "list_filter":
+                matching_mv: List = [mv for mv in self.measurement_version if
+                                     all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
+            elif method == "db_filter":
+                session = self.get_database_manager().session()
+                matching_mv: List = (session.query(MeasurementVersion)
+                                     .filter(MeasurementVersion.measurement == self)
+                                     .filter_by(**filter_dict)
+                                     .all())
+            else:
+                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
+                return None
+
+            if not matching_mv:
+                logger.debug(f"No MeasurementVersion instance found with the given filters: {filter_dict}.")
+                return None
+
+            logger.info(f"{len(matching_mv)} MeasurementVersion instances found with the given filters: {filter_dict}.")
+            return matching_mv
+
+        except Exception as e:
+            logger.error(f"An error occurred while querying the MeasurementVersion: {str(e)}")
+            return None

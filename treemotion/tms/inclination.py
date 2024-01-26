@@ -2,28 +2,22 @@ import numpy as np
 import pandas as pd
 
 
-def get_absolute_inclination(x: pd.Series, y: pd.Series) -> pd.Series:
+
+def calc_abs_inclino(x: pd.Series, y: pd.Series) -> pd.Series:
     """
-    Computes the absolute data from x and y values.
+    Calculates the total inclination from the x and y components.
 
     Parameters:
-    x (pd.Series): A pandas Series containing numerical values.
-    y (pd.Series): A pandas Series containing numerical values.
+    x (pd.Series): A pandas Series containing x-component values.
+    y (pd.Series): A pandas Series containing y-component values.
 
     Returns:
-    pd.Series: A pandas Series containing the computed absolute values.
+    pd.Series: A pandas Series containing the total inclination values, computed by applying the Pythagorean theorem to the x and y components.
     """
-    # Calculate the square of x and y values
-    x_squared = np.square(x)
-    y_squared = np.square(y)
-
-    # Calculate the square root of the sum of x^2 and y^2
-    absolute_values = np.sqrt(x_squared + y_squared)
-
-    return absolute_values
+    return np.sqrt(x ** 2 + y ** 2)
 
 
-def get_inclination_direction(x: pd.Series, y: pd.Series) -> pd.Series:
+def calc_inclination_direction(x: pd.Series, y: pd.Series) -> pd.Series:
     """
     Calculates the inclination direction in degrees from the given x and y values.
 

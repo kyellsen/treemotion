@@ -1,10 +1,11 @@
 from kj_core.classes.core_data_class import CoreDataClass
+from kj_core.df_utils.validate import validate_df
 
 from ..common_imports.imports_classes import *
 
 from ..wind.wind_dwd_download import download_wind_file, download_wind_extreme_file, download_station_list_file
 from ..wind.wind_file_extraction import extract_wind_df, extract_station_metadata
-from kj_core.utils.df_utils import validate_df
+
 
 logger = get_logger(__name__)
 
@@ -51,6 +52,7 @@ class DataWindStation(CoreDataClass, BaseClass):
         obj = cls(station_id=station_id, data_filepath=str(cls._get_feather_file_path(station_id)))
         if obj.get_dwd_data(station_id, filename_wind,
                             filename_wind_extreme, filename_stations_list):
+            # sets self.data as wind_df
             return obj
         return None
 
@@ -58,7 +60,7 @@ class DataWindStation(CoreDataClass, BaseClass):
     @classmethod
     def _get_feather_file_path(cls, station_id: str) -> Path:
         data_directory = cls.get_data_manager().data_directory
-        folder = cls.get_config().DataWindStation.data_directory
+        folder = cls.get_config().Data.data_wind_directory
         filename = cls.get_data_manager().get_new_filename(station_id, prefix="wind", file_extension="feather")
         return data_directory / folder / filename
 
@@ -90,7 +92,7 @@ class DataWindStation(CoreDataClass, BaseClass):
 
     def _get_download_folder_path(self, station_id: str) -> Path:
         data_directory = self.get_data_manager().data_directory
-        folder = self.get_config().DataWindStation.download_folder
+        folder = self.get_config().Data.wind_download_folder
         return data_directory / folder / station_id
 
     def read_dwd_files(self, filename_wind, filename_wind_extreme, filename_stations_list):
@@ -108,6 +110,7 @@ class DataWindStation(CoreDataClass, BaseClass):
 
         try:
             wind_df = extract_wind_df(path.joinpath(filename_wind), path.joinpath(filename_wind_extreme))
+            wind_df.drop(self.get_config().Data.data_wind_columns_drop, axis=1, inplace=True)
         except Exception as e:
             logger.error(f"Error while loading and preparing dataframes: {e}")
             return None
@@ -119,6 +122,7 @@ class DataWindStation(CoreDataClass, BaseClass):
                 f"Error while loading and preparing station metadata from {filename_stations_list}: {e}")
             return None
         self.data = wind_df
+        #self.interpolate_data()
 
         self.station_name = station_metadata['station_name']
         self.bundesland = station_metadata['bundesland']
@@ -128,6 +132,39 @@ class DataWindStation(CoreDataClass, BaseClass):
         self.source = None
         return
 
+    @dec_runtime
+    def interpolate_data(self) -> None:
+        """
+        Interpolates and resamples the data within the DataFrame.
+
+        This method performs linear interpolation on specified columns
+        and resamples other columns using the nearest value based on the
+        frequency defined in the configuration.
+        """
+        logger.info("Start linear interpolation")
+        try:
+            config = self.get_config().Data
+            columns_int = config.data_wind_columns_int
+            columns_float = [col for col in self.data.columns if col not in columns_int]
+            freq = config.wind_resample_freq
+            resampled_df = self.data.resample(freq).asfreq()
+
+            # Für Integer-Spalten verwenden wir eine forward fill
+            logger.info(f"integer_columns to ffill: '{columns_int}")
+            resampled_df[columns_int] = resampled_df[columns_int].ffill().astype('int64')
+
+            # Dann interpolieren wir alle Float-Spalten linear
+            logger.info(f"float_columns to interpolate: '{columns_float}")
+            resampled_df[columns_float] = resampled_df[columns_float].ffill().interpolate(method='linear')
+
+            self.data = resampled_df
+
+            logger.info("Data interpolation and resampling completed successfully.")
+
+        except Exception as e:
+            logger.critical(f"Error in interpolate_data: {e}")
+            raise
+
     def validate_data(self) -> bool:
         """
         Checks if the DataFrame data is valid and contains the required columns.
@@ -136,7 +173,7 @@ class DataWindStation(CoreDataClass, BaseClass):
             bool: True if the DataFrame is valid, False otherwise.
         """
         try:
-            validate_df(df=self.data, columns=self.get_config().DataWindStation.data_columns)
+            validate_df(df=self.data, columns=self.get_config().Data.data_wind_columns)
             logger.debug(f"Data validation for '{self}' correct!")
             return True
         except Exception as e:
