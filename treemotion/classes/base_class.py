@@ -1,9 +1,10 @@
-from kj_core import get_logger
-from kj_core.utils.runtime_manager import dec_runtime
-from kj_core.classes.core_base_class import CoreBaseClass
 from typing import Type, Dict, Tuple, List, Optional, Union, Any
 
 import treemotion
+from kj_core.utils.runtime_manager import dec_runtime
+from kj_core.classes.core_base_class import CoreBaseClass
+
+from kj_logger import get_logger
 
 logger = get_logger(__name__)
 

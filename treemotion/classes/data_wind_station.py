@@ -15,6 +15,7 @@ class DataWindStation(CoreDataClass, BaseClass):
     __tablename__ = 'DataWindStation'
     data_id = Column(Integer, primary_key=True, autoincrement=True, nullable=False, unique=True)
     data_filepath = Column(String, unique=True)
+    data_changed = Column(Boolean)
     datetime_added = Column(DateTime)
     datetime_last_edit = Column(DateTime)
     station_name = Column(String)
@@ -25,10 +26,10 @@ class DataWindStation(CoreDataClass, BaseClass):
     station_longitude = Column(Float)
     source = Column(String)
 
-    def __init__(self, data_id=None, data=None, data_filepath=None, datetime_added=None, datetime_last_edit=None,
+    def __init__(self, data_id=None, data=None, data_filepath=None, data_changed: bool = False, datetime_added=None, datetime_last_edit=None,
                  station_id=None, station_name=None, bundesland=None,
                  station_height=None, station_latitude=None, station_longitude=None, source=None):
-        CoreDataClass.__init__(self, data_id=data_id, data=data, data_filepath=data_filepath,
+        CoreDataClass.__init__(self, data_id=data_id, data=data, data_filepath=data_filepath, data_changed=data_changed,
                                datetime_added=datetime_added, datetime_last_edit=datetime_last_edit)
 
         self.station_id = station_id

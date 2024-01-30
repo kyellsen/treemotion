@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, relationship, class_mapper, joinedload
 
 # Import kj_core/tms_csv
 from kj_core.utils.runtime_manager import dec_runtime
-from kj_core import get_logger
+from kj_logger import get_logger
 
 # Import treemotion/classes
 from ..classes.base_class import BaseClass

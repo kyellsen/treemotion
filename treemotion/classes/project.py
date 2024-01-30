@@ -4,6 +4,8 @@ from .series import Series
 
 logger = get_logger(__name__)
 
+logger.info("TEAST")  # TODO: DELETE!
+
 
 class Project(BaseClass):
     __tablename__ = 'Project'

@@ -4,7 +4,7 @@ import pandas as pd
 
 from typing import Union
 
-from kj_core.utils.log_manager import get_logger
+from kj_logger import get_logger
 
 logger = get_logger(__name__)
 

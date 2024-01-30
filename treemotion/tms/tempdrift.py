@@ -3,7 +3,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from scipy.signal import butter, filtfilt
-import emd as emd
 
 SAMPLE_RATE = 20
 LOW_FREQ_CUTOFF = 0.05
@@ -88,7 +87,10 @@ def temp_drift_comp_mov_avg(inclino: pd.Series, window_size: int = 1001) -> pd.S
 
 # EMD and HHT, check also get_emd.py
 def temp_drift_comp_emd(inclino: pd.Series, sample_rate: int = SAMPLE_RATE, freq_range: tuple = (
-LOW_FREQ_CUTOFF, HIGH_FREQ_CUTOFF)) -> pd.Series:  # Rust tuple = (0.05, 2, 128)
+        LOW_FREQ_CUTOFF, HIGH_FREQ_CUTOFF)) -> pd.Series:  # Rust tuple = (0.05, 2, 128)
+
+    import emd as emd  # Problems because reset of all loggers, only use insides of funktion
+
     # Wende EMD auf die Neigungswerte an
     imfs = emd.sift.sift(inclino.values)
 

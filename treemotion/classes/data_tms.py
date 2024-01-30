@@ -11,14 +11,15 @@ class DataTMS(CoreDataClass, BaseClassDataTMS):
     __tablename__ = 'DataTMS'
     data_id = Column(Integer, primary_key=True, autoincrement=True, unique=True)
     data_filepath = Column(String, unique=True)
+    data_changed = Column(Boolean)
     measurement_version_id = Column(Integer,
                                     ForeignKey('MeasurementVersion.measurement_version_id', onupdate='CASCADE'),
                                     nullable=False)
     tempdrift_method = Column(String)
 
-    def __init__(self, data_id: int = None, data: pd.DataFrame = None, data_filepath: str = None, datetime_added=None,
+    def __init__(self, data_id: int = None, data: pd.DataFrame = None, data_filepath: str = None, data_changed: bool = False, datetime_added=None,
                  datetime_last_edit=None, measurement_version_id: int = None, tempdrift_method: str = None):
-        CoreDataClass.__init__(self, data_id=data_id, data=data, data_filepath=data_filepath,
+        CoreDataClass.__init__(self, data_id=data_id, data=data, data_filepath=data_filepath, data_changed=data_changed,
                                datetime_added=datetime_added, datetime_last_edit=datetime_last_edit)
 
         self.measurement_version_id = measurement_version_id
@@ -63,8 +64,6 @@ class DataTMS(CoreDataClass, BaseClassDataTMS):
             logger.error(f"Error during validation of the DataFrame: {e}")
             return False
 
-
-
     def time_cut(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
         """
         Limits the data to a specific time range and optionally updates the instance data in-place.
@@ -103,7 +102,6 @@ class DataTMS(CoreDataClass, BaseClassDataTMS):
                 self.data = data
 
             if auto_commit:
-                self.tempdrift_method = "haalllo"
                 self.get_database_manager().commit()
 
             logger.info(f"Successfully limited the data of '{self}' between '{start_time}' and '{end_time}', inplace: '{inplace}', auto_commit: '{auto_commit}'.")

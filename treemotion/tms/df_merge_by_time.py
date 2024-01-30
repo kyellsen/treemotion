@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Tuple
 
-from kj_core import get_logger
+from kj_logger import get_logger
 from kj_core.utils.runtime_manager import dec_runtime
 
 logger = get_logger(__name__)

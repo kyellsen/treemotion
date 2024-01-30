@@ -1,5 +1,4 @@
 from ..common_imports.imports_classes import *
-
 from .sensor import Sensor
 from .tree_treatment import TreeTreatment
 from .measurement_status import MeasurementStatus

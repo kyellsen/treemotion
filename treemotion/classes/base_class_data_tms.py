@@ -1,13 +1,18 @@
 import numpy as np
 import pandas as pd
+from typing import Type, Dict, Tuple, List, Optional, Union, Any
 
 from kj_core.df_utils.time_cut import validate_time_format, time_cut_by_datetime_index
 from kj_core.plotting.multiple_dfs import plot_multiple_dfs
 
 from ..common_imports.imports_classes import *
-# from ..tms.find_peaks import *
+from ..classes import BaseClass
+from kj_logger import get_logger
+
+from ..tms.find_peaks import *
 from ..tms.tempdrift import temp_drift_comp_lin_reg, temp_drift_comp_lin_reg_2, temp_drift_comp_mov_avg, \
-    temp_drift_comp_emd, fft_freq_filter, butter_lowpass_filter
+    temp_drift_comp_emd
+from ..tms.tempdrift import fft_freq_filter, butter_lowpass_filter
 from ..tms.inclination import calc_abs_inclino, calc_inclination_direction
 
 logger = get_logger(__name__)
@@ -220,45 +225,45 @@ class BaseClassDataTMS(BaseClass):
             return sampled_data
         except Exception as e:
             logger.error(f"Failed to select a random sample: {e}")
-
-
-
-# @property
-# def peak_max(self) -> Optional[Dict]:
 #
-#     datetime_column_name = self.datetime_column_name
-#     main_value_column_name = self.get_config().Data.main_tms_value
-#     try:
-#         peak = find_max_peak(self.data, main_value_column_name, datetime_column_name)
-#     except Exception as e:
-#         logger.warning(f"No peak found for {self}, error: {e}")
-#         return None
 #
-#     # For debugging
-#     show_peak: bool = False
-#     if show_peak:
-#         logger.info(f"Peak in {self}: {peak}")
-#     return peak
 #
-# @property
-# def peaks(self):
-#     config = self.get_config().Data
-#     datetime_column_name = self.datetime_column_name
-#     tms_main_value = self.get_config().Data.main_tms_value
-#     n_peaks: int = config.n_peaks
-#     sample_rate: float = config.sample_rate
-#     min_time_diff: float = config.min_time_diff
-#     prominence: int = config.prominence
-#
-#     try:
-#         peaks = find_n_peaks(self.data, tms_main_value, datetime_column_name, n_peaks, sample_rate, min_time_diff,
-#                              prominence)
-#     except Exception as e:
-#         logger.warning(f"No peaks found for {self.__str__()}, error: {e}")
-#         return None
-#
-#     # For debugging
-#     show_peaks: bool = False
-#     if show_peaks:
-#         logger.info(f"Peaks found in {self.__str__()}: {peaks.__str__()}")
-#     return peaks
+# # @property
+# # def peak_max(self) -> Optional[Dict]:
+# #
+# #     datetime_column_name = self.datetime_column_name
+# #     main_value_column_name = self.get_config().Data.main_tms_value
+# #     try:
+# #         peak = find_max_peak(self.data, main_value_column_name, datetime_column_name)
+# #     except Exception as e:
+# #         logger.warning(f"No peak found for {self}, error: {e}")
+# #         return None
+# #
+# #     # For debugging
+# #     show_peak: bool = False
+# #     if show_peak:
+# #         logger.info(f"Peak in {self}: {peak}")
+# #     return peak
+# #
+# # @property
+# # def peaks(self):
+# #     config = self.get_config().Data
+# #     datetime_column_name = self.datetime_column_name
+# #     tms_main_value = self.get_config().Data.main_tms_value
+# #     n_peaks: int = config.n_peaks
+# #     sample_rate: float = config.sample_rate
+# #     min_time_diff: float = config.min_time_diff
+# #     prominence: int = config.prominence
+# #
+# #     try:
+# #         peaks = find_n_peaks(self.data, tms_main_value, datetime_column_name, n_peaks, sample_rate, min_time_diff,
+# #                              prominence)
+# #     except Exception as e:
+# #         logger.warning(f"No peaks found for {self.__str__()}, error: {e}")
+# #         return None
+# #
+# #     # For debugging
+# #     show_peaks: bool = False
+# #     if show_peaks:
+# #         logger.info(f"Peaks found in {self.__str__()}: {peaks.__str__()}")
+# #     return peaks

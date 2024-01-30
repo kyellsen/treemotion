@@ -3,6 +3,11 @@ from typing import Optional
 
 from kj_core.core_config import CoreConfig
 
+from kj_logger import get_logger
+
+logger = get_logger(__name__)
+logger.info(f"TEST001")
+
 
 class Config(CoreConfig):
     """
@@ -14,13 +19,14 @@ class Config(CoreConfig):
     package_name_short = "tms"
     # Override default working directory specific
     default_working_directory = r"C:\kyellsen\006_Packages\treemotion\working_directory_tms"
+    logger.info(f"TEST002")
 
-    def __init__(self, working_directory: Optional[str] = None, log_level: Optional[str] = None):
+    def __init__(self, working_directory: Optional[str] = None):
         """
         Initializes the configuration settings, building upon the core configuration.
-
         """
-        super().__init__(working_directory, log_level)
+        super().__init__(f"{working_directory}/{self.package_name_short}")
+        logger.info(f"TEST003")
 
     class Measurement:
         pass

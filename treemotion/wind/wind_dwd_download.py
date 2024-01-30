@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 import zipfile
 import re
 
-from kj_core.utils.log_manager import get_logger
+from kj_logger import get_logger
 from kj_core.utils.path_utils import get_directory
 
 logger = get_logger(__name__)
