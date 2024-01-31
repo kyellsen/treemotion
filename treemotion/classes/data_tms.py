@@ -64,49 +64,4 @@ class DataTMS(CoreDataClass, BaseClassDataTMS):
             logger.error(f"Error during validation of the DataFrame: {e}")
             return False
 
-    def time_cut(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
-        """
-        Limits the data to a specific time range and optionally updates the instance data in-place.
 
-        Parameters
-        ----------
-        start_time : str
-            The start time of the range, in a format compatible with `validate_time_format`.
-        end_time : str
-            The end time of the range, in a format compatible with `validate_time_format`.
-        inplace : bool, optional
-            If True, updates the instance's data in-place. Defaults to False.
-        auto_commit : bool, optional
-            If True, automatically commits changes to the database. Defaults to False.
-
-        Returns
-        -------
-        Version
-            Self-reference for method chaining.
-        """
-        from kj_core.df_utils.time_cut import validate_time_format, time_cut_by_datetime_index
-        # Validate time formats
-        validated_start_time = validate_time_format(start_time)
-        validated_end_time = validate_time_format(end_time)
-
-        if isinstance(validated_start_time, ValueError) or isinstance(validated_end_time, ValueError):
-            logger.error("Invalid time format provided.")
-            return
-
-        # Attempt to limit data within the specified time range
-        try:
-            data = self.data.copy()
-            data = time_cut_by_datetime_index(data,  start_time=start_time, end_time=end_time)
-
-            if inplace:
-                self.data = data
-
-            if auto_commit:
-                self.get_database_manager().commit()
-
-            logger.info(f"Successfully limited the data of '{self}' between '{start_time}' and '{end_time}', inplace: '{inplace}', auto_commit: '{auto_commit}'.")
-
-            return data
-        except Exception as e:
-            logger.error(f"Error limiting the data of '{self}': {e}")
-            return

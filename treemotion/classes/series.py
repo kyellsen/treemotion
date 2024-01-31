@@ -122,6 +122,7 @@ class Series(BaseClass):
         total_measurements = len(self.measurement)
         logger.info(f"Updated filenames for {successful_updates} out of {total_measurements} measurements.")
 
+    @dec_runtime
     def add_wind_station(self,
                          station_id: str,
                          filename_wind: Optional[str] = None,
@@ -227,6 +228,7 @@ class Series(BaseClass):
     import pandas as pd
     import logging
 
+    @dec_runtime
     def calc_optimal_shift_median(self, measurement_version_name: str = None, filter_min_corr: float = 0.5) -> Tuple[
         pd.DataFrame, float]:
         """

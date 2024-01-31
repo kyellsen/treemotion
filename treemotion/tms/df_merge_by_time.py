@@ -18,11 +18,11 @@ def merge_dfs_by_time(df_high_freq: pd.DataFrame, df_low_freq: pd.DataFrame) -> 
     """
     # Reindex the lower frequency DataFrame to match the higher frequency DataFrame's index
     df_low_freq = df_low_freq.reindex(df_high_freq.index, method='nearest')
-    logger.info("Reindexed df_low_freq to match df_high_freq.")
+    #logger.debug("Reindexed df_low_freq to match df_high_freq.")
 
     # Perform an outer join between the two DataFrames
     merged_data = df_high_freq.merge(df_low_freq, left_index=True, right_index=True, how='outer')
-    logger.info("Merged dataframes using an outer join.")
+    #logger.debug("Merged dataframes using an outer join.")
     return merged_data
 
 
@@ -45,7 +45,7 @@ def cut_df_to_match_length(df_to_cut: pd.DataFrame, df_reference: pd.DataFrame) 
 
     # Limit df_to_cut to the relevant time range with buffer
     df_cut = df_to_cut.loc[start_time:end_time]
-    logger.info(f"Trimmed df_to_cut from '{start_time}' to '{end_time}'.")
+    logger.debug(f"Trimmed df_to_cut from '{start_time}' to '{end_time}'.")
     return df_cut
 
 

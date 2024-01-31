@@ -171,7 +171,9 @@ class BaseClassDataTMS(BaseClass):
         fig = plot_multiple_dfs(dfs_and_columns)
         plot_manager = self.get_plot_manager()
         filename = f'mv_id_{self.measurement_version_id}'
-        plot_manager.save_plot(fig, filename, subdir="tempdrift/compare_tms_tempdrift")
+        subdir=f"tempdrift/compare_tms_tempdrift/{self.__class__.__name__}"
+
+        plot_manager.save_plot(fig, filename, subdir)
 
     def plot_tms_tempdrift(self):
         pass
@@ -225,6 +227,52 @@ class BaseClassDataTMS(BaseClass):
             return sampled_data
         except Exception as e:
             logger.error(f"Failed to select a random sample: {e}")
+
+    def time_cut(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
+        """
+        Limits the data to a specific time range and optionally updates the instance data in-place.
+
+        Parameters
+        ----------
+        start_time : str
+            The start time of the range, in a format compatible with `validate_time_format`.
+        end_time : str
+            The end time of the range, in a format compatible with `validate_time_format`.
+        inplace : bool, optional
+            If True, updates the instance's data in-place. Defaults to False.
+        auto_commit : bool, optional
+            If True, automatically commits changes to the database. Defaults to False.
+
+        Returns
+        -------
+        Version
+            Self-reference for method chaining.
+        """
+        # Validate time formats
+        validated_start_time = validate_time_format(start_time)
+        validated_end_time = validate_time_format(end_time)
+
+        if isinstance(validated_start_time, ValueError) or isinstance(validated_end_time, ValueError):
+            logger.error("Invalid time format provided.")
+            return
+
+        # Attempt to limit data within the specified time range
+        try:
+            data = self.data.copy()
+            data = time_cut_by_datetime_index(data,  start_time=start_time, end_time=end_time)
+
+            if inplace:
+                self.data = data
+
+            if auto_commit:
+                self.get_database_manager().commit()
+
+            logger.info(f"Successfully limited the data of '{self}' between '{start_time}' and '{end_time}', inplace: '{inplace}', auto_commit: '{auto_commit}'.")
+
+            return data
+        except Exception as e:
+            logger.error(f"Error limiting the data of '{self}': {e}")
+            return
 #
 #
 #

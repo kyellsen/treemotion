@@ -29,7 +29,6 @@ def setup(working_directory: Optional[str] = None, log_level="info", safe_logs_t
     LOG_MANAGER.update_config(working_directory, log_level, safe_logs_to_file)
 
     logger = get_logger(__name__)
-    print(LOG_MANAGER.log_directory, LOG_MANAGER.log_level)
 
     CONFIG = Config(working_directory)
 

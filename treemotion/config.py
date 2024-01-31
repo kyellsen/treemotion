@@ -26,7 +26,7 @@ class Config(CoreConfig):
         Initializes the configuration settings, building upon the core configuration.
         """
         super().__init__(f"{working_directory}/{self.package_name_short}")
-        logger.info(f"TEST003")
+        logger.info(f"{self} initialized! Code: 002")
 
     class Measurement:
         pass

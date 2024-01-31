@@ -20,7 +20,7 @@ if __name__ == "__main__":
     CONFIG, LOG_MANAGER, DATA_MANAGER, DATABASE_MANAGER, PLOT_MANAGER = tms.setup(
         working_directory=str(working_directory), log_level="DEBUG")
 
-    # DATABASE_MANAGER.duplicate(database_path=str(source_db))
+    DATABASE_MANAGER.duplicate(database_path=str(source_db))
     DATABASE_MANAGER.connect(db_name=str(db_name))
 
     project = DATABASE_MANAGER.load(Project, 1)[0]
@@ -30,25 +30,25 @@ if __name__ == "__main__":
     filename_wind_extreme = 'produkt_zehn_min_fx_20200101_20221231_06163.txt'
     series: Series = DATABASE_MANAGER.load(Series, 1)[0]
     series.add_wind_station("06163", filename_wind=filename_wind, filename_wind_extreme=filename_wind_extreme,
-                            update_existing=False)
-    # project.method_for_all_children("add_wind_station", "06163")
-    # project.method_for_all_children("add_wind_station", "06163", filename_wind=filename_wind,
-    #                                filename_wind_extreme=filename_wind_extreme, update_existing=True)
+                            update_existing=True)
+    project.method_for_all_children("add_wind_station", "06163")
+    project.method_for_all_children("add_wind_station", "06163", filename_wind=filename_wind,
+                                    filename_wind_extreme=filename_wind_extreme, update_existing=True)
 
-    # series.method_for_all_of_class("Measurement", "load_from_csv", update_existing=False)
+    series.method_for_all_of_class("Measurement", "load_from_csv", update_existing=True)
 
     measurement: Measurement = series.measurement[0]
     measurement.load_from_csv(update_existing=True)
     measurement_version = measurement.measurement_version[0]
 
-    # shift = series.calc_optimal_shift_median()
-    # measurement_version.add_data_merge(update_existing=True)
+    shift = series.calc_optimal_shift_median()
+    measurement_version.add_data_merge(update_existing=True)
 
-    # series.method_for_all_of_class("MeasurementVersion", "add_data_merge", update_existing=False)
-    # series.method_for_all_of_class("MeasurementVersion", "plot_shift_sync_wind_tms", mode="median")
+    series.method_for_all_of_class("MeasurementVersion", "add_data_merge", update_existing=True)
+    series.method_for_all_of_class("MeasurementVersion", "plot_shift_sync_wind_tms", mode="median")
 
     data_tms: DataTMS = measurement_version.data_tms
-    # data_merge: DataMerge = measurement_version.data_merge
+    data_merge: DataMerge = measurement_version.data_merge
     start_time = '2022-01-29T19:30:00'
     end_time = '2022-01-29T20:00:00'
     mv_list: List[MeasurementVersion] = DATABASE_MANAGER.load(MeasurementVersion)
@@ -56,25 +56,9 @@ if __name__ == "__main__":
     for mv in mv_list:
         mv.data_tms.time_cut(start_time, end_time, inplace=True, auto_commit=True)
         mv.data_tms.plot_compare_tms_tempdrift()
+        mv.data_merge.time_cut(start_time, end_time, inplace=True, auto_commit=True)
+        mv.data_merge.plot_compare_tms_tempdrift()
 
-    #
-    # db_1 = DATABASE_MANAGER
-    # db_2 = data_merge.get_database_manager()
-    # if db_1 == db_2:
-    #     print(True)
-    # else:
-    #     print(False)
-    #
-    # data_tms.get_plot_manager().test()
-    #
-    # print("READY1")
-
-    # Beispiel: Verwendung der Funktion (df1 und df2 müssen vorher definiert sein)
-    # plot_dataframes(df1, df2)
-
-    # merged_data, shifted_data = mv.sync_wind_tms_data()
-    #
-    # plot(merged_data, shifted_data)
 
     # tms_data.to_csv(working_directory/'export/tms_data.csv')
     # wind_data.to_csv(working_directory/'export/wind_data.csv')

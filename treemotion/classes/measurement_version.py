@@ -223,6 +223,7 @@ class MeasurementVersion(BaseClass):
             raise ValueError
         return shift_sec
 
+    @dec_runtime
     def plot_shift_sync_wind_tms(self, mode: str = "median", plot_shift: bool = True, plot_linear: bool = True, plot_exponential: bool = True):
         config = self.get_config().Data
 
@@ -273,6 +274,7 @@ class MeasurementVersion(BaseClass):
             logger.error(f"Failed to plot_shift_sync_wind_tms: '{self}'. Error: {e}")
             raise
 
+    @dec_runtime
     def add_data_merge(self, update_existing: bool = True) -> Optional[DataMerge]:
         logger.info(f"Processing add_data_merge for '{self}'")
         session = self.get_database_manager().session
