@@ -57,7 +57,7 @@ class Measurement(BaseClass):
 
         :return: A string representation of the Measurement instance.
         """
-        return f"Measurement(id={self.measurement_id}, series_id={self.series_id}, filename={self.filepath_tms})"
+        return f"Measurement(id={self.measurement_id}, series_id={self.series_id})"
 
     @dec_runtime
     def load_from_csv(self, measurement_version_name: str = None,
@@ -77,7 +77,7 @@ class Measurement(BaseClass):
         logger.info(f"Start loading TMS data from CSV for '{self}'")
 
         try:
-            m_v_name = measurement_version_name or self.get_config().MeasurementVersion.default_load_from_csv_measurement_version_name
+            m_v_name = measurement_version_name or self.get_config().MeasurementVersion.measurement_version_name_default
 
             present_m_v = (self.get_database_manager().session.query(MeasurementVersion)
                            .filter(MeasurementVersion.measurement_id == self.measurement_id,
@@ -101,7 +101,8 @@ class Measurement(BaseClass):
                 session.delete(present_m_v)
                 session.flush()
 
-            m_v = MeasurementVersion.load_tms_from_csv(filepath_tms=self.filepath_tms, measurement_id=self.measurement_id,
+            m_v = MeasurementVersion.load_tms_from_csv(filepath_tms=self.filepath_tms,
+                                                       measurement_id=self.measurement_id,
                                                        measurement_version_id=None, measurement_version_name=m_v_name)
             self.measurement_version.append(m_v)
             DATABASE_MANAGER.commit()
@@ -113,7 +114,8 @@ class Measurement(BaseClass):
 
             return None
 
-    def get_measurement_version_by_filter_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[List[MeasurementVersion]]:
+    def get_measurement_version_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[
+        List[MeasurementVersion]]:
         """
         Find all MeasurementVersion objects based on the provided filters.
 
@@ -130,25 +132,22 @@ class Measurement(BaseClass):
 
         try:
             if method == "list_filter":
-                matching_mv: List = [mv for mv in self.measurement_version if
-                                     all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
+                matching_mv_list: List = [mv for mv in self.measurement_version if
+                                          all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
             elif method == "db_filter":
                 session = self.get_database_manager().session()
-                matching_mv: List = (session.query(MeasurementVersion)
-                                     .filter(MeasurementVersion.measurement == self)
-                                     .filter_by(**filter_dict)
-                                     .all())
+                matching_mv_list: List = (session.query(MeasurementVersion)
+                                          .filter(MeasurementVersion.measurement == self)
+                                          .filter_by(**filter_dict)
+                                          .all())
             else:
-                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
-                return None
+                raise ValueError("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
 
-            if not matching_mv:
-                logger.debug(f"No MeasurementVersion instance found with the given filters: {filter_dict}.")
-                return None
+            if len(matching_mv_list) <= 0:
+                raise ValueError(f"No measurement_version found for filter: '{filter_dict}'")
 
-            logger.info(f"{len(matching_mv)} MeasurementVersion instances found with the given filters: {filter_dict}.")
-            return matching_mv
+            return matching_mv_list
 
         except Exception as e:
-            logger.error(f"An error occurred while querying the MeasurementVersion: {str(e)}")
+            logger.error(f"An error occurred while querying the Version: {e}")
             return None

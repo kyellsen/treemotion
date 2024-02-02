@@ -3,6 +3,8 @@ from .tree import Tree
 from .tree_treatment_type import TreeTreatmentType
 from .tree_cable import TreeCable
 
+from .measurement_version import MeasurementVersion
+
 logger = get_logger(__name__)
 
 

@@ -43,17 +43,19 @@ class BaseClass(CoreBaseClass):
         :return: List with measurement_versions of method execution on all 'Measurement' class children,
                  or None if an error occurred.
         """
-        logger.info(f"Start 'get_measurement_version_by_filter' with filter '{filter_dict}' for instance of '{self}'")
+        logger.debug(f"Start 'get_measurement_version_by_filter' with filter '{filter_dict}' for instance of '{self}'")
         try:
-            mv: List = self.method_for_all_of_class(class_name="Measurement",
-                                                    method_name='get_measurement_version_by_filter',
-                                                    filter_dict=filter_dict,
-                                                    method=method)
-            logger.info(f"Finished 'get_measurement_version_by_filter' for instance of '{self}'")
-            logger.info(f"Found '{len(mv)}' MeasurementVersions")
+            matching_mv_list: List = self.method_for_all_of_class(class_name="Measurement",
+                                                                  method_name='get_measurement_version_by_filter',
+                                                                  filter_dict=filter_dict,
+                                                                  method=method)
+            if len(matching_mv_list) <= 0:
+                raise ValueError(f"No measurement_version found for filter: '{filter_dict}'")
 
-            return mv
+            logger.debug(
+                f"{self} finished 'get_measurement_version_by_filter', found '{len(matching_mv_list)}' MeasurementVersions.")
+
+            return matching_mv_list
         except Exception as e:
-            logger.error(
-                f"Error in '{self.__class__.__name__}'.get_measurement_version_by_filter from '{self}', Error: {e}")
+            logger.error(f"{self}.get_measurement_version_by_filter from, Error: {e}")
             return None

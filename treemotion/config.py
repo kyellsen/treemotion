@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional
+import pandas as pd
 
 from kj_core.core_config import CoreConfig
 
@@ -31,11 +32,8 @@ class Config(CoreConfig):
     class Measurement:
         pass
 
-        # tms_df_time_column_name = 'Time'
-        # tms_df_main_column_name = 'Absolute-Inclination - drift compensated'
-
     class MeasurementVersion:
-        default_load_from_csv_measurement_version_name = "raw"
+        measurement_version_name_default = "raw"
 
     class Data:
         data_wind_directory = "data_wind_station"
@@ -79,7 +77,19 @@ class Config(CoreConfig):
         time_rolling_max = '30min'  # pandas time format!
         merge_wind_value = 'wind_rolling_max_' + time_rolling_max
         merge_tms_value = 'tms_rolling_max_' + time_rolling_max
+
+        # shift
         calc_optimal_shift_down_sample_rate = "60S"  # default "60S"
         max_shift_sec: float = 90 * 60  # Default 7200 sec or 2 hours
 
-        tms_sample_rate = '50ms'
+        tms_sample_rate_hz = 20
+        tms_sample_rate_interval = pd.to_timedelta(1 / tms_sample_rate_hz, unit='s')
+
+        # peak_n
+        peak_n_count: int = 50
+        peak_n_min_time_diff: float = 30
+        peak_n_prominence: int = None
+
+    class Series:
+        default_data_class_name = "data_merge"
+        cut_time_by_peaks_duration = 15*60  # Seconds

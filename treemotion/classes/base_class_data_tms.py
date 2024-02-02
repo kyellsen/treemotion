@@ -9,7 +9,7 @@ from ..common_imports.imports_classes import *
 from ..classes import BaseClass
 from kj_logger import get_logger
 
-from ..tms.find_peaks import *
+from ..tms.find_peaks import find_max_peak, find_n_peaks
 from ..tms.tempdrift import temp_drift_comp_lin_reg, temp_drift_comp_lin_reg_2, temp_drift_comp_mov_avg, \
     temp_drift_comp_emd
 from ..tms.tempdrift import fft_freq_filter, butter_lowpass_filter
@@ -131,21 +131,21 @@ class BaseClassDataTMS(BaseClass):
             data['North-South-Inclination - drift compensated'])
         return data
 
-    def compare_tms_tempdrift_methods(self):
+    def compare_tms_tempdrift_methods(self) -> Dict[str, pd.DataFrame]:
         results = {"original": self.data.copy()}
 
         for method in ["linear", "moving_average", "emd"]:  # "linear_2",
             if method in ["linear", "linear_2", "moving_average"]:
                 for freq_filter in ["no_filter", "butter_lowpass", "fft"]:
-                    compensated_data = self.correct_tms_data(method=method, freq_filter=freq_filter, inplace=False)
+                    compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter=freq_filter, inplace=False)
                     results[f"{method}_{freq_filter}"] = compensated_data
             elif method in ["emd"]:
-                compensated_data = self.correct_tms_data(method=method, freq_filter="no_filter", inplace=False)
+                compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter="no_filter", inplace=False)
                 results[f"{method}"] = compensated_data
 
         return results
 
-    def plot_compare_tms_tempdrift(self, start_time='2022-01-29T19:30:00', end_time='2022-01-29T20:00:00'):
+    def plot_compare_tms_tempdrift(self, start_time=None, end_time=None):
         results = self.compare_tms_tempdrift_methods()
 
         original_columns = ['East-West-Inclination',
@@ -165,8 +165,9 @@ class BaseClassDataTMS(BaseClass):
 
         for method, df in results.items():
             if method != "original":
-                df_time = df.loc[start_time:end_time].copy()
-                dfs_and_columns.append((method, df_time, compensated_columns))
+                if (start_time is not None) and (end_time is not None):
+                    df = df.loc[start_time:end_time].copy()
+                dfs_and_columns.append((method, df, compensated_columns))
 
         fig = plot_multiple_dfs(dfs_and_columns)
         plot_manager = self.get_plot_manager()
@@ -228,7 +229,7 @@ class BaseClassDataTMS(BaseClass):
         except Exception as e:
             logger.error(f"Failed to select a random sample: {e}")
 
-    def time_cut(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
+    def cut_by_time(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
         """
         Limits the data to a specific time range and optionally updates the instance data in-place.
 
@@ -273,45 +274,39 @@ class BaseClassDataTMS(BaseClass):
         except Exception as e:
             logger.error(f"Error limiting the data of '{self}': {e}")
             return
-#
-#
-#
-# # @property
-# # def peak_max(self) -> Optional[Dict]:
-# #
-# #     datetime_column_name = self.datetime_column_name
-# #     main_value_column_name = self.get_config().Data.main_tms_value
-# #     try:
-# #         peak = find_max_peak(self.data, main_value_column_name, datetime_column_name)
-# #     except Exception as e:
-# #         logger.warning(f"No peak found for {self}, error: {e}")
-# #         return None
-# #
-# #     # For debugging
-# #     show_peak: bool = False
-# #     if show_peak:
-# #         logger.info(f"Peak in {self}: {peak}")
-# #     return peak
-# #
-# # @property
-# # def peaks(self):
-# #     config = self.get_config().Data
-# #     datetime_column_name = self.datetime_column_name
-# #     tms_main_value = self.get_config().Data.main_tms_value
-# #     n_peaks: int = config.n_peaks
-# #     sample_rate: float = config.sample_rate
-# #     min_time_diff: float = config.min_time_diff
-# #     prominence: int = config.prominence
-# #
-# #     try:
-# #         peaks = find_n_peaks(self.data, tms_main_value, datetime_column_name, n_peaks, sample_rate, min_time_diff,
-# #                              prominence)
-# #     except Exception as e:
-# #         logger.warning(f"No peaks found for {self.__str__()}, error: {e}")
-# #         return None
-# #
-# #     # For debugging
-# #     show_peaks: bool = False
-# #     if show_peaks:
-# #         logger.info(f"Peaks found in {self.__str__()}: {peaks.__str__()}")
-# #     return peaks
+
+    @property
+    def peak_max(self) -> Optional[Tuple]:
+
+        column: str = self.get_config().Data.main_tms_value
+        try:
+            index, value = find_max_peak(self.data[column])
+        except Exception as e:
+            logger.warning(f"No peak found for {self}, error: {e}")
+            return None
+
+        # For debugging
+        if False:
+            logger.debug(f"Peak in {self}: index '{index}', value '{value}'")
+        return index, value
+
+    @property
+    def peak_n(self) -> pd.Series:
+        config = self.get_config().Data
+
+        column = config.main_tms_value
+        n_peaks: int = config.peak_n_count
+        sample_rate: float = config.tms_sample_rate_hz
+        min_time_diff: float = config.peak_n_min_time_diff
+        prominence: int = config.peak_n_prominence
+
+        try:
+            peaks: pd.Series = find_n_peaks(self.data[column], n_peaks, sample_rate, min_time_diff, prominence)
+
+        except Exception as e:
+            raise ValueError(f"No peaks found for {self}, error: {e}")
+
+        # For debugging
+        if False:
+            logger.debug(f"Peaks found in {self}:\n {peaks}\n")
+        return peaks

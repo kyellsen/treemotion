@@ -1,89 +1,60 @@
 import pandas as pd
+import numpy as np
 from scipy.signal import find_peaks
 
 
-def find_max_peak(df: pd.DataFrame, value_col: str, time_col: str) -> dict:
+def find_max_peak(series: pd.Series) -> tuple:
     """
-    Finds the highest peak in a given Pandas DataFrame.
+    Finds the highest peak in a given Pandas Series with a DateTimeIndex.
 
     Parameters:
-    df (DataFrame): The DataFrame in which to search for the peak.
-    value_col (str): The name of the column in the DataFrame containing the values.
-    time_col (str): The name of the column in the DataFrame containing the timestamps.
+    series (pd.Series): The Series in which to search for the peak.
 
     Returns:
-    dict: A dictionary with the index, time, and value of the found peak.
+    tuple: A tuple with the time (index) of the peak and the peak value.
     """
 
     # Select the maximum peak
-    max_peak_index = df[value_col].idxmax()
-
-    return {
-        'peak_index': max_peak_index,
-        'peak_time': df[time_col].iloc[max_peak_index],
-        'peak_value': df[value_col].iloc[max_peak_index]
-    }
+    return series.idxmax(), series.max()
 
 
-def find_n_peaks(df: pd.DataFrame, value_col: str, time_col: str, n_peaks: int,
-                 sample_rate: float, min_time_diff: float = None,
-                 prominence: int = None) -> dict:
+def find_n_peaks(series: pd.Series, count: int, sample_rate: float,
+                 min_time_diff: float = None, prominence: int = None) -> pd.Series:
     """
-    Finds the n highest peaks in a given Pandas DataFrame.
+    Finds the n largest peaks in a given Pandas Series with a DateTimeIndex and returns a single pd.Series
+    where the values are the peak values and the index is the datetime of each peak, sorted by datetime.
 
     Parameters:
-    df (DataFrame): The DataFrame in which to search for peaks.
-    value_col (str): The name of the column in the DataFrame containing the values.
-    time_col (str): The name of the column in the DataFrame containing the timestamps.
-    n_peaks (int): The number of highest peaks to return.
+    series (pd.Series): The Series in which to search for peaks.
+    count (int): The number of largest peaks to return.
     sample_rate (float): The sampling rate of the data (in Hertz).
     min_time_diff (float, optional): The minimum time difference (in seconds) between two peaks.
     prominence (int, optional): The prominence value to be used for peak detection.
 
     Returns:
-    dict: A dictionary with the indices, times, and values of the found peaks.
+    pd.Series: A Series where the index is the datetime of each peak and the values are the peak values,
+               sorted by datetime.
 
     Raises:
-    ValueError: If n_peaks is less than or equal to 0,
+    ValueError: If count is less than or equal to 0,
                 if sample_rate is less than or equal to 0,
                 if min_time_diff is present and less than or equal to 0.
     """
 
-    # Check if the inputs are valid
-    if n_peaks <= 0:
-        raise ValueError('n_peaks must be greater than 0')
-
+    if count <= 0:
+        raise ValueError('count must be greater than 0')
     if sample_rate <= 0:
         raise ValueError('sample_rate must be greater than 0')
-
     if min_time_diff is not None and min_time_diff <= 0:
         raise ValueError('min_time_diff must be greater than 0')
 
-    # Convert min_time_diff to distance in indices
-    if min_time_diff is not None:
-        min_samples_diff = min_time_diff * sample_rate
-    else:
-        min_samples_diff = None
+    min_samples_diff = np.ceil(min_time_diff * sample_rate) if min_time_diff is not None else None
+    peaks, _ = find_peaks(series, distance=min_samples_diff, prominence=prominence)
 
-    # Find all peaks
-    peaks, _ = find_peaks(df[value_col], distance=min_samples_diff, prominence=prominence)
+    # Select the 'count' largest peaks by their values
+    peak_values = series.iloc[peaks]
+    largest_peaks = peak_values.nlargest(count)
+    sorted_largest_peaks = largest_peaks.sort_index()
 
-    # Sort the peaks by their values and keep only the top n_peaks
-    peaks = sorted(peaks, key=lambda x: df[value_col].iloc[x], reverse=True)[:n_peaks]
+    return sorted_largest_peaks
 
-    return {
-        'peak_index': peaks,
-        'peak_time': df[time_col].iloc[peaks].tolist(),
-        'peak_value': df[value_col].iloc[peaks].tolist()
-    }
-
-
-def merge_peak_dicts(peak_dicts):
-    """
-    Merges a list of 'peak' dictionaries.
-    """
-    return {
-        'peak_index': [index for peaks in peak_dicts for index in peaks['peak_index']],
-        'peak_time': [time for peaks in peak_dicts for time in peaks['peak_time']],
-        'peak_value': [value for peaks in peak_dicts for value in peaks['peak_value']]
-    }

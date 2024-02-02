@@ -1,9 +1,14 @@
+import pandas as pd
+from typing import Tuple
+
 from kj_core.utils.path_utils import validate_and_get_file_list, extract_sensor_id, extract_last_three_digits
 from ..common_imports.imports_classes import *
 
 from .measurement import Measurement
 from .measurement_version import MeasurementVersion
 from .data_wind_station import DataWindStation
+from .base_class_data_tms import BaseClassDataTMS
+from .data_tms import DataTMS
 from .data_merge import DataMerge
 
 import treemotion
@@ -199,34 +204,26 @@ class Series(BaseClass):
 
         try:
             if method == "list_filter":
-                matching_versions = [mv for measurement in self.measurement for mv in measurement.measurement_version if
-                                     all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
+                matching_mv_list: List= [mv for measurement in self.measurement for mv in measurement.measurement_version if
+                                    all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
             elif method == "db_filter":
                 session = self.get_database_manager().session()
-                matching_versions = (session.query(MeasurementVersion)
-                                     .join(Measurement, MeasurementVersion.measurement_id == Measurement.id)
-                                     .filter(Measurement.series_id == self.series_id)
-                                     .filter_by(**filter_dict)
-                                     .all())
+                matching_mv_list: List = (session.query(MeasurementVersion)
+                                          .join(Measurement, MeasurementVersion.measurement_id == Measurement.id)
+                                          .filter(Measurement.series_id == self.series_id)
+                                          .filter_by(**filter_dict)
+                                          .all())
             else:
-                logger.error("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
-                return None
+                raise ValueError("Invalid method. Please choose between 'list_filter' and 'db_filter'.")
 
-            if not matching_versions:
-                logger.debug(f"No MeasurementVersion instance found with the given filters: {filter_dict}.")
-                return None
+            if len(matching_mv_list) <= 0:
+                raise ValueError(f"No measurement_version found for filter: '{filter_dict}'")
 
-            logger.debug(
-                f"{len(matching_versions)} MeasurementVersion instances found with the given filters: {filter_dict}.")
-            return matching_versions
+            return matching_mv_list
 
         except Exception as e:
-            logger.error(f"An error occurred while querying the Version: {str(e)}")
+            logger.error(f"An error occurred while querying the Version: {e}")
             return None
-
-    from typing import Tuple
-    import pandas as pd
-    import logging
 
     @dec_runtime
     def calc_optimal_shift_median(self, measurement_version_name: str = None, filter_min_corr: float = 0.5) -> Tuple[
@@ -245,12 +242,12 @@ class Series(BaseClass):
         """
         try:
             # Use default measurement version name if not specified
-            measurement_version_name = measurement_version_name or self.get_config().MeasurementVersion.default_load_from_csv_measurement_version_name
+            measurement_version_name = measurement_version_name or self.get_config().MeasurementVersion.measurement_version_name_default
 
             results = []  # Initialize list to store result dictionaries
 
             # Retrieve list of MeasurementVersion instances based on the specified name
-            mv_list = self.get_measurement_version_by_filter(
+            mv_list: List[MeasurementVersion] = self.get_measurement_version_by_filter(
                 filter_dict={'measurement_version_name': measurement_version_name})
 
             for mv in mv_list:
@@ -288,3 +285,132 @@ class Series(BaseClass):
             logger.critical(f"Critical error in calc_optimal_shift_median: {e}")
             raise  # Ensuring that the exception is not silently swallowed
 
+    @dec_runtime
+    def cut_by_time(self, start_time: str, end_time: str, measurement_version_name: Optional[str] = None,
+                    data_class_name: str = None, inplace: bool = False,
+                    auto_commit: bool = False) -> Optional[List[pd.DataFrame]]:
+        """
+        Limits the measurement versions in the series by a specified time range.
+
+        Args:
+            start_time (str): Start time of the range, in a compatible format.
+            end_time (str): End time of the range, in a compatible format.
+            measurement_version_name (Optional[str]): Name of the measurement version.
+                Defaults to a system-defined default measurement version name.
+            data_class_name (str): Name of the subclass of BaseClassDataTMS related to measurement_version.
+                Options are 'data_tms' or 'data_merge' (default).
+            inplace (bool): If True, updates the instance's data in-place. Defaults to False.
+            auto_commit (bool): If True, automatically commits changes to the database. Defaults to False.
+
+        Returns:
+            Optional[List[pd.DataFrame]]: List of DataFrame objects limited by the time range, or None if an error occurs.
+        """
+        # Default param-values as fallback
+        config = self.get_config()
+        measurement_version_name = measurement_version_name or config.MeasurementVersion.measurement_version_name_default
+        data_class_name = data_class_name or config.Series.default_data_class_name
+        try:
+            # Retrieve list of MeasurementVersion instances based on the specified name
+            mv_list: List[MeasurementVersion] = self.get_measurement_version_by_filter(
+                filter_dict={'measurement_version_name': measurement_version_name})
+
+            result = []
+            for mv in mv_list:
+                try:
+                    mv.validate_data_class_name(data_class_name)
+                    data_instance: BaseClassDataTMS = getattr(mv, data_class_name, None)
+                    df: pd.DataFrame = data_instance.cut_by_time(start_time, end_time, inplace, auto_commit)
+                    result.append(df)
+                except Exception as e:
+                    logger.error(f"Error processing measurement version '{mv}': {e}")
+
+            logger.info(
+                f"{self} successfully limited {len(result)} instances of Measurement_Version '{measurement_version_name}' by time.")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error occurred during cut_by_time: {e}")
+            return None
+
+    @dec_runtime
+    def cut_time_by_peaks(self, measurement_version_name: Optional[str] = None,
+                          data_class_name: str = None, duration: float = None, inplace: bool = False,
+                          auto_commit: bool = False) -> Optional[Tuple[List[pd.DataFrame], pd.Series]]:
+        """
+        Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
+
+        Args:
+            measurement_version_name (Optional[str]): Name of the measurement version.
+                Defaults to a system-defined default measurement version name.
+            data_class_name (str): Name of the subclass of BaseClassDataTMS related to measurement_version.
+                Options are 'data_tms' or 'data_merge' (default).
+            duration (float):
+            inplace (bool): If True, updates the instance's data in-place. Defaults to False.
+            auto_commit (bool): If True, automatically commits changes to the database. Defaults to False.
+
+        Returns:
+            Optional[Tuple[List[pd.DataFrame], pd.Series]]: Tuple containing a list of DataFrame objects limited by the time range, and the Series of all peaks used for the time limit, or None if an error occurs.
+        """
+        # Default param-values as fallback
+        config = self.get_config()
+        measurement_version_name = measurement_version_name or config.MeasurementVersion.measurement_version_name_default
+        data_class_name = data_class_name or config.Series.default_data_class_name
+        duration = duration or config.Series.cut_time_by_peaks_duration
+
+        try:
+            if duration is None or duration <= 0:
+                raise ValueError("duration must be greater than 0.")
+
+            # Retrieve list of MeasurementVersion instances based on the specified name
+            mv_list: List[MeasurementVersion] = self.get_measurement_version_by_filter(
+                filter_dict={'measurement_version_name': measurement_version_name})
+
+            peaks_list: List[pd.Series] = []
+            for mv in mv_list:
+                try:
+                    mv.validate_data_class_name(data_class_name)
+                    data_instance: BaseClassDataTMS = getattr(mv, data_class_name, None)
+                    peaks: pd.Series = data_instance.peak_n
+                    peaks_list.append(peaks)
+                except Exception as e:
+                    logger.error(f"Error processing measurement version '{mv}': {e}")
+            all_peaks: pd.Series = pd.concat(peaks_list).sort_index()
+
+            # Verwende all_peaks.index direkt für die Zeitpunkte der Peaks
+            peak_times = all_peaks.index
+
+            start_time, end_time = self._find_optimal_time_frame(duration, peak_times)
+            result = self.cut_by_time(start_time, end_time, measurement_version_name, data_class_name, inplace,
+                                      auto_commit)
+
+            return result, all_peaks
+
+        except Exception as e:
+            logger.error(f"Error occurred during cut_by_time: {e}")
+            return None
+
+    @staticmethod
+    def _find_optimal_time_frame(duration: float, peak_times: pd.DatetimeIndex) -> Tuple[str, str]:
+        if peak_times.empty:
+            raise ValueError("The peak_times Series is empty.")
+
+        optimal_start_time = peak_times[0]
+        optimal_end_time = optimal_start_time + pd.Timedelta(seconds=duration)
+        max_peak_count = 0
+
+        for start_time in peak_times:
+            end_time = start_time + pd.Timedelta(seconds=duration)
+            peak_count = peak_times[(peak_times >= start_time) & (peak_times < end_time)].size
+            #logger.debug(f"Timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
+            if peak_count > max_peak_count:
+                max_peak_count = peak_count
+                optimal_start_time = start_time
+                optimal_end_time = end_time
+                logger.debug(f"Better timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
+
+        # Umwandeln der optimalen Zeiten in das korrekte Format
+        optimal_start_time = optimal_start_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+        optimal_end_time = optimal_end_time.strftime("%Y-%m-%d %H:%M:%S.%f")
+        logger.info(f"Found optimal timeframe: {optimal_start_time} - {optimal_end_time}, max_peak_count {max_peak_count}")
+
+        return optimal_start_time, optimal_end_time

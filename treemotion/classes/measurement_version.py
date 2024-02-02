@@ -25,6 +25,8 @@ class MeasurementVersion(BaseClass):
     data_ls3 = relationship("DataLS3", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
     data_merge = relationship("DataMerge", backref="measurement_version", uselist=False, cascade='all, delete-orphan')
 
+    valid_data_attributes: List[str] = ["data_tms", "data_merge", "data_ls3"]
+
     def __init__(self, measurement_version_id=None, measurement_version_name=None, measurement_id=None,
                  optimal_shift=None, optimal_shift_sec=None, corr_shift_0=None, max_corr=None,
                  data_tms_id=None, data_ls3_id=None, data_merge_id=None):
@@ -82,6 +84,11 @@ class MeasurementVersion(BaseClass):
         session = obj.get_database_manager().session
         session.add(obj)
         return obj
+
+    def validate_data_class_name(self, data_class_name: str):
+        if data_class_name not in self.valid_data_attributes:
+            raise ValueError(
+                f"Invalid data_class_name '{data_class_name}'. Expected one of {self.valid_data_attributes}.")
 
     @dec_runtime
     def calc_optimal_shift(self) -> Tuple[int, float, float, float]:
@@ -224,7 +231,8 @@ class MeasurementVersion(BaseClass):
         return shift_sec
 
     @dec_runtime
-    def plot_shift_sync_wind_tms(self, mode: str = "median", plot_shift: bool = True, plot_linear: bool = True, plot_exponential: bool = True):
+    def plot_shift_sync_wind_tms(self, mode: str = "median", plot_shift: bool = True, plot_linear: bool = False,
+                                 plot_exponential: bool = True):
         config = self.get_config().Data
 
         try:
@@ -286,7 +294,7 @@ class MeasurementVersion(BaseClass):
 
             if existing_data and not update_existing:
                 data_merge = existing_data
-                session.flush()
+                session.flush() # Maybe Cause of Error?
                 logger.warning(
                     f"Return existing {data_merge.__class__.__name__}, update_existing = '{update_existing}': '{data_merge}'")
 
