@@ -156,23 +156,29 @@ class BaseClassDataTMS(BaseClass):
         return data
 
     def compare_tms_tempdrift_methods(self) -> Dict[str, pd.DataFrame]:
+        """
+        Compares different methods for correcting TMS data for temperature drift, filtering, and rotation.
+
+        Returns:
+            A dictionary with keys as method descriptions and values as the compensated data DataFrames.
+        """
         results = {"original": self.data.copy()}
 
-        run_for_tempdrift_methods = ["linear"]  # "moving_average", "emd", "linear_2",
-        run_for_filter_methods = ["no_filter", "butter_lowpass"]  # "fft"
-        run_for_rotation_methods = ["no_rotation", "rotate_pca"]  # "rotate_l_reg"
+        tempdrift_methods = ["linear"]  # Placeholder for additional methods: "moving_average", "emd", "linear_2"
+        filter_methods = ["no_filter", "butter_lowpass"]  # Placeholder for additional methods: "fft"
+        rotation_methods = ["no_rotation", "rotate_pca"]  # Placeholder for additional method: "rotate_l_reg"
 
-        for method in run_for_tempdrift_methods:
-            for rotation in run_for_rotation_methods:
-                if method in ["linear", "linear_2", "moving_average"]:
-                    for freq_filter in run_for_filter_methods:
-                        compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter=freq_filter,
-                                                                               rotation=rotation, inplace=False)
-                        results[f"{method}_{freq_filter}"] = compensated_data
-                elif method in ["emd"]:
-                    compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter="no_filter",
-                                                                           rotation=rotation, inplace=False)
-                    results[f"{method}"] = compensated_data
+        # Generating combinations of methods, filters, and rotations
+        combinations = [(method, filter_, rotation) for method in tempdrift_methods
+                        for filter_ in (filter_methods if method not in ["emd"] else ["no_filter"])
+                        for rotation in rotation_methods]
+
+        # Iterating over each combination to correct TMS data and store in results
+        for method, freq_filter, rotation in combinations:
+            compensated_data = self.correct_tms_data(method=method, freq_filter=freq_filter, rotation=rotation,
+                                                     inplace=False)
+            key = f"{method}_{freq_filter}" if method != "emd" else method  # Special handling for "emd" method
+            results[key] = compensated_data
 
         return results
 
