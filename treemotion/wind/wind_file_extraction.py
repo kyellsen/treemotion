@@ -33,10 +33,6 @@ def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
     df1 = pd.read_csv(filepath_wind, sep=';', index_col=False, skipinitialspace=True)
     df2 = pd.read_csv(filepath_wind_extreme, sep=';', index_col=False, skipinitialspace=True)
 
-    # # Remove leading and trailing spaces from column names
-    # df1.columns = df1.columns.str.strip()
-    # df2.columns = df2.columns.str.strip()
-
     # Ensure 'MESS_DATUM' is in the correct date format
     df1['MESS_DATUM'] = pd.to_datetime(df1['MESS_DATUM'], format='%Y%m%d%H%M')
     df2['MESS_DATUM'] = pd.to_datetime(df2['MESS_DATUM'], format='%Y%m%d%H%M')
@@ -54,7 +50,7 @@ def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
     for col in merged_df.columns:
         if merged_df[col].dtype == 'float64':
             # Ersetze -999 durch NaN in float64 Spalten
-            merged_df[col] = merged_df[col].replace(-999, np.nan)
+            merged_df[col] = merged_df[col].replace(-999, np.nan).astype("float32") # TODO: float64 ?
         elif merged_df[col].dtype == 'int64':
             # Temporär auf float konvertieren für NaN Unterstützung
             temp_col = merged_df[col].astype('float64')
@@ -62,7 +58,7 @@ def extract_wind_df(filepath_wind: Path, filepath_wind_extreme: Path):
             temp_col.replace(-999, np.nan, inplace=True)
             temp_col.ffill(inplace=True)
             # Zurück zu int64 konvertieren
-            merged_df[col] = temp_col.astype('int64')
+            merged_df[col] = temp_col.astype('int32') # TODO: int64 ?
 
     logger.debug(f"Loaded wind and extreme wind data from {filepath_wind} and {filepath_wind_extreme}!")
     return merged_df

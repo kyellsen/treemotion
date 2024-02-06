@@ -6,11 +6,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from sqlalchemy import and_
 
-from ...classes.base_class import BaseClass
-from treemotion import Series, Measurement, MeasurementVersion, TreeTreatment, Tree
+from scipy.stats import pearsonr
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from kj_core.plotting.multiple_dfs import plot_multiple_dfs
 from kj_logger import get_logger
+
+from treemotion import Series, Measurement, MeasurementVersion, TreeTreatment, Tree
+
+from ...classes.base_class import BaseClass
+from ..df_merge_by_time import calc_optimal_shift
 
 logger = get_logger(__name__)
 
@@ -31,9 +36,53 @@ class CrownMotionSimilarity(BaseClass):
         for key in ['base', 'trunk', 'trunk_a', 'trunk_b', 'trunk_c', 'trunk_cable']:
             setattr(self, key, kwargs.get(key))
 
+        self._shifted_trunk_data = None
+
     def __str__(self):
         return (f"{self.__class__.__name__}(id={self.cms_id}, series_id={self.series_id}, "
                 f"mv_name={self.measurement_version_name}, tree_treatment_id={self.tree_treatment.tree_treatment_id})")
+
+    @property
+    def tree_cable_typ(self):
+        tree_cable = self.tree_treatment.tree_cable
+        if tree_cable:
+            cable_typ = tree_cable.tree_cable_type.tree_cable_type
+        else:
+            cable_typ = "free"
+        return cable_typ
+
+    @property
+    def trunk_data(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Retrieves trunk data from both sources.
+
+        Returns:
+            A tuple of pandas DataFrames for trunk_a and trunk_b.
+
+        Raises:
+            ValueError: If trunk_a or trunk_b attributes are not set or None.
+        """
+        try:
+            df_a = self.trunk_a[0].data_merge.data.copy()
+            df_b = self.trunk_b[0].data_merge.data.copy()
+            return df_a, df_b
+        except AttributeError as e:
+            logger.error(f"{self} has no attribute trunk_a and trunk_b or it's None. Exception: {e}")
+
+    @property
+    def shifted_trunk_data(self) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Provides shifted trunk data, caching the result for subsequent calls.
+
+        Returns:
+            A tuple of DataFrames: df_a, df_b (shifted), and df_b_reference (original df_b).
+        """
+        if self._shifted_trunk_data:
+            logger.info("Using existing shifted_trunk_data.")
+        else:
+            logger.warning("Creating new shifted_trunk_data with default parameters.")
+            self._shifted_trunk_data = self.get_shifted_trunk_data()
+        return self._shifted_trunk_data
 
     @classmethod
     def load_and_process_data(cls, series_id: int, measurement_version_name: str) -> List[Dict[str, Any]]:
@@ -54,7 +103,7 @@ class CrownMotionSimilarity(BaseClass):
             return cls.categorize_by_sensor_location(grouped)
         except Exception as e:
             logger.error(f"Error loading and processing data: {e}")
-            return []
+            raise
 
     @staticmethod
     def query_measurement_versions(series_id: int, measurement_version_name: str, session: Session) -> List[
@@ -159,20 +208,94 @@ class CrownMotionSimilarity(BaseClass):
             logger.error(f"Failed to create CrownMotionSimilarity objects: {e}", exc_info=True)
         return cms_objects
 
-    def plot_cms(self, columns: List[str] = None):
-        if hasattr(self, "trunk_a") and hasattr(self, "trunk_b"):
-            df_a = self.trunk_a[0].data_merge.data
-            df_b = self.trunk_b[0].data_merge.data
+    def _calc_optimal_shift(self, df_a: pd.DataFrame, df_b: pd.DataFrame, column_name: str) -> Tuple[
+        float, float, float]:
+        """
+        Calculates the optimal shift for given DataFrame columns.
 
-            if columns is None:
-                columns = ['East-West-Inclination - drift compensated',
-                           'North-South-Inclination - drift compensated',
-                           'Absolute-Inclination - drift compensated'
-                           ]
+        Args:
+            df_a: DataFrame of the first trunk.
+            df_b: DataFrame of the second trunk.
+            column_name: Name of the column to calculate the shift for.
 
-            dfs_and_columns: [List[Tuple[str, pd.DataFrame, List[str]]]] = [
-                ("trunk_a", df_a, columns),
-                ("trunk_b", df_b, columns)
+        Returns:
+            A tuple containing the optimal shift, correlation without shift, and correlation with optimal shift.
+        """
+        config = self.get_config()
+        sample_rate_hz = config.Data.tms_sample_rate_hz  # Sample rate in Hz, e.g., 20 Hz
+        max_shift_sec = config.CrownMotionSimilarity.max_shift_sec  # Maximum shift in seconds
+
+        optimal_shift, correlation_no_shift, correlation_optimal_shift = calc_optimal_shift(
+            df_a[column_name],
+            df_b[column_name],
+            max_shift=sample_rate_hz * max_shift_sec)  # Calculate as an integer, e.g., 20 Hz * 5 sec
+
+        logger.info(f"For Column '{column_name}' before shifting df_b:\n"
+                    f"Optimal get_shifted_trunk_data: {optimal_shift}, "
+                    f"Correlation without get_shifted_trunk_data: {correlation_no_shift:.4f}, "
+                    f"Correlation at optimal get_shifted_trunk_data: {correlation_optimal_shift:.4f}")
+
+        return optimal_shift, correlation_no_shift, correlation_optimal_shift
+
+    def get_shifted_trunk_data(self, use_for_mean_columns: Optional[List[str]] = None, debug: bool = False) -> Tuple[
+        pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Shifts trunk_b data based on optimal shift calculations for specified columns.
+
+        Args:
+            use_for_mean_columns: Columns to use for mean shift calculation. Defaults to config setting.
+            debug: If True, perform validation check to ensure optimal shift mean is approximately 0.0.
+
+        Returns:
+            A tuple of DataFrames: df_a, df_b (shifted), and df_b_reference (original df_b).
+        """
+        config = self.get_config()
+        columns = use_for_mean_columns or config.CrownMotionSimilarity.use_for_mean_columns
+        sample_rate_hz = config.Data.tms_sample_rate_hz  # Sample rate in Hz, e.g., 20 Hz
+
+        df_a, df_b = self.trunk_data
+        df_b_reference = df_b.copy()
+
+        # Calculate optimal shifts for specified columns
+        optimal_shift_list = [self._calc_optimal_shift(df_a, df_b, column)[0] for column in columns]
+
+        # Calculate mean of optimal shifts and apply to df_b
+        optimal_shift_mean = np.mean(optimal_shift_list)
+        logger.info(f"Mean of optimal shifts: {optimal_shift_mean}, List of shifts: {optimal_shift_list}")
+
+        df_b.index += pd.DateOffset(seconds=optimal_shift_mean / sample_rate_hz)
+
+        if debug:
+            # Re-calculate shifts for validation if debug mode is enabled
+            validation_shift_list = [self._calc_optimal_shift(df_a, df_b, column)[0] for column in columns]
+            validation_shift_mean = np.mean(validation_shift_list)
+            logger.debug(
+                f"VALIDATION: Mean of optimal shifts: {validation_shift_mean}, expected to be close to 0.0. List of shifts: {validation_shift_list}")
+
+        self._shifted_trunk_data = (df_a, df_b, df_b_reference)
+        return self._shifted_trunk_data
+
+    def plot_shifted_trunk_data(self, columns_to_plot: Optional[List[str]] = None,
+                                use_for_mean_columns: Optional[List[str]] = None, debug: bool = False):
+        """
+        Plots shifted trunk data for specified columns.
+
+        Args:
+            columns_to_plot: Columns to include in the plot. Defaults to config setting.
+            use_for_mean_columns: Columns used for mean shift calculation. Affects the data if not already cached.
+            debug: If True, includes validation data in the plot.
+        """
+        config = self.get_config()
+        columns_to_plot = columns_to_plot or config.CrownMotionSimilarity.columns_to_plot
+        try:
+
+            df_a, df_b, df_b_reference = self.get_shifted_trunk_data(use_for_mean_columns, debug)
+
+            # Prepare data for plotting
+            dfs_and_columns = [
+                ("Trunk A", df_a, columns_to_plot),
+                ("Trunk B (Shifted)", df_b, columns_to_plot),
+                ("Trunk B (Reference)", df_b_reference, columns_to_plot)
             ]
 
             fig = plot_multiple_dfs(dfs_and_columns)
@@ -181,65 +304,98 @@ class CrownMotionSimilarity(BaseClass):
             subdir = f"cms/compare_trunks/{self.measurement_version_name}"
 
             plot_manager.save_plot(fig, filename, subdir)
-        else:
-            logger.warning(f"Self has not trunk_a and trunk_b")
 
-    def plot_cms_shift(self, columns: List[str] = None):
-        if self.trunk_a and self.trunk_b:
-            df_a = self.trunk_a[0].data_merge.data.copy()
-            df_b = self.trunk_b[0].data_merge.data.copy()
-            df_b_2 = self.trunk_b[0].data_merge.data.copy()
+        except Exception as e:
+            logger.warning(f"Plotting not possible: e: {e}")
 
-            # Merge_asof ausführen, um die DataFrames auf Basis des nächsten Datums zu mergen
-            df_merged = pd.merge_asof(df_a, df_b, left_index=True, right_index=True, direction='nearest',
-                                      suffixes=('_a', '_b'))
+    def get_data_for_analysis(self, window_time: pd.Timedelta = "6s", q: float = 0.90):
+        df_a, df_b, _ = self.shifted_trunk_data
+        df_b = df_b.reindex(df_a.index, method='nearest')
 
-            from ..df_merge_by_time import calc_optimal_shift
+        col = 'Absolute-Inclination - drift compensated'
 
-            max_correlation, optimal_shift = calc_optimal_shift(df_merged,
-                                               'Absolute-Inclination - drift compensated_a',
-                                               'Absolute-Inclination - drift compensated_b',
-                                               max_shift=20*20, step=1)
+        a: pd.Series = df_a[col].copy()
+        b: pd.Series = df_b[col].copy()
 
-            logger.info(f"EINS: max_correlation {max_correlation}, optimal_shift {optimal_shift}")
+        # Anwenden der Rolling-Maximum-Funktion mit einem Fenster von 10 Sekunden
+        a_roll = a.abs().rolling(window=window_time, center=True).max()
+        b_roll = b.abs().rolling(window=window_time, center=True).max()
 
-            sample_rate_hz = 20  # Hz
+        # Berechne den Schwellenwert für die oberen 5%
+        threshold_a = np.quantile(a_roll.dropna(), q=q)
+        threshold_b = np.quantile(b_roll.dropna(), q=q)
 
-            # Timedelta für die Verschiebung erstellen
-            shift_timedelta = pd.Timedelta(seconds=optimal_shift/sample_rate_hz)
+        # Erstelle eine Maske für die Extremwerte
+        mask_a = a_roll >= threshold_a
+        mask_b = b_roll >= threshold_b
 
-            # DataFrame-Index verschieben
-            df_b.index += shift_timedelta
+        # Kombiniere die Masken, um Bereiche zu markieren, die in mindestens einer der beiden Serien Extremwerte enthalten
+        combined_mask = mask_a | mask_b
 
-            # Merge_asof ausführen, um die DataFrames auf Basis des nächsten Datums zu mergen
-            df_merged = pd.merge_asof(df_a, df_b, left_index=True, right_index=True, direction='nearest',
-                                      suffixes=('_a', '_b'))
+        # Wende die kombinierte Maske auf die ursprünglichen Serien an
+        filtered_a = a[combined_mask]
+        filtered_b = b[combined_mask]
 
+        return filtered_a, filtered_b, combined_mask
 
-            max_correlation, optimal_shift = calc_optimal_shift(df_merged,
-                                               'Absolute-Inclination - drift compensated_a',
-                                               'Absolute-Inclination - drift compensated_b',
-                                               max_shift=20*20, step=1)
+    def analyse_similarity(self):
 
-            logger.info(f"ZWEI: max_correlation {max_correlation}, optimal_shift {optimal_shift}")
+        filtered_a, filtered_b, combined_mask = self.get_data_for_analysis()
+        correlation, p_value = pearsonr(filtered_a, filtered_b)
+        logger.info(f"Pearson-Korrelationskoeffizient: {correlation:.4f}, p_value: {p_value:.4f}")
 
-            if columns is None:
-                columns = ['East-West-Inclination - drift compensated',
-                           'North-South-Inclination - drift compensated',
-                           'Absolute-Inclination - drift compensated'
-                           ]
+        rmse = np.sqrt(mean_squared_error(filtered_a, filtered_b))
+        logger.info(f"Root Mean Square Error (RMSE): {rmse:.4f}")
 
-            dfs_and_columns: [List[Tuple[str, pd.DataFrame, List[str]]]] = [
-                ("trunk_a", df_a, columns),
-                ("trunk_b", df_b, columns),
-                ("trunk_b_2", df_b_2, columns)
+        mae = mean_absolute_error(filtered_a, filtered_b)
+        logger.info(f"Mean Absolute Error (MAE): {mae:.4f}")
+
+        tree_cable_typ = self.tree_cable_typ
+        return correlation, p_value, rmse, mae, tree_cable_typ
+
+    def plot_filtered_trunk_data(self, columns_to_plot: Optional[List[str]] = None,
+                                 use_for_mean_columns: Optional[List[str]] = None, debug: bool = False):
+        import plotly.graph_objects as go
+
+        config = self.get_config()
+        columns_to_plot = columns_to_plot or config.CrownMotionSimilarity.columns_to_plot
+        try:
+            df_a, df_b, df_b_reference = self.get_shifted_trunk_data(use_for_mean_columns, debug)
+
+            # Aufruf von analyse_similarity, um die gefilterten Daten zu erhalten
+            filtered_a, filtered_b, combined_mask = self.get_data_for_analysis()
+
+            # Bereite Daten für das Plotten vor, einschließlich der gefilterten Bereiche
+            dfs_and_columns = [
+                ("Trunk A", df_a, columns_to_plot),
+                ("Trunk B (Shifted)", df_b, columns_to_plot),
+                ("Trunk B (Reference)", df_b_reference, columns_to_plot),
+                ("Filtered A", filtered_a, columns_to_plot),
+                ("Filtered B", filtered_b, columns_to_plot)
             ]
 
-            fig = plot_multiple_dfs(dfs_and_columns)
+            fig = go.Figure()
+
+            for name, df, columns in dfs_and_columns[:-2]:  # Normale Daten plotten
+                for column in columns:
+                    if column in df.columns:
+                        fig.add_trace(go.Scatter(x=df.index, y=df[column], mode='lines', name=f'{name}: {column}'))
+
+            for name, series in [("Filtered A", filtered_a), ("Filtered B", filtered_b)]:  # Gefilterte Daten plotten
+                fig.add_trace(go.Scatter(x=series.index, y=series, mode='markers', name=f'{name}', marker=dict(size=5)))
+
+            fig.update_layout(
+                title='Compare DFs with Filtered Data',
+                xaxis_title='DateTime',
+                yaxis_title='Value',
+                legend_title='Variable'
+            )
+
             plot_manager = self.get_plot_manager()
-            filename = f'series_id_{self.series_id}_cms_id_{self.cms_id}'
-            subdir = f"cms/compare_trunks/{self.measurement_version_name}"
+            filename = f'series_id_{self.series_id}_cms_id_{self.cms_id}_filtered'
+            subdir = f"cms/compare_trunks_filtered/{self.measurement_version_name}"
 
             plot_manager.save_plot(fig, filename, subdir)
-        else:
-            logger.warning(f"Self has not trunk_a and trunk_b")
+
+        except Exception as e:
+            logger.warning(f"Plotting not possible: e: {e}")

@@ -37,8 +37,21 @@ class DataTMS(CoreDataClass, BaseClassDataTMS):
             logger.error(f"search_path {filepath} does not exist.")
             return
 
+        type = 'float64'
+        dtype = {
+            'East-West-Inclination': type,
+            'North-South-Inclination': type,
+            'Absolute-Inclination': type,
+            'Inclination direction of the tree': type,
+            'Temperature': type,
+            'East-West-Inclination - drift compensated': type,
+            'North-South-Inclination - drift compensated': type,
+            'Absolute-Inclination - drift compensated': type,
+            'Inclination direction of the tree - drift compensated': type
+        }
+
         try:
-            tms_df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",", index_col='Time')
+            tms_df = pd.read_csv(filepath, sep=";", parse_dates=["Time"], decimal=",", index_col='Time', dtype=dtype)
         except pd.errors.ParserError as e:
             logger.error(f"Error while reading the file {filepath.stem}. Please check the file format.")
             raise e

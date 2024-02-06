@@ -204,8 +204,9 @@ class Series(BaseClass):
 
         try:
             if method == "list_filter":
-                matching_mv_list: List= [mv for measurement in self.measurement for mv in measurement.measurement_version if
-                                    all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
+                matching_mv_list: List = [mv for measurement in self.measurement for mv in
+                                          measurement.measurement_version if
+                                          all(getattr(mv, k, None) == v for k, v in filter_dict.items())]
             elif method == "db_filter":
                 session = self.get_database_manager().session()
                 matching_mv_list: List = (session.query(MeasurementVersion)
@@ -229,7 +230,7 @@ class Series(BaseClass):
     def calc_optimal_shift_median(self, measurement_version_name: str = None, filter_min_corr: float = 0.5) -> Tuple[
         pd.DataFrame, float]:
         """
-        Calculates the median of the optimal shift in seconds for a specified measurement version,
+        Calculates the median of the optimal get_shifted_trunk_data in seconds for a specified measurement version,
         considering only those measurements with a maximum correlation above a specified threshold.
 
         Args:
@@ -238,7 +239,7 @@ class Series(BaseClass):
 
         Returns:
             Tuple[pd.DataFrame, float]: A tuple containing a DataFrame with the detailed calculation results for each measurement
-            and the median of the optimal shift in seconds for measurements above the correlation threshold.
+            and the median of the optimal get_shifted_trunk_data in seconds for measurements above the correlation threshold.
         """
         try:
             # Use default measurement version name if not specified
@@ -252,38 +253,38 @@ class Series(BaseClass):
 
             for mv in mv_list:
                 try:
-                    optimal_shift, optimal_shift_sec, corr_shift_0, max_corr = mv.calc_optimal_shift()
+                    optimal_shift, optimal_shift_sec, correlation_no_shift, correlation_optimal_shift = mv.calc_optimal_shift()
                     results.append({
                         'optimal_shift': optimal_shift,
                         'optimal_shift_sec': optimal_shift_sec,
-                        'initial_corr': corr_shift_0,  # Renamed for clarity
-                        'max_corr': max_corr
+                        'correlation_no_shift': correlation_no_shift,
+                        'correlation_optimal_shift': correlation_optimal_shift
                     })
                 except Exception as e:
-                    logger.error(f"Error calculating optimal shift for {mv}: {e}")
+                    logger.error(f"Error calculating optimal get_shifted_trunk_data for {mv}: {e}")
 
             # Convert results to DataFrame
             optimal_shift_df = pd.DataFrame(results)
 
             try:
                 # Filter DataFrame to keep rows with 'max_corr' above specified threshold
-                filtered_df = optimal_shift_df[optimal_shift_df['max_corr'] >= filter_min_corr]
+                filtered_df = optimal_shift_df[optimal_shift_df['correlation_optimal_shift'] >= filter_min_corr]
 
                 # Calculate median of 'optimal_shift_sec' from the filtered DataFrame
                 optimal_shift_sec_median = filtered_df['optimal_shift_sec'].median()
 
-                # Store the median of optimal shift seconds for further reference
+                # Store the median of optimal get_shifted_trunk_data seconds for further reference
                 self.optimal_shift_sec_median = optimal_shift_sec_median
 
-                logger.info("Successfully calculated optimal shift median.")
+                logger.info("Successfully calculated optimal get_shifted_trunk_data median.")
                 return optimal_shift_df, optimal_shift_sec_median
             except Exception as e:
                 logger.error(f"Error filtering data or calculating median: {e}")
-                raise  # Re-raise exception after logging
+                raise
 
         except Exception as e:
             logger.critical(f"Critical error in calc_optimal_shift_median: {e}")
-            raise  # Ensuring that the exception is not silently swallowed
+            raise
 
     @dec_runtime
     def cut_by_time(self, start_time: str, end_time: str, measurement_version_name: Optional[str] = None,
@@ -401,16 +402,18 @@ class Series(BaseClass):
         for start_time in peak_times:
             end_time = start_time + pd.Timedelta(seconds=duration)
             peak_count = peak_times[(peak_times >= start_time) & (peak_times < end_time)].size
-            #logger.debug(f"Timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
+            # logger.debug(f"Timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
             if peak_count > max_peak_count:
                 max_peak_count = peak_count
                 optimal_start_time = start_time
                 optimal_end_time = end_time
-                logger.debug(f"Better timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
+                logger.debug(
+                    f"Better timeframe: {start_time} - {end_time}, duration {start_time - end_time}, peak_count {peak_count}")
 
         # Umwandeln der optimalen Zeiten in das korrekte Format
         optimal_start_time = optimal_start_time.strftime("%Y-%m-%d %H:%M:%S.%f")
         optimal_end_time = optimal_end_time.strftime("%Y-%m-%d %H:%M:%S.%f")
-        logger.info(f"Found optimal timeframe: {optimal_start_time} - {optimal_end_time}, max_peak_count {max_peak_count}")
+        logger.info(
+            f"Found optimal timeframe: {optimal_start_time} - {optimal_end_time}, max_peak_count {max_peak_count}")
 
         return optimal_start_time, optimal_end_time

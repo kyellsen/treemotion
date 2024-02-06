@@ -6,43 +6,6 @@ from scipy.stats import linregress
 from sklearn.metrics import r2_score
 
 
-# def plot_wind_shift(measurement_id: int, merged_df: pd.DataFrame, shifted_df: pd.DataFrame,
-#                     tms_col: str, wind_col: str,
-#                     shift_sec: float, corr_shift_0: float, max_corr: float):
-#     # Create the plot
-#     fig, ax1 = plt.subplots()
-#
-#     # Plot TMS data
-#     ax1.plot(merged_df.index, merged_df[tms_col], color='tab:blue', label=f'{tms_col}')
-#
-#     ax1.set_xlabel('datetime')
-#     ax1.set_ylabel(tms_col, color='tab:blue')
-#
-#     # Second axis for wind data
-#     ax2 = ax1.twinx()
-#     ax2.plot(merged_df.index, merged_df[wind_col], color='tab:red', label=f'{wind_col}')
-#     ax2.plot(shifted_df.index, shifted_df[wind_col], color='tab:orange', label=f'shifted_{wind_col}')
-#     ax2.set_ylabel(wind_col, color='tab:red')
-#
-#     # Display legends
-#     lines, labels = ax1.get_legend_handles_labels()
-#     lines2, labels2 = ax2.get_legend_handles_labels()
-#     ax2.legend(lines + lines2, labels + labels2, loc='upper left')
-#
-#     # Adding a textbox
-#     param_str = f"Optimal Shift (sec): {shift_sec}\n" \
-#                 f"Initial Correlation: {corr_shift_0:.2f}\n" \
-#                 f"Max Correlation: {max_corr:.2f}"
-#
-#     plt.title(f"Wind Shift fpr measurement '{measurement_id}'")
-#
-#     plt.annotate(param_str, xy=(0.95, 0.10), xycoords='axes fraction', fontsize=10,
-#                  bbox=dict(boxstyle="round,pad=0.3", facecolor='white', edgecolor='black'),
-#                  verticalalignment='top', horizontalalignment='right')
-#
-#     return fig
-
-
 def plot_wind_shift(measurement_id: int, merged_df: pd.DataFrame, shifted_df: pd.DataFrame,
                     tms_col: str, wind_col: str,
                     shift_sec: float, corr_shift_0: float, max_corr: float):
@@ -67,8 +30,8 @@ def plot_wind_shift(measurement_id: int, merged_df: pd.DataFrame, shifted_df: pd
 
     # Textbox hinzufügen
     param_str = f"Optimal Shift: {shift_sec} [sec]\n" \
-                f"Initial Correlation: {corr_shift_0:.2f}\n" \
-                f"Max Correlation: {max_corr:.2f}"
+                f"Initial Correlation: {corr_shift_0:.4f}\n" \
+                f"Max Correlation: {max_corr:.4f}"
 
     plt.title(f"Wind Shift for measurement '{measurement_id}'")
     plt.annotate(param_str, xy=(0.95, 0.10), xycoords='axes fraction', fontsize=10,

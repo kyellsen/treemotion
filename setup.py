@@ -9,7 +9,7 @@ with open('README.md', 'r', encoding='utf-8') as f:
 
 
 setup(
-    name="dummy",
+    name="treemotion",
     version="1.0.0",
     packages=find_packages(),
     install_requires=requirements,
@@ -18,7 +18,7 @@ setup(
     description="Dummy Beschreibung",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/kyelljensen/dummy",
+    url="https://github.com/kyelljensen/treemotion",
     classifiers=[
         "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: Apache Software License",

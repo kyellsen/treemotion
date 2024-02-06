@@ -78,11 +78,9 @@ class Config(CoreConfig):
         merge_wind_value = 'wind_rolling_max_' + time_rolling_max
         merge_tms_value = 'tms_rolling_max_' + time_rolling_max
 
-        # shift
-        calc_optimal_shift_down_sample_rate = "60S"  # default "60S"
         max_shift_sec: float = 90 * 60  # Default 7200 sec or 2 hours
 
-        tms_sample_rate_hz = 20
+        tms_sample_rate_hz: int = 20
         tms_sample_rate_interval = pd.to_timedelta(1 / tms_sample_rate_hz, unit='s')
 
         # peak_n
@@ -92,4 +90,11 @@ class Config(CoreConfig):
 
     class Series:
         default_data_class_name = "data_merge"
-        cut_time_by_peaks_duration = 15*60  # Seconds
+        cut_time_by_peaks_duration = 15 * 60  # Seconds
+
+    class CrownMotionSimilarity:
+        max_shift_sec: int = 5  # Seconds
+        use_for_mean_columns = ['Absolute-Inclination - drift compensated']
+        columns_to_plot = ['East-West-Inclination - drift compensated',
+                           'North-South-Inclination - drift compensated',
+                           'Absolute-Inclination - drift compensated']

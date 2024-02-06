@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Type, Dict, Tuple, List, Optional, Union, Any
+from typing import Type, Dict, Tuple, List, Optional, Union, Any, Callable
 
 from kj_core.df_utils.time_cut import validate_time_format, time_cut_by_datetime_index
 from kj_core.plotting.multiple_dfs import plot_multiple_dfs
@@ -13,6 +13,7 @@ from ..tms.find_peaks import find_max_peak, find_n_peaks
 from ..tms.tempdrift import temp_drift_comp_lin_reg, temp_drift_comp_lin_reg_2, temp_drift_comp_mov_avg, \
     temp_drift_comp_emd
 from ..tms.tempdrift import fft_freq_filter, butter_lowpass_filter
+from ..tms.rotate import rotate_pca, rotate_l_reg
 from ..tms.inclination import calc_abs_inclino, calc_inclination_direction
 
 logger = get_logger(__name__)
@@ -35,6 +36,12 @@ class BaseClassDataTMS(BaseClass):
         "fft": fft_freq_filter,
     }
 
+    rotation_methods = {
+        "no_rotation": None,
+        "rotate_pca": rotate_pca,
+        "rotate_l_reg": rotate_l_reg,
+    }
+
     def __init__(self, data: pd.DataFrame = None, measurement_version_id: int = None, tempdrift_method: str = None,
                  filter_method: str = None):
         super().__init__()
@@ -43,7 +50,8 @@ class BaseClassDataTMS(BaseClass):
         self.tempdrift_method = tempdrift_method
         self.filter_method = filter_method
 
-    def correct_tms_data(self, method: str = "linear", freq_filter: str = "butter_lowpass", inplace: bool = False,
+    def correct_tms_data(self, method: str = "linear", freq_filter: str = "butter_lowpass",
+                         rotation: str = "no_rotation", inplace: bool = False,
                          auto_commit=False, **kwargs: Any) -> pd.DataFrame:
         """
         Corrects temperature distortion of inclination data using a specified method and optionally updates
@@ -75,16 +83,20 @@ class BaseClassDataTMS(BaseClass):
         temp_drift_comp_func = self.tempdrift_methods[method]
 
         if freq_filter not in self.filter_methods:
-            logger.error(f"Method {freq_filter} for temperature drift compensation is not allowed.")
-            raise ValueError(f"Unauthorized method {freq_filter} for temperature drift compensation.")
+            logger.error(f"Method {freq_filter} for filtering is not allowed.")
+            raise ValueError(f"Unauthorized method {freq_filter} for data filtering.")
+
+        if rotation not in self.rotation_methods:
+            logger.error(f"Method {rotation} for rotation is not allowed.")
+            raise ValueError(f"Unauthorized method {rotation} for data rotation.")
 
         filter_func = self.filter_methods[freq_filter]
+        rotation_func = self.rotation_methods[rotation]
 
         if method in ["linear", "linear_2"]:
             kwargs["temperature"] = self.data["Temperature"]
 
         data_copy = self.data.copy()
-
         try:
             for axis in ['East-West-Inclination', 'North-South-Inclination']:
                 inclino_series = data_copy[axis]
@@ -92,6 +104,9 @@ class BaseClassDataTMS(BaseClass):
                 if filter_func and method in ["linear", "linear_2", "moving_average"]:
                     compensated = filter_func(inclino=compensated)
                 data_copy[f"{axis} - drift compensated"] = compensated
+
+            if rotation in ["rotate_pca", "rotate_l_reg"]:
+                data_copy: pd.DataFrame = self.rotate(data_copy, rotation_func)
 
             data_copy = self.calc_inclino_abs_and_dir(data_copy)
 
@@ -109,6 +124,15 @@ class BaseClassDataTMS(BaseClass):
         except Exception as e:
             logger.error(f"Error in performing temperature drift compensation: {e}")
             raise
+
+    @staticmethod
+    def rotate(data: pd.DataFrame, rotation_func: Callable) -> pd.DataFrame:
+        x_axs = 'East-West-Inclination - drift compensated'
+        y_axs = 'North-South-Inclination - drift compensated'
+
+        data[x_axs], data[x_axs] = rotation_func(data[x_axs], data[y_axs])
+
+        return data
 
     @staticmethod
     def calc_inclino_abs_and_dir(data: pd.DataFrame) -> pd.DataFrame:
@@ -134,14 +158,21 @@ class BaseClassDataTMS(BaseClass):
     def compare_tms_tempdrift_methods(self) -> Dict[str, pd.DataFrame]:
         results = {"original": self.data.copy()}
 
-        for method in ["linear", "moving_average", "emd"]:  # "linear_2",
-            if method in ["linear", "linear_2", "moving_average"]:
-                for freq_filter in ["no_filter", "butter_lowpass", "fft"]:
-                    compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter=freq_filter, inplace=False)
-                    results[f"{method}_{freq_filter}"] = compensated_data
-            elif method in ["emd"]:
-                compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter="no_filter", inplace=False)
-                results[f"{method}"] = compensated_data
+        run_for_tempdrift_methods = ["linear"]  # "moving_average", "emd", "linear_2",
+        run_for_filter_methods = ["no_filter", "butter_lowpass"]  # "fft"
+        run_for_rotation_methods = ["no_rotation", "rotate_pca"]  # "rotate_l_reg"
+
+        for method in run_for_tempdrift_methods:
+            for rotation in run_for_rotation_methods:
+                if method in ["linear", "linear_2", "moving_average"]:
+                    for freq_filter in run_for_filter_methods:
+                        compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter=freq_filter,
+                                                                               rotation=rotation, inplace=False)
+                        results[f"{method}_{freq_filter}"] = compensated_data
+                elif method in ["emd"]:
+                    compensated_data: pd.DataFrame = self.correct_tms_data(method=method, freq_filter="no_filter",
+                                                                           rotation=rotation, inplace=False)
+                    results[f"{method}"] = compensated_data
 
         return results
 
@@ -172,7 +203,7 @@ class BaseClassDataTMS(BaseClass):
         fig = plot_multiple_dfs(dfs_and_columns)
         plot_manager = self.get_plot_manager()
         filename = f'mv_id_{self.measurement_version_id}'
-        subdir=f"tempdrift/compare_tms_tempdrift/{self.__class__.__name__}"
+        subdir = f"tempdrift/compare_tms_tempdrift/{self.__class__.__name__}"
 
         plot_manager.save_plot(fig, filename, subdir)
 
@@ -229,7 +260,8 @@ class BaseClassDataTMS(BaseClass):
         except Exception as e:
             logger.error(f"Failed to select a random sample: {e}")
 
-    def cut_by_time(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[pd.DataFrame, None]:
+    def cut_by_time(self, start_time: str, end_time: str, inplace: bool = False, auto_commit: bool = False) -> Union[
+        pd.DataFrame, None]:
         """
         Limits the data to a specific time range and optionally updates the instance data in-place.
 
@@ -260,7 +292,7 @@ class BaseClassDataTMS(BaseClass):
         # Attempt to limit data within the specified time range
         try:
             data = self.data.copy()
-            data = time_cut_by_datetime_index(data,  start_time=start_time, end_time=end_time)
+            data = time_cut_by_datetime_index(data, start_time=start_time, end_time=end_time)
 
             if inplace:
                 self.data = data
@@ -268,7 +300,8 @@ class BaseClassDataTMS(BaseClass):
             if auto_commit:
                 self.get_database_manager().commit()
 
-            logger.info(f"Successfully limited the data of '{self}' between '{start_time}' and '{end_time}', inplace: '{inplace}', auto_commit: '{auto_commit}'.")
+            logger.info(
+                f"Successfully limited the data of '{self}' between '{start_time}' and '{end_time}', inplace: '{inplace}', auto_commit: '{auto_commit}'.")
 
             return data
         except Exception as e:
