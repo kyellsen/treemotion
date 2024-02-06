@@ -1,5 +1,4 @@
 # treemotion/classes/version.py
-from sqlalchemy import text
 from common_imports.classes_heavy import *
 from utils.path_utils import validate_and_get_filepath
 from utils.dataframe_utils import validate_df
@@ -188,6 +187,27 @@ class Version(BaseClass):
         except (KeyError, ValueError) as e:
             logger.error(f"Failed to update metadata for {self}: {e}")
             return False
+
+    @property
+    def wind_df(self) -> Optional[DataFrame]:
+        if not hasattr(self, '_wind_df') or self._wind_df is None:
+            pass
+
+        return self._wind_df
+
+    @wind_df.setter
+    def wind_df(self, wind_df: DataFrame) -> None:
+        self._wind_df = wind_df
+
+    @property
+    def tms_wind_df(self) -> Optional[DataFrame]:
+        if not hasattr(self, '_tms_wind_df') or self._tms_wind_df is None:
+            pass
+        return self._tms_wind_df
+
+    @tms_wind_df.setter
+    def tms_wind_df(self, tms_wind_df: DataFrame) -> None:
+        self._tms_wind_df = tms_wind_df
 
     @staticmethod
     def get_tms_table_name(version_name: str, measurement_id: int) -> str:
@@ -486,7 +506,7 @@ class Version(BaseClass):
             db_manager.commit()
         return self
 
-    def get_wind_df(self, wind_measurement_id: int, time_extension_secs: int=0):
+    def get_wind_df(self, wind_measurement_id: int, time_extension_secs: int = 0):
         """
         Query the wind data based on a given wind measurement ID and store the resulting DataFrame.
 
@@ -517,7 +537,7 @@ class Version(BaseClass):
             wind_df = wind_measurement.get_wind_df(extended_datetime_start, extended_datetime_end,
                                                    columns=config.wind_df_columns_selected, session=session)
 
-            self._wind_df = wind_df
+            self.wind_df = wind_df
             logger.info(f'Successfully retrieved wind data for wind measurement with ID {wind_measurement_id}')
             return wind_df
 
@@ -526,60 +546,163 @@ class Version(BaseClass):
                 f'Error while retrieving wind data for wind measurement with ID {wind_measurement_id}: {str(e)}')
             raise e
 
-# def sync_wind_df(self, wind_measurement_id, max_time_shift_secs=0, session=None):
-#
-#     tms_df = self.tms_df
-#     wind_df = self.get_wind_df(wind_measurement_id, time_extension_secs=max_time_shift_secs, session=session)
-#
-#     if not self._tms_df_validate(wind_in_df=False):
-#         logger.error(f"")
-#         return None
-#     if not validate_df(wind_df, columns=config.wind_df_columns_selected):
-#         logger.error(f"")
-#         return None
-#
-#     # tms_time_col =
+    def get_tms_wind_df(self, tms_column: str = config.tms_df_main_column_name,
+                        wind_column: str = config.wind_df_main_column_name, max_lag: int = 0, resample_freq='10T',
+                        output_freq='20H'):
+
+        import tms.root_plate_tilt.time_wind_sync as tws
+        import tms.root_plate_tilt.tms_regression as tr
+
+        tms_df = self.tms_df.copy().set_index(config.tms_df_time_column_name)
+        wind_df = self.wind_df.copy().set_index(config.wind_df_time_column_name)
+
+        import pandas as pd
+        import numpy as np
+        from scipy.signal import correlate
+
+        def find_optimal_shift(df, tms_column, wind_column, columns_to_shift, max_shift_sec, sample_rate = '20L'):
+            # Überprüfen, ob die angegebenen Spalten im DataFrame vorhanden sind
+            if tms_column not in df.columns or wind_column not in df.columns:
+                print("Die angegebenen Spalten sind nicht im DataFrame vorhanden.")
+                return
+
+            # Überprüfen, ob die zu shiftenden Spalten in der Liste enthalten sind
+            for column in columns_to_shift:
+                if column not in df.columns:
+                    print(f"Die Spalte {column} ist nicht im DataFrame vorhanden.")
+                    return
+
+            # Berechne die maximale Verschiebung in Anzahl der Samples
+            max_shifts = int(max_shift_sec * sample_rate)
+
+            # Berechne die Kreuzkorrelation zwischen den beiden Referenzspalten
+            cross_correlation = correlate(df[tms_column], df[wind_column])
+
+            # Beschränke die Kreuzkorrelation auf die maximale Verschiebung
+            half_length = len(cross_correlation) // 2
+            limited_cross_correlation = cross_correlation[half_length - max_shifts:half_length + max_shifts]
+
+            # Finde den Index der maximalen Kreuzkorrelation
+            shift_index = limited_cross_correlation.argmax() - max_shifts
+
+            # Verschiebe die angegebenen Spalten um den Index der maximalen Kreuzkorrelation
+            for column in columns_to_shift:
+                df[column] = df[column].shift(-shift_index)
+
+            return shifted_df
+
+        # Resample wind_df auf die inferierte Frequenz und setze fehlende Daten
+        wind_df = wind_df.resample(sample_rate).asfreq().interpolate(method='linear')
+
+        # Reindiziere wind_df, um die gleichen Indizes wie tms_df zu haben
+        wind_df = wind_df.reindex(tms_df.index, method='nearest')
+
+        # Führe einen outer join zwischen tms_df und wind_df durch
+        tms_wind_df = tms_df.merge(wind_df, left_index=True, right_index=True, how='outer')
+        tms_wind_df['tms_rolling_max_10_min'] = tms_wind_df[tms_column].rolling('10T', closed='right').max()
+        tms_wind_df['wind_rolling_max_10_min'] = tms_wind_df[wind_column].rolling('10T', closed='right').max()
+
+        shifted_df = find_optimal_shift(tms_wind_df, 'tms_rolling_max_10_min', 'wind_rolling_max_10_min', max_shift_sec=10,
+                                        columns_to_shift=['wind_speed_10min_avg', 'wind_direction_10min_avg',
+                                         'wind_speed_max_10min', 'wind_direction_max_wind_speed'])
+
+        import matplotlib.pyplot as plt
+
+        # Erstellen des Plots
+        fig, ax1 = plt.subplots()
+
+        # Linie für die erste Spalte hinzufügen
+        ax1.plot(tms_wind_df.index, tms_wind_df['tms_rolling_max_10_min'], color='tab:blue',
+                 label='tms_rolling_max_10_min')
+        ax1.set_xlabel('DateTime')
+        ax1.set_ylabel('tms_rolling_max_10_min', color='tab:blue')
+
+        # Zweite Achse für die zweite Spalte erstellen
+        ax2 = ax1.twinx()
+        # Linie für die zweite Spalte hinzufügen
+        ax2.plot(tms_wind_df.index, tms_wind_df['wind_rolling_max_10_min'], color='tab:red',
+                 label='wind_rolling_max_10_min')
+        ax2.set_ylabel('wind_rolling_max_10_min', color='tab:red')
+
+        # Legenden anzeigen
+        lines, labels = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2)
+
+        # Plot anzeigen
+        plt.show()
+
+        # Erstellen des Plots
+        fig, ax1 = plt.subplots()
+
+        # Linie für die erste Spalte hinzufügen
+        ax1.plot(shifted_df.index, shifted_df['tms_rolling_max_10_min'], color='tab:blue',
+                 label='tms_rolling_max_10_min')
+        ax1.set_xlabel('DateTime')
+        ax1.set_ylabel('tms_rolling_max_10_min', color='tab:blue')
+
+        # Zweite Achse für die zweite Spalte erstellen
+        ax2 = ax1.twinx()
+        # Linie für die zweite Spalte hinzufügen
+        ax2.plot(shifted_df.index, shifted_df['wind_rolling_max_10_min'], color='tab:red',
+                 label='wind_rolling_max_10_min')
+        ax2.set_ylabel('wind_rolling_max_10_min', color='tab:red')
+
+        # Legenden anzeigen
+        lines, labels = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2)
+
+        # Plot anzeigen
+        plt.show()
+
+        self.test = tms_wind_df
+        # Calculate and plot linear regression
+        tr.regression_plot_matplotlib(tms_wind_df, 'wind_rolling_max_10_min', 'tms_rolling_max_10_min', method='linear')
+        tr.plot_regression(tms_wind_df, 'wind_rolling_max_10_min', 'tms_rolling_max_10_min', 5)
+
+        return tms_wind_df
 
 #
-# @dec_runtime
-# def temp_drift_comp(self, method="emd_hht", overwrite=True, sample_rate=20, window_size=1000,
-#                     freq_range=(0.05, 2, 128), feedback=False):  # 128 is used because ...
-#     """
-#     Compensate the temperature drift in the measurements using the specified method.
-#
-#     :param method: The method to use for temperature drift compensation.
-#     :param overwrite: Whether to overwrite the original data or create new columns.
-#     :param sample_rate: The sample rate of the data (in Hz).
-#     :param window_size: The window size for the moving average method.
-#     :param freq_range: The frequency range for the EMD-HHT method.
-#     :param feedback: Show result and runtime
-#     """
-#     temp = self.df['Temperature']
-#
-#     methods = {
-#         "lin_reg": lambda df: tempdrift.temp_drift_comp_lin_reg(df, temp),
-#         "lin_reg_2": lambda df: tempdrift.temp_drift_comp_lin_reg_2(df, temp),
-#         "mov_avg": lambda df: tempdrift.temp_drift_comp_mov_avg(df, window_size),
-#         "emd_hht": lambda df: tempdrift.temp_drift_comp_emd(df, sample_rate, freq_range),
-#     }
-#
-#     if method in methods:
-#         x = methods[method](self.df['East-West-Inclination'])
-#         y = methods[method](self.df['North-South-Inclination'])
-#     else:
-#         raise ValueError(f"Invalid method for temp_drift_comp: {method}")
-#
-#     suffix = "" if overwrite else " - new"
-#
-#     self.df[f'East-West-Inclination - drift compensated{suffix}'] = x
-#     self.df[f'North-South-Inclination - drift compensated{suffix}'] = y
-#     self.df[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
-#     self.df[
-#         f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
-#         x, y)
-#     if feedback is True:
-#         print(
-#             f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
+@dec_runtime
+def temp_drift_comp(self, method="emd_hht", overwrite=True, sample_rate=20, window_size=1000,
+                    freq_range=(0.05, 2, 128), feedback=False):  # 128 is used because ...
+    """
+    Compensate the temperature drift in the measurements using the specified method.
+
+    :param method: The method to use for temperature drift compensation.
+    :param overwrite: Whether to overwrite the original data or create new columns.
+    :param sample_rate: The sample rate of the data (in Hz).
+    :param window_size: The window size for the moving average method.
+    :param freq_range: The frequency range for the EMD-HHT method.
+    :param feedback: Show result and runtime
+    """
+    temp = self.df['Temperature']
+
+    methods = {
+        "lin_reg": lambda df: tempdrift.temp_drift_comp_lin_reg(df, temp),
+        "lin_reg_2": lambda df: tempdrift.temp_drift_comp_lin_reg_2(df, temp),
+        "mov_avg": lambda df: tempdrift.temp_drift_comp_mov_avg(df, window_size),
+        "emd_hht": lambda df: tempdrift.temp_drift_comp_emd(df, sample_rate, freq_range),
+    }
+
+    if method in methods:
+        x = methods[method](self.df['East-West-Inclination'])
+        y = methods[method](self.df['North-South-Inclination'])
+    else:
+        raise ValueError(f"Invalid method for temp_drift_comp: {method}")
+
+    suffix = "" if overwrite else " - new"
+
+    self.df[f'East-West-Inclination - drift compensated{suffix}'] = x
+    self.df[f'North-South-Inclination - drift compensated{suffix}'] = y
+    self.df[f'Absolute-Inclination - drift compensated{suffix}'] = tms_basics.get_absolute_inclination(x, y)
+    self.df[
+        f'Inclination direction of the tree - drift compensated{suffix}'] = tms_basics.get_inclination_direction(
+        x, y)
+    if feedback is True:
+        print(
+            f"Messung.temp_drift_comp - id_messung: {self.id_messung}")
 #
 # def plot_df(self, y_cols):
 #     """

@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import List, Optional
 
+
 def validate_df(df: pd.DataFrame, columns: Optional[List[str]] = None) -> bool:
     """
     Validate if an object is a valid pandas DataFrame and check for the existence of specific columns.

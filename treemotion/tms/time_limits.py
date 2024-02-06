@@ -1,6 +1,7 @@
 from datetime import datetime
 import pandas as pd
 
+
 def validate_time_format(time_str: str):
     """
     Überprüft und passt gegebenenfalls das Zeitformat an.

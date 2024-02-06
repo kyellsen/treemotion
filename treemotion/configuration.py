@@ -18,7 +18,7 @@ class Configuration:
 
         # Default Directory´s
         self.working_directory = None
-        self.set_working_directory(r"C:\Users\mail\Meine Ablage\Kyellsen\006_Tools\treemotion\working_directory")
+        self.set_working_directory(r"C:\kyellsen\006_Tools\treemotion\working_directory")
 
         # noinspection PyUnresolvedReferences
         self.log_directory = self.working_directory / "logs"
@@ -53,6 +53,7 @@ class Configuration:
                            'Absolute-Inclination - drift compensated',
                            'Inclination direction of the tree - drift compensated']
         self.tms_df_time_column_name = 'Time'
+        self.tms_df_main_column_name = 'Absolute-Inclination - drift compensated'
         self.default_load_from_csv_version_name = "raw"
         self.default_new_version_name = "copy"
 
@@ -66,6 +67,7 @@ class Configuration:
         self.wind_df_columns_selected = ['datetime', 'wind_speed_10min_avg', 'wind_direction_10min_avg',
                                          'wind_speed_max_10min', 'wind_direction_max_wind_speed']
         self.wind_df_time_column_name = 'datetime'
+        self.wind_df_main_column_name = 'wind_speed_max_10min'
 
         # PlotManager
 
