@@ -230,7 +230,7 @@ class Series(BaseClass):
     def calc_optimal_shift_median(self, measurement_version_name: str = None, filter_min_corr: float = 0.5) -> Tuple[
         pd.DataFrame, float]:
         """
-        Calculates the median of the optimal get_shifted_trunk_data in seconds for a specified measurement version,
+        Calculates the median of the optimal shift in seconds for a specified measurement version,
         considering only those measurements with a maximum correlation above a specified threshold.
 
         Args:
@@ -239,7 +239,7 @@ class Series(BaseClass):
 
         Returns:
             Tuple[pd.DataFrame, float]: A tuple containing a DataFrame with the detailed calculation results for each measurement
-            and the median of the optimal get_shifted_trunk_data in seconds for measurements above the correlation threshold.
+            and the median of the optimal shift in seconds for measurements above the correlation threshold.
         """
         try:
             # Use default measurement version name if not specified
@@ -261,7 +261,7 @@ class Series(BaseClass):
                         'correlation_optimal_shift': correlation_optimal_shift
                     })
                 except Exception as e:
-                    logger.error(f"Error calculating optimal get_shifted_trunk_data for {mv}: {e}")
+                    logger.error(f"Error calculating optimal shift for {mv}: {e}")
 
             # Convert results to DataFrame
             optimal_shift_df = pd.DataFrame(results)
@@ -273,10 +273,10 @@ class Series(BaseClass):
                 # Calculate median of 'optimal_shift_sec' from the filtered DataFrame
                 optimal_shift_sec_median = filtered_df['optimal_shift_sec'].median()
 
-                # Store the median of optimal get_shifted_trunk_data seconds for further reference
+                # Store the median of optimal shift median seconds for further reference
                 self.optimal_shift_sec_median = optimal_shift_sec_median
 
-                logger.info("Successfully calculated optimal get_shifted_trunk_data median.")
+                logger.info("Successfully calculated optimal shift median.")
                 return optimal_shift_df, optimal_shift_sec_median
             except Exception as e:
                 logger.error(f"Error filtering data or calculating median: {e}")

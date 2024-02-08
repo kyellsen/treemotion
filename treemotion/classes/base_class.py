@@ -31,6 +31,28 @@ class BaseClass(CoreBaseClass):
     def get_plot_manager(cls):
         return treemotion.PLOT_MANAGER
 
+    def get_child_attr_name(self) -> Optional[str]:
+        """
+        Get the attribute name of the children based on the class name.
+        Should be overridden in specific packages due to the specific hierarchie.
+
+        Returns
+        -------
+        str or None
+            The attribute name if the class name is found, otherwise None.
+        """
+        mapping = {
+            "Project": "series",
+            "Series": "measurement",
+            "Measurement": "measurement_version",
+            "MeasurementVersion": "data_merge"  # e. g. data_tms
+        }
+
+        # Store the attribute name corresponding to the class in a variable
+        child_attr_name = mapping.get(self.__class__.__name__)
+
+        return child_attr_name
+
     def get_measurement_version_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> (
             Optional)[List[Any]]:
         """

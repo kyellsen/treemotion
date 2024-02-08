@@ -1,9 +1,7 @@
-import pandas as pd
-
-from kj_core.df_utils.sample_rate import calc_sample_rate
+#from kj_core.df_utils.sample_rate import calc_sample_rate
 
 from ..common_imports.imports_classes import *
-from treemotion.tms.df_merge_by_time import cut_to_match_length, merge_dfs_by_time, calc_optimal_shift
+from treemotion.tms.df_merge_by_time import merge_dfs_by_time, calc_optimal_shift
 
 from .data_tms import DataTMS
 from .data_merge import DataMerge
@@ -104,7 +102,7 @@ class MeasurementVersion(BaseClass):
 
     @property
     def shift_sec_median(self) -> float:
-        """Returns the median get_shifted_trunk_data in seconds."""
+        """Returns the median shift in seconds."""
         shift_sec_median = self.measurement.series.optimal_shift_sec_median
         if shift_sec_median is None:
             error_msg = f"shift_sec is '{shift_sec_median}', set shift_sec manually or call series.calc_optimal_shift_median first."
@@ -116,13 +114,13 @@ class MeasurementVersion(BaseClass):
     @dec_runtime
     def calc_optimal_shift(self, max_shift_sec=None) -> Tuple[int, float, float, float]:
         """
-        Calculates the optimal get_shifted_trunk_data between wind and TMS data series within a specified time range.
+        Calculates the optimal shift between wind and TMS data series within a specified time range.
 
         param: max_shift_sec
 
-        :return: A tuple containing optimal get_shifted_trunk_data in index values, optimal get_shifted_trunk_data in seconds, initial correlation without get_shifted_trunk_data, and maximum correlation.
+        :return: A tuple containing optimal shift in index values, optimal shift in seconds, initial correlation without shift, and maximum correlation.
         """
-        logger.info("Starting calculation of optimal get_shifted_trunk_data.")
+        logger.info("Starting calculation of optimal shift.")
 
         config = self.get_config().Data
 
@@ -145,7 +143,7 @@ class MeasurementVersion(BaseClass):
             f"Input: sample_rate: '{sample_rate:.4f} Hz', max_shift_sec: '{max_shift_sec} s', "
             f"max_shift: '{max_shift} samples'")
 
-        # Calculate optimal get_shifted_trunk_data
+        # Calculate optimal shift
         optimal_shift, correlation_no_shift, correlation_optimal_shift = calc_optimal_shift(tms_series, wind_series,
                                                                                             max_shift)
 
@@ -179,9 +177,9 @@ class MeasurementVersion(BaseClass):
     @dec_runtime
     def sync_wind_tms_data(self, shift_sec: float = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Synchronizes wind and TMS data by applying an optimal time get_shifted_trunk_data to the wind data.
+        Synchronizes wind and TMS data by applying an optimal time shift to the wind data.
 
-        :return: A tuple of merged DataFrame without get_shifted_trunk_data (for reference) and the shifted DataFrame.
+        :return: A tuple of merged DataFrame without shift (for reference) and the shifted DataFrame.
         """
         logger.info("Starting synchronization of wind and TMS data.")
 
@@ -192,10 +190,10 @@ class MeasurementVersion(BaseClass):
         tms_df: pd.DataFrame = self.data_tms.data.copy()
         wind_df: pd.DataFrame = self.data_wind_station.data.copy()
 
-        # Merge without get_shifted_trunk_data for reference
+        # Merge without shift for reference
         merged_df: pd.DataFrame = merge_dfs_by_time(tms_df, wind_df)
 
-        # Calculate the get_shifted_trunk_data in index values for wind_df
+        # Calculate the shift in index values for wind_df
         freq = wind_df.index.inferred_freq
         if freq is not None and not any(char.isdigit() for char in freq):
             freq = '1' + freq  # Prepend '1' if freq is only a unit abbreviation (e.g., 'T' becomes '1T')
@@ -203,7 +201,7 @@ class MeasurementVersion(BaseClass):
             wind_sampling_interval = pd.to_timedelta(freq).total_seconds()
             index_shift = round(shift_sec / wind_sampling_interval)
             logger.info(
-                f"Calculated index get_shifted_trunk_data for wind_df: {index_shift} index-values based on optimal get_shifted_trunk_data of {shift_sec} seconds.")
+                f"Calculated index shift for wind_df: {index_shift} index-values based on optimal shift of {shift_sec} seconds.")
         except ValueError as e:
             logger.error(f"Error converting frequency to timedelta: {e}")
             raise
@@ -212,11 +210,11 @@ class MeasurementVersion(BaseClass):
         columns_to_shift = config.data_wind_columns
         for column in columns_to_shift:
             if column in wind_df.columns:
-                wind_df[column] = wind_df[column].get_shifted_trunk_data(index_shift)
+                wind_df[column] = wind_df[column].shift(index_shift)
             else:
-                logger.warning(f"Column '{column}' not found in wind_df. Skipping get_shifted_trunk_data for this column.")
+                logger.warning(f"Column '{column}' not found in wind_df. Skipping shift for this column.")
 
-        # Merge after applying get_shifted_trunk_data
+        # Merge after applying shift
         shifted_data: pd.DataFrame = merge_dfs_by_time(tms_df, wind_df)
 
         # Apply rolling max to both DataFrames

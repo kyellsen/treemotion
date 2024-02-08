@@ -3,7 +3,7 @@ import pandas as pd
 from typing import Type, Dict, Tuple, List, Optional, Union, Any, Callable
 
 from kj_core.df_utils.time_cut import validate_time_format, time_cut_by_datetime_index
-from kj_core.plotting.multiple_dfs import plot_multiple_dfs
+from kj_core.plotting.multiple_dfs import plot_multiple_lines, plot_multiple_scatter, plot_multiple_polar
 
 from ..common_imports.imports_classes import *
 from ..classes import BaseClass
@@ -13,7 +13,7 @@ from ..tms.find_peaks import find_max_peak, find_n_peaks
 from ..tms.tempdrift import temp_drift_comp_lin_reg, temp_drift_comp_lin_reg_2, temp_drift_comp_mov_avg, \
     temp_drift_comp_emd
 from ..tms.tempdrift import fft_freq_filter, butter_lowpass_filter
-from ..tms.rotate import rotate_pca, rotate_l_reg
+from ..tms.rotate import rotate_pca
 from ..tms.inclination import calc_abs_inclino, calc_inclination_direction
 
 logger = get_logger(__name__)
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 class BaseClassDataTMS(BaseClass):
     __abstract__ = True
 
-    tempdrift_methods = {
+    tempdrift_methods: Dict[str, Optional[Callable]] = {
         "original": None,
         "linear": temp_drift_comp_lin_reg,
         "linear_2": temp_drift_comp_lin_reg_2,
@@ -30,66 +30,63 @@ class BaseClassDataTMS(BaseClass):
         "emd": temp_drift_comp_emd,
     }
 
-    filter_methods = {
+    filter_methods: Dict[str, Optional[Callable]] = {
         "no_filter": None,
         "butter_lowpass": butter_lowpass_filter,
         "fft": fft_freq_filter,
     }
 
-    rotation_methods = {
+    rotation_methods: Dict[str, Optional[Callable]] = {
         "no_rotation": None,
-        "rotate_pca": rotate_pca,
-        "rotate_l_reg": rotate_l_reg,
+        "rotate_pca": rotate_pca
     }
 
     def __init__(self, data: pd.DataFrame = None, measurement_version_id: int = None, tempdrift_method: str = None,
-                 filter_method: str = None):
+                 filter_method: str = None, rotation_method: str = None):
         super().__init__()
         self.data = data
         self.measurement_version_id = measurement_version_id
         self.tempdrift_method = tempdrift_method
         self.filter_method = filter_method
+        self.rotation_method = rotation_method
 
     def correct_tms_data(self, method: str = "linear", freq_filter: str = "butter_lowpass",
                          rotation: str = "no_rotation", inplace: bool = False,
-                         auto_commit=False, **kwargs: Any) -> pd.DataFrame:
+                         auto_commit: bool = False, **kwargs: Any) -> pd.DataFrame:
         """
         Corrects temperature distortion of inclination data using a specified method and optionally updates
         the instance's data attribute in place.
 
         Parameters:
-        - method (str, optional): Method for temperature drift compensation. Defaults to "linear".
-        - freq_filter (str, optional):
-        - inplace (bool, optional): If True, updates the instance's data attribute. Defaults to True.
-        - **kwargs: Keyword arguments for the temperature drift compensation function.
-
-        - Allowed functions are:
-            - linear: temp_drift_comp_lin_reg(inclino, temperature: pd.Series) - default
-            - linear_2: temp_drift_comp_lin_reg_2(inclino, temperature: pd.Series)
-            - moving_average: temp_drift_comp_mov_avg(inclino, window_size=1000) = 6 minutes
-            - emd: temp_drift_comp_emd(inclino, sample_rate=20, freq_range=(0.05, 2, 128))
+            method (str): Method for temperature drift compensation. Defaults to "linear".
+            freq_filter (str): Filtering method. Defaults to "butter_lowpass".
+            rotation (str): Rotation method. Defaults to "no_rotation".
+            inplace (bool): If True, updates the instance's data attribute. Defaults to False.
+            auto_commit (bool): If True, auto-commits changes to the database. Defaults to False.
+            **kwargs: Additional keyword arguments for the temperature drift compensation function.
 
         Returns:
-        - pd.DataFrame: Corrected data.
+            pd.DataFrame: Corrected data.
 
         Raises:
-        - ValueError: If an unauthorized method is passed.
+            ValueError: If an unauthorized method is passed.
         """
-
         if method not in self.tempdrift_methods:
-            logger.error(f"Method {method} for temperature drift compensation is not allowed.")
-            raise ValueError(f"Unauthorized method {method} for temperature drift compensation.")
-
-        temp_drift_comp_func = self.tempdrift_methods[method]
+            error_msg = f"Unauthorized method {method} for temperature drift compensation."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if freq_filter not in self.filter_methods:
-            logger.error(f"Method {freq_filter} for filtering is not allowed.")
-            raise ValueError(f"Unauthorized method {freq_filter} for data filtering.")
+            error_msg = f"Unauthorized method {freq_filter} for filtering."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         if rotation not in self.rotation_methods:
-            logger.error(f"Method {rotation} for rotation is not allowed.")
-            raise ValueError(f"Unauthorized method {rotation} for data rotation.")
+            error_msg = f"Unauthorized method {rotation} for data rotation."
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
+        temp_drift_comp_func = self.tempdrift_methods[method]
         filter_func = self.filter_methods[freq_filter]
         rotation_func = self.rotation_methods[rotation]
 
@@ -105,8 +102,8 @@ class BaseClassDataTMS(BaseClass):
                     compensated = filter_func(inclino=compensated)
                 data_copy[f"{axis} - drift compensated"] = compensated
 
-            if rotation in ["rotate_pca", "rotate_l_reg"]:
-                data_copy: pd.DataFrame = self.rotate(data_copy, rotation_func)
+            if rotation_func:
+                data_copy = self.rotate(data_copy, rotation_func)
 
             data_copy = self.calc_inclino_abs_and_dir(data_copy)
 
@@ -119,7 +116,8 @@ class BaseClassDataTMS(BaseClass):
                 self.get_database_manager().commit()
 
             logger.info(
-                f"Temperature drift compensation successfully performed. Method: {method}, freq_filter: {freq_filter}, inplace: {inplace}")
+                f"Temperature drift compensation successfully performed. "
+                f"Method: {method}, freq_filter: {freq_filter}, rotation: {rotation}, inplace: {inplace}")
             return data_copy
         except Exception as e:
             logger.error(f"Error in performing temperature drift compensation: {e}")
@@ -129,10 +127,13 @@ class BaseClassDataTMS(BaseClass):
     def rotate(data: pd.DataFrame, rotation_func: Callable) -> pd.DataFrame:
         x_axs = 'East-West-Inclination - drift compensated'
         y_axs = 'North-South-Inclination - drift compensated'
+        try:
 
-        data[x_axs], data[x_axs] = rotation_func(data[x_axs], data[y_axs])
-
-        return data
+            data[x_axs], data[y_axs], angle_rad, angle_deg = rotation_func(data[x_axs], data[y_axs])
+            logger.info(f"Rotate - angle_rad: {angle_rad:.4f}, angle_deg {angle_deg:.4f}")
+            return data
+        except Exception as e:
+            logger.error(f"Rotation failed, e: {e}")
 
     @staticmethod
     def calc_inclino_abs_and_dir(data: pd.DataFrame) -> pd.DataFrame:
@@ -155,7 +156,7 @@ class BaseClassDataTMS(BaseClass):
             data['North-South-Inclination - drift compensated'])
         return data
 
-    def compare_tms_tempdrift_methods(self) -> Dict[str, pd.DataFrame]:
+    def compare_correct_tms_data_methods(self) -> Dict[str, pd.DataFrame]:
         """
         Compares different methods for correcting TMS data for temperature drift, filtering, and rotation.
 
@@ -165,8 +166,8 @@ class BaseClassDataTMS(BaseClass):
         results = {"original": self.data.copy()}
 
         tempdrift_methods = ["linear"]  # Placeholder for additional methods: "moving_average", "emd", "linear_2"
-        filter_methods = ["no_filter", "butter_lowpass"]  # Placeholder for additional methods: "fft"
-        rotation_methods = ["no_rotation", "rotate_pca"]  # Placeholder for additional method: "rotate_l_reg"
+        filter_methods = ["butter_lowpass"]  # Placeholder for additional methods: "no_filter", "fft"
+        rotation_methods = ["no_rotation", "rotate_pca"]  # Placeholder for additional method: "rotate_pca"
 
         # Generating combinations of methods, filters, and rotations
         combinations = [(method, filter_, rotation) for method in tempdrift_methods
@@ -177,18 +178,18 @@ class BaseClassDataTMS(BaseClass):
         for method, freq_filter, rotation in combinations:
             compensated_data = self.correct_tms_data(method=method, freq_filter=freq_filter, rotation=rotation,
                                                      inplace=False)
-            key = f"{method}_{freq_filter}" if method != "emd" else method  # Special handling for "emd" method
+            key = f"{method}_{freq_filter}_{rotation}" if method != "emd" else f"{method}_{rotation}"  # Special handling for "emd" method
             results[key] = compensated_data
 
         return results
 
-    def plot_compare_tms_tempdrift(self, start_time=None, end_time=None):
-        results = self.compare_tms_tempdrift_methods()
+    def plot_compare_correct_tms_data_methods(self, start_time=None, end_time=None):
+        results = self.compare_correct_tms_data_methods()
 
         original_columns = ['East-West-Inclination',
                             'North-South-Inclination',
                             'Absolute-Inclination',
-                            'Temperature',
+                            #'Temperature',
                             ]
 
         compensated_columns = ['East-West-Inclination - drift compensated',
@@ -206,15 +207,24 @@ class BaseClassDataTMS(BaseClass):
                     df = df.loc[start_time:end_time].copy()
                 dfs_and_columns.append((method, df, compensated_columns))
 
-        fig = plot_multiple_dfs(dfs_and_columns)
+        fig = plot_multiple_lines(dfs_and_columns)
+
         plot_manager = self.get_plot_manager()
         filename = f'mv_id_{self.measurement_version_id}'
-        subdir = f"tempdrift/compare_tms_tempdrift/{self.__class__.__name__}"
-
+        subdir = f"correct_tms/compare_methods_lines/{self.__class__.__name__}"
         plot_manager.save_plot(fig, filename, subdir)
 
-    def plot_tms_tempdrift(self):
-        pass
+        polar_cols = ['East-West-Inclination - drift compensated', 'North-South-Inclination - drift compensated']
+
+        fig_polar = plot_multiple_scatter(dfs_and_columns, polar_cols)
+        filename = f'mv_id_{self.measurement_version_id}'
+        subdir = f"correct_tms/compare_methods_cartesian/{self.__class__.__name__}"
+        plot_manager.save_plot(fig_polar, filename, subdir)
+
+        fig_polar = plot_multiple_polar(dfs_and_columns, polar_cols)
+        filename = f'mv_id_{self.measurement_version_id}'
+        subdir = f"correct_tms/compare_methods_polar/{self.__class__.__name__}"
+        plot_manager.save_plot(fig_polar, filename, subdir)
 
     def random_sample(self, n: int, inplace: bool = False, auto_commit: bool = False) -> pd.DataFrame:
         """

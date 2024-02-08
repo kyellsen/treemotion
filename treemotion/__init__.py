@@ -10,14 +10,14 @@ from .classes import DataWindStation, DataTMS, DataMerge, DataLS3
 from .classes import Project, Series, Measurement, MeasurementVersion, TreeTreatment, Tree
 from .tms.crown_motion_similarity.cms import CrownMotionSimilarity
 
-
 CONFIG = None
 DATA_MANAGER = None
 DATABASE_MANAGER = None
 PLOT_MANAGER = None
 
 
-def setup(working_directory: Optional[str] = None, log_level="info", safe_logs_to_file=True) -> tuple[Config, LogManager, DataManager, DatabaseManager, PlotManager]:
+def setup(working_directory: Optional[str] = None, log_level="info", safe_logs_to_file=True) -> tuple[
+    Config, LogManager, DataManager, DatabaseManager, PlotManager]:
     """
     Set up the treemotion package with specific configurations.
 

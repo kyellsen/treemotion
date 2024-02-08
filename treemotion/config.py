@@ -7,7 +7,6 @@ from kj_core.core_config import CoreConfig
 from kj_logger import get_logger
 
 logger = get_logger(__name__)
-logger.info(f"TEST001")
 
 
 class Config(CoreConfig):
@@ -20,7 +19,6 @@ class Config(CoreConfig):
     package_name_short = "tms"
     # Override default working directory specific
     default_working_directory = r"C:\kyellsen\006_Packages\treemotion\working_directory_tms"
-    logger.info(f"TEST002")
 
     def __init__(self, working_directory: Optional[str] = None):
         """
@@ -57,7 +55,7 @@ class Config(CoreConfig):
 
         data_wind_columns_int = []  # , 'station_id', 'quality_level_wind_avg', 'quality_level_wind_extremes']
 
-        wind_resample_freq = "60S"
+        wind_resample_freq = "60s"
 
         data_tms_columns = ['East-West-Inclination',
                             'North-South-Inclination',
@@ -93,8 +91,16 @@ class Config(CoreConfig):
         cut_time_by_peaks_duration = 15 * 60  # Seconds
 
     class CrownMotionSimilarity:
-        max_shift_sec: int = 5  # Seconds
-        use_for_mean_columns = ['Absolute-Inclination - drift compensated']
+        # shifting
+        max_shift_sec: int = 10  # Seconds
+        calc_shift_by_column = 'Absolute-Inclination - drift compensated'
+
+        # analysing
+        calc_similarity_by_col = 'Absolute-Inclination - drift compensated'
+        window_time_around_peak = "10s"  # Pandas TimeDelta-Format
+        quantil_included = 0.95
+
+        # plotting
         columns_to_plot = ['East-West-Inclination - drift compensated',
                            'North-South-Inclination - drift compensated',
                            'Absolute-Inclination - drift compensated']
