@@ -1,4 +1,4 @@
-#from kj_core.df_utils.sample_rate import calc_sample_rate
+# from kj_core.df_utils.sample_rate import calc_sample_rate
 
 from ..common_imports.imports_classes import *
 from treemotion.tms.df_merge_by_time import merge_dfs_by_time, calc_optimal_shift
@@ -53,38 +53,39 @@ class MeasurementVersion(BaseClass):
         return filename
 
     @classmethod
-    def load_tms_from_csv(cls, filepath_tms: str, measurement_id: int, measurement_version_id: int = None,
-                          measurement_version_name: str = None) -> Optional['MeasurementVersion']:
+    def create_from_csv(cls, csv_filepath: str, measurement_id: int, measurement_version_name: str = None) -> Optional['MeasurementVersion']:
         """
         Loads TMS Data from a CSV file.
 
-        :param filepath_tms: Path to the CSV file.
-        :param measurement_version_id: Unique ID of the version.
+        :param csv_filepath: Path to the CSV file.
         :param measurement_id: ID of the measurement to which the data belongs.
         :param measurement_version_name: Version Name of the data.
         :return: MeasurementVersion object.
         """
-
+        config = cls.get_config()
         obj = cls(measurement_id=measurement_id, measurement_version_name=measurement_version_name)
 
-        data_directory = cls.get_config().data_directory
-        folder = cls.get_config().Data.data_tms_directory
-        filename = (cls.
-                    get_data_manager().
-                    get_new_filename(measurement_id,
-                                     prefix=f"tms_{measurement_version_name}",
-                                     file_extension="feather"))
-        data_tms_filepath = data_directory / folder / filename
+        data_directory = config.data_directory
+        folder: str = config.Data.data_tms_directory
+        filename: str = cls.get_data_manager().get_new_filename(measurement_id,
+                                                                prefix=f"tms_{measurement_version_name}",
+                                                                file_extension="feather")
 
-        data_tms = DataTMS(data_id=None, data=DataTMS.read_csv_tms(filepath=filepath_tms),
-                           data_filepath=str(data_tms_filepath),
-                           measurement_version_id=measurement_version_id)
+        data_filepath = str(data_directory / folder / filename)
+
+        data_tms = DataTMS.create_from_csv(csv_filepath, data_filepath, obj.measurement_version_id)
 
         obj.data_tms = data_tms
 
-        session = obj.get_database_manager().session
+        session = cls.get_database_manager().session
         session.add(obj)
+        logger.info(f"Created new '{obj}'")
         return obj
+
+    def update_from_csv(self, csv_filepath: str) -> Optional['MeasurementVersion']:
+        self.data_tms = self.data_tms.update_from_csv(csv_filepath)
+        logger.info(f"Updated new '{self}'")
+        return self
 
     def validate_data_class_name(self, data_class_name: str):
         if data_class_name not in self.valid_data_attributes:

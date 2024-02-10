@@ -61,58 +61,68 @@ class Measurement(BaseClass):
 
     @dec_runtime
     def load_from_csv(self, measurement_version_name: str = None,
-                      update_existing: bool = False) -> Optional[MeasurementVersion]:
+                      update_existing: bool = True) -> Optional[MeasurementVersion]:
         """
-        Load data from a CSV file and update existing data if necessary.
+        Loads data from a CSV file into a MeasurementVersion instance.
 
-        :param measurement_version_name: MeasurementVersion of the data.
-        :param update_existing: Determines whether to overwrite existing data.
-        :return: The updated or newly created MeasurementVersion instance, or None if an error occurs.
+        Attempts to find an existing MeasurementVersion based on the provided name or a default.
+        If found and `update_existing` is False, returns the found instance without changes.
+        If not found, creates a new MeasurementVersion from the CSV.
+        If found and `update_existing` is True, updates the existing MeasurementVersion from the CSV.
+
+        Args:
+            measurement_version_name (str, optional): Name of the MeasurementVersion. Defaults to None, which uses the default name from config.
+            update_existing (bool): Whether to update an existing MeasurementVersion with the same name. Defaults to True.
+
+        Returns:
+            Optional[MeasurementVersion]: The updated, newly created, or found MeasurementVersion instance, or None if an error occurs.
         """
-
-        if self.filepath_tms is None or not Path(self.filepath_tms).is_file():
-            logger.warning(f"Process for '{self}' canceled, no filepath_tms: '{self.filepath_tms}'.")
-            return None
-
         logger.info(f"Start loading TMS data from CSV for '{self}'")
-
         try:
-            m_v_name = measurement_version_name or self.get_config().MeasurementVersion.measurement_version_name_default
+            mv_name = measurement_version_name or self.get_config().MeasurementVersion.measurement_version_name_default
 
-            present_m_v = (self.get_database_manager().session.query(MeasurementVersion)
-                           .filter(MeasurementVersion.measurement_id == self.measurement_id,
-                                   MeasurementVersion.measurement_version_name == m_v_name)
-                           .first())
+            m_v_present: MeasurementVersion = (self.get_database_manager().session.query(MeasurementVersion)
+                                               .filter(MeasurementVersion.measurement_id == self.measurement_id,
+                                                       MeasurementVersion.measurement_version_name == mv_name)
+                                               .first())
 
         except Exception as e:
             logger.error(
                 f"Failed to retrieve MeasurementVersion '{measurement_version_name}' for Measurement ID '{self.measurement_id}'. Error: {e}")
             return None
 
-        # Wenn present_m_v vorhanden und overwrite=False -> return present_m_v
-        if present_m_v and not update_existing:
-            logger.warning(f"Existing measurement_version '{m_v_name}' will not be overwritten: '{present_m_v}'")
-            return present_m_v
-        try:
-            DATABASE_MANAGER = self.get_database_manager()
-            session = DATABASE_MANAGER.session
-            if present_m_v and update_existing:
-                logger.warning(f"Existing measurement_version '{m_v_name}' will be overwritten: '{present_m_v}'")
-                session.delete(present_m_v)
-                session.flush()
+        if m_v_present and not update_existing:
+            # Fall 1: Ein vorhandenes Objekt existiert und soll nicht aktualisiert werden.
+            # Gib das vorhandene Objekt zurück.
+            logger.warning(f"Existing measurement_version '{mv_name}' not updated: '{m_v_present}'")
+            return m_v_present
 
-            m_v = MeasurementVersion.load_tms_from_csv(filepath_tms=self.filepath_tms,
-                                                       measurement_id=self.measurement_id,
-                                                       measurement_version_id=None, measurement_version_name=m_v_name)
-            self.measurement_version.append(m_v)
-            DATABASE_MANAGER.commit()
-            logger.info(f"{'Updated' if present_m_v else 'Created'} '{m_v}' from CSV, attached to '{self}'.")
-            return m_v
-        except Exception as e:
-            logger.error(
-                f"Failed to {'update' if present_m_v else 'create'} MeasurementVersion '{m_v_name}' for '{self}', error: {e}")
+        elif not m_v_present:
+            # Fall 2: Kein vorhandenes Objekt existiert.
+            # Erstelle ein neues Objekt und gib dieses zurück.
+            try:
+                mv_new = MeasurementVersion.create_from_csv(self.filepath_tms, self.measurement_id, mv_name)
+                DATABASE_MANAGER = self.get_database_manager()
+                self.measurement_version.append(mv_new)
+                DATABASE_MANAGER.commit()
+                logger.info(f"New measurement_version '{mv_name}' created: '{mv_new}'")
+                return mv_new
+            except Exception as e:
+                logger.error(f"Failed to create MeasurementVersion '{mv_name}' for '{self}', error: {e}")
 
-            return None
+        elif m_v_present and update_existing:
+            # Fall 3: Ein vorhandenes Objekt existiert und soll aktualisiert werden.
+            # Aktualisiere das vorhandene Objekt und gib es zurück.
+            try:
+                mv_updated = m_v_present.update_from_csv(self.filepath_tms)
+                DATABASE_MANAGER = self.get_database_manager()
+                self.measurement_version.append(mv_updated)
+                DATABASE_MANAGER.commit()
+                logger.info(f"Existing measurement_version '{mv_name}' updated: '{mv_updated}'")
+                return mv_updated
+            except Exception as e:
+                logger.error(f"Failed to update MeasurementVersion '{mv_name}' for '{self}', error: {e}")
+        return None
 
     def get_measurement_version_by_filter(self, filter_dict: Dict[str, Any], method: str = "list_filter") -> Optional[
         List[MeasurementVersion]]:

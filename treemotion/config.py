@@ -57,17 +57,23 @@ class Config(CoreConfig):
 
         wind_resample_freq = "60s"
 
-        data_tms_columns = ['East-West-Inclination',
-                            'North-South-Inclination',
-                            'Absolute-Inclination',
-                            'Inclination direction of the tree',
-                            'Temperature',
-                            'East-West-Inclination - drift compensated',
-                            'North-South-Inclination - drift compensated',
-                            'Absolute-Inclination - drift compensated',
-                            'Inclination direction of the tree - drift compensated']  # 'Time' is the index!
+        data_tms_default_dtype = 'float64'
+        data_tms_time_column = "Time"  # 'Time' is the index!
+        data_tms_columns_and_dtypes = {
+            'East-West-Inclination': data_tms_default_dtype,
+            'North-South-Inclination': data_tms_default_dtype,
+            'Absolute-Inclination': data_tms_default_dtype,
+            'Inclination direction of the tree': data_tms_default_dtype,
+            'Temperature': data_tms_default_dtype,
+            'East-West-Inclination - drift compensated': data_tms_default_dtype,
+            'North-South-Inclination - drift compensated': data_tms_default_dtype,
+            'Absolute-Inclination - drift compensated': data_tms_default_dtype,
+            'Inclination direction of the tree - drift compensated': data_tms_default_dtype
+        }
 
-        data_merge_columns = data_tms_columns + data_tms_columns
+        data_tms_columns = list(data_tms_columns_and_dtypes.keys())
+
+        data_merge_columns = data_wind_columns + data_tms_columns
 
         main_wind_value = 'wind_speed_max_10min_moving_avg'
         main_tms_value = 'Absolute-Inclination - drift compensated'

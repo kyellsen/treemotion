@@ -38,7 +38,7 @@ if __name__ == "__main__":
     # TESTING FOR ONE MEASUREMENT
     # if False:
     #     m_1: Measurement = series.measurement[5]
-    #     mv_1 = m_1.load_from_csv(measurement_version_name="rotate", update_existing=True)
+    #     mv_1 = m_1.create_from_csv(measurement_version_name="rotate", update_existing=True)
     #     mv_1.add_data_merge(update_existing=True)
     #     start_time = '2022-01-29T19:30:00'
     #     end_time = '2022-01-29T19:35:00'
@@ -58,9 +58,9 @@ if __name__ == "__main__":
     series.add_wind_station("06163", filename_wind=filename_wind, filename_wind_extreme=filename_wind_extreme,
                             update_existing=True)
 
-    # series.method_for_all_of_class("Measurement", "load_from_csv", measurement_version_name="raw",
+    # series.method_for_all_of_class("Measurement", "create_from_csv", measurement_version_name="raw",
     #                                update_existing=True)
-    series.method_for_all_of_class("Measurement", "load_from_csv", measurement_version_name="rotate",
+    series.method_for_all_of_class("Measurement", "create_from_csv", measurement_version_name="rotate",
                                    update_existing=True)
 
     series.calc_optimal_shift_median(measurement_version_name="rotate")
