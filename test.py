@@ -24,7 +24,7 @@ if __name__ == "__main__":
     CONFIG, LOG_MANAGER, DATA_MANAGER, DATABASE_MANAGER, PLOT_MANAGER = tms.setup(
         working_directory=str(working_directory), log_level="DEBUG")
 
-    #DATABASE_MANAGER.duplicate(database_path=str(source_db))
+    DATABASE_MANAGER.duplicate(database_path=str(source_db))
     DATABASE_MANAGER.connect(db_name=str(db_name))
 
     project = DATABASE_MANAGER.load(Project, 1)[0]
@@ -60,27 +60,28 @@ if __name__ == "__main__":
 
     # series.method_for_all_of_class("Measurement", "create_from_csv", measurement_version_name="raw",
     #                                update_existing=True)
-    series.method_for_all_of_class("Measurement", "create_from_csv", measurement_version_name="rotate",
+    series.method_for_all_of_class("Measurement", "load_from_csv", measurement_version_name="rotate",
                                    update_existing=True)
 
     series.calc_optimal_shift_median(measurement_version_name="rotate")
-    #series.method_for_all_of_class("MeasurementVersion", "add_data_merge", update_existing=True)
-    #series.method_for_all_of_class("MeasurementVersion", "plot_shift_sync_wind_tms", mode="median")
-
+    # series.method_for_all_of_class("MeasurementVersion", "add_data_merge", update_existing=True)
+    # series.method_for_all_of_class("MeasurementVersion", "plot_shift_sync_wind_tms", mode="median")
 
     mv_list: List[MeasurementVersion] = series.get_measurement_version_by_filter(
         filter_dict={'measurement_version_name': "rotate"})
     for mv in mv_list:
         mv.add_data_merge(update_existing=True)
-    result, peaks = series.cut_time_by_peaks(measurement_version_name="rotate", inplace=True, auto_commit=True)
+    result, peaks = series.cut_time_by_peaks(measurement_version_name="rotate", duration=60*60*60, inplace=True, auto_commit=True)
 
     for mv in mv_list:
         mv.data_merge.plot_compare_correct_tms_data_methods()
 
     for mv in mv_list:
-        mv.data_merge.correct_tms_data(method="linear", freq_filter="butter_lowpass", rotation="rotate_pca", inplace=True, auto_commit=True)
+        mv.data_merge.correct_tms_data(method="linear", freq_filter="butter_lowpass", rotation="rotate_pca",
+                                       inplace=True, auto_commit=True)
 
-    cms_list: List[CrownMotionSimilarity] = CrownMotionSimilarity.create_all_cms(series_id=1, measurement_version_name="rotate")
+    cms_list: List[CrownMotionSimilarity] = CrownMotionSimilarity.create_all_cms(series_id=1,
+                                                                                 measurement_version_name="rotate")
 
     cms_list = cms_list[0:8]
     for cms in cms_list:
@@ -99,7 +100,7 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error analyse_similarity for {cms}: {e}")
     df_all = pd.DataFrame(all_dicts).astype({'tree_cable_type': 'category'})
-    df_all.to_csv(working_directory/'export/cms.csv')
+    df_all.to_csv(working_directory / 'export/cms.csv')
 
 
     def analyze_groups(data: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Dict[str, float]]]:
@@ -159,4 +160,3 @@ if __name__ == "__main__":
     print(ttest_results)
 
     plot_cable_type(df_all)
-

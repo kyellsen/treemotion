@@ -334,23 +334,29 @@ class Series(BaseClass):
             return None
 
     @dec_runtime
-    def cut_time_by_peaks(self, measurement_version_name: Optional[str] = None,
-                          data_class_name: str = None, duration: float = None, inplace: bool = False,
+    def cut_time_by_peaks(self, measurement_version_name: Optional[str] = None, data_class_name: Optional[str] = None,
+                          duration: Optional[float] = None, inplace: bool = False,
                           auto_commit: bool = False) -> Optional[Tuple[List[pd.DataFrame], pd.Series]]:
         """
-        Begrenzt die Zeiten basierend auf Peaks in den gegebenen Daten.
+        Limits the data to a specified duration based on peak detection within the data.
+
+        This method identifies the optimal time frame that captures the maximum number of peaks
+        within the specified duration and then limits the data to this time frame.
 
         Args:
-            measurement_version_name (Optional[str]): Name of the measurement version.
-                Defaults to a system-defined default measurement version name.
-            data_class_name (str): Name of the subclass of BaseClassDataTMS related to measurement_version.
-                Options are 'data_tms' or 'data_merge' (default).
-            duration (float):
+            measurement_version_name (Optional[str]): The name of the measurement version to process.
+                If None, uses a default measurement version name from the configuration.
+            data_class_name (Optional[str]): The name of the data class associated with the measurement version.
+                This class should be a subclass of BaseClassDataTMS. If None, uses a default data class name.
+            duration (Optional[float]): The duration (in seconds) for which to limit the data around peak times.
+                If None, uses a default duration from the configuration.
             inplace (bool): If True, updates the instance's data in-place. Defaults to False.
             auto_commit (bool): If True, automatically commits changes to the database. Defaults to False.
 
         Returns:
-            Optional[Tuple[List[pd.DataFrame], pd.Series]]: Tuple containing a list of DataFrame objects limited by the time range, and the Series of all peaks used for the time limit, or None if an error occurs.
+            Optional[Tuple[List[pd.DataFrame], pd.Series]]: A tuple containing a list of DataFrame objects
+            limited by the optimal time frame, and a Series of all peaks used to determine this time frame,
+            or None if an error occurs.
         """
         # Default param-values as fallback
         config = self.get_config()
@@ -392,6 +398,19 @@ class Series(BaseClass):
 
     @staticmethod
     def _find_optimal_time_frame(duration: float, peak_times: pd.DatetimeIndex) -> Tuple[str, str]:
+        """
+        Finds the optimal start and end time to encompass the maximum number of peaks within the given duration.
+
+        Args:
+            duration (float): The duration (in seconds) to search for the optimal time frame.
+            peak_times (pd.DatetimeIndex): A DateTimeIndex of all peak times.
+
+        Returns:
+            Tuple[str, str]: A tuple containing the optimal start and end times as strings in the format 'YYYY-MM-DD HH:MM:SS.ssssss'.
+
+        Raises:
+            ValueError: If the peak_times series is empty.
+        """
         if peak_times.empty:
             raise ValueError("The peak_times Series is empty.")
 
