@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import emd as emd
+
 
 def plot_imfs(imfs, sample_rate):
+    import emd as emd
     """
     Plots the Intrinsic Mode Functions (IMFs) of a given dataset using the EMD package.
 

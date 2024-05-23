@@ -8,7 +8,7 @@ from sqlalchemy import and_
 
 import plotly.graph_objects as go
 
-from kj_core.classes.similarity_metrics import SimilarityMetrics, calculate_similarity_metrics
+from kj_core.classes.similarity_metrics import SimilarityMetrics
 from kj_core.plotting.multiple_dfs import plot_multiple_lines
 from kj_logger import get_logger
 
@@ -366,7 +366,7 @@ class CrownMotionSimilarity(BaseClass):
             data_a, data_b, combined_mask = self._get_data_for_analyse_similarity(calc_similarity_by_col,
                                                                                   window_time_around_peak,
                                                                                   quantile_included)
-            cms_metrics = calculate_similarity_metrics(data_a, data_b)
+            cms_metrics = SimilarityMetrics.calc(data_a, data_b)
             metrics_dict = {
                 "cms_id": self.cms_id,
                 "tree_cable_type": self.tree_cable_type,

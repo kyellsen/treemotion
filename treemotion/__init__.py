@@ -7,7 +7,7 @@ from kj_core import DatabaseManager
 from kj_core import PlotManager
 
 from .classes import DataWindStation, DataTMS, DataMerge, DataLS3
-from .classes import Project, Series, Measurement, MeasurementVersion, TreeTreatment, Tree
+from .classes import Project, Series, Measurement, MeasurementVersion, TreeTreatment, Tree, TreeCable
 from .tms.crown_motion_similarity.cms import CrownMotionSimilarity
 
 CONFIG = None
