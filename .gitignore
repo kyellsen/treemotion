@@ -1,2 +1,4 @@
 .idea/
 treemotion.egg-info/
+build/
+dist/
